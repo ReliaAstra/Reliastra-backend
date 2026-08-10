@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS monitor_secrets;
+DROP TABLE IF EXISTS monitors;
+DROP TABLE IF EXISTS regions;

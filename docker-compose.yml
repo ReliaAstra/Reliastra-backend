@@ -1,0 +1,117 @@
+# Reliastra development/production-oriented stack.
+#
+# Phase 1 runs N=1 of each process; every service is stateless and the
+# architecture permits increasing N (API/worker/scheduler/notifier) behind a
+# load balancer without code changes.
+#
+#   docker compose up -d
+#   docker compose exec api ./usr/local/bin/migrate up   (first boot)
+#
+# Configuration is via environment (see .env.example). Never commit secrets.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: reliastra
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reliastra-dev-password}
+      POSTGRES_DB: reliastra
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reliastra"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  migrate:
+    image: reliastra:dev
+    command: ["/usr/local/bin/migrate", "up"]
+    environment: &common-env
+      RELI_DATABASE_URL: postgres://reliastra:${POSTGRES_PASSWORD:-reliastra-dev-password}@postgres:5432/reliastra?sslmode=disable
+      RELI_ENV: ${RELI_ENV:-development}
+      RELI_ENCRYPTION_MASTER_KEY: ${RELI_ENCRYPTION_MASTER_KEY:?set RELI_ENCRYPTION_MASTER_KEY}
+      RELI_OBJECT_STORE_BACKEND: s3
+      RELI_OBJECT_STORE_ENDPOINT: minio:9000
+      RELI_OBJECT_STORE_BUCKET: reliastra-evidence
+      RELI_OBJECT_STORE_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      RELI_OBJECT_STORE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      RELI_OBJECT_STORE_USE_SSL: "false"
+      RELI_REDIS_ADDR: redis:6379
+      RELI_DATABASE_MAX_CONNS: "20"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: reliastra:dev
+    command: ["/usr/local/bin/api"]
+    environment: *common-env
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  scheduler:
+    image: reliastra:dev
+    command: ["/usr/local/bin/scheduler"]
+    environment: *common-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    image: reliastra:dev
+    command: ["/usr/local/bin/worker"]
+    environment: *common-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  notifier:
+    image: reliastra:dev
+    command: ["/usr/local/bin/notifier"]
+    environment: *common-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  miniodata:

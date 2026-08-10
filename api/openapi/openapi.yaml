@@ -1,0 +1,660 @@
+openapi: 3.0.3
+info:
+  title: Reliastra API
+  version: 1.0.0
+  description: |
+    External Dependency Intelligence and Incident Evidence.
+
+    All responses use a uniform envelope: `{"data": ..., "request_id": ...}`
+    on success, `{"error": {"code","message","request_id","details"}}` on
+    failure. Errors never contain stack traces or raw database errors.
+
+    Authenticated endpoints require `Authorization: Bearer <session token | api key>`.
+    Tenancy is selected with the `X-Reliasorg: <organization_id>` header for
+    user sessions; API keys are bound to exactly one organization.
+servers:
+  - url: /v1
+tags:
+  - name: auth
+  - name: organizations
+  - name: projects
+  - name: services
+  - name: dependencies
+  - name: monitors
+  - name: incidents
+  - name: evidence
+  - name: api-keys
+  - name: notification-channels
+  - name: audit
+  - name: public
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Register a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: {type: string, format: email}
+                password: {type: string, minLength: 10}
+                name: {type: string}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user: {$ref: '#/components/schemas/User'}
+        '400': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Log in and receive a bearer token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: {type: string, format: email}
+                password: {type: string}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      token: {type: string}
+                      token_type: {type: string, enum: [bearer]}
+                      user: {$ref: '#/components/schemas/User'}
+        '401': {$ref: '#/components/responses/Error'}
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Revoke the current session token
+      responses:
+        '200':
+          description: OK
+  /me:
+    get:
+      tags: [auth]
+      summary: Current user
+      security: [{Bearer: []}]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user: {$ref: '#/components/schemas/User'}
+  /organizations:
+    get:
+      tags: [organizations]
+      summary: List organizations the user belongs to
+      security: [{Bearer: []}]
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [organizations]
+      summary: Create an organization (creator becomes owner)
+      security: [{Bearer: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug]
+              properties:
+                name: {type: string, maxLength: 100}
+                slug: {type: string, pattern: '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$'}
+      responses:
+        '201':
+          description: Created
+        '409': {$ref: '#/components/responses/Error'}
+  /projects:
+    get:
+      tags: [projects]
+      summary: List projects in the current organization
+      security: [{Bearer: []}]
+      parameters:
+        - $ref: '#/components/parameters/Reliasorg'
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [projects]
+      summary: Create a project
+      security: [{Bearer: []}]
+      parameters:
+        - $ref: '#/components/parameters/Reliasorg'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string}
+                slug: {type: string}
+                description: {type: string}
+      responses:
+        '201':
+          description: Created
+  /projects/{id}:
+    get:
+      tags: [projects]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+    patch:
+      tags: [projects]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [projects]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+  /services:
+    get:
+      tags: [services]
+      summary: List services (filter by project_id)
+      security: [{Bearer: []}]
+      parameters:
+        - $ref: '#/components/parameters/Reliasorg'
+        - {name: project_id, in: query, schema: {type: string}}
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [services]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id, name]
+              properties:
+                project_id: {type: string}
+                name: {type: string}
+                identifier: {type: string}
+                base_url: {type: string}
+      responses:
+        '201':
+          description: Created
+  /services/{id}:
+    get:
+      tags: [services]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+    patch:
+      tags: [services]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [services]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+  /dependencies:
+    get:
+      tags: [dependencies]
+      summary: List dependencies (filter by project_id)
+      security: [{Bearer: []}]
+      parameters:
+        - $ref: '#/components/parameters/Reliasorg'
+        - {name: project_id, in: query, schema: {type: string}}
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [dependencies]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id, name]
+              properties:
+                project_id: {type: string}
+                name: {type: string}
+                provider: {type: string}
+                type:
+                  type: string
+                  enum: [api, cloud, cdn, auth, payment, email, ai, database, dns, other]
+                identifier: {type: string}
+                metadata: {type: object}
+      responses:
+        '201':
+          description: Created
+  /dependencies/{id}:
+    get:
+      tags: [dependencies]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [dependencies]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+  /services/{id}/dependencies:
+    post:
+      tags: [dependencies]
+      summary: Link a dependency to a service
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [dependency_id]
+              properties:
+                dependency_id: {type: string}
+                criticality: {type: string, enum: [low, medium, high, critical]}
+                description: {type: string}
+      responses:
+        '201':
+          description: Created
+  /services/{id}/dependencies/{dependencyID}:
+    delete:
+      tags: [dependencies]
+      security: [{Bearer: []}]
+      parameters:
+        - $ref: '#/components/parameters/Reliasorg'
+      responses:
+        '200':
+          description: OK
+  /monitors:
+    get:
+      tags: [monitors]
+      security: [{Bearer: []}]
+      parameters:
+        - $ref: '#/components/parameters/Reliasorg'
+        - {name: project_id, in: query, schema: {type: string}}
+        - {name: enabled, in: query, schema: {type: boolean}}
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [monitors]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, configuration, region_ids]
+              properties:
+                project_id: {type: string}
+                service_id: {type: string}
+                dependency_id: {type: string}
+                name: {type: string, maxLength: 120}
+                type: {type: string, enum: [http, dns, tcp, browser, webhook, semantic]}
+                target: {type: string}
+                interval_seconds: {type: integer, minimum: 10}
+                timeout_seconds: {type: integer, minimum: 1, maximum: 120}
+                max_attempts: {type: integer, minimum: 1, maximum: 10}
+                region_ids: {type: array, items: {type: string}}
+                enabled: {type: boolean}
+                configuration:
+                  type: object
+                  description: |
+                    HTTP monitor configuration. Sensitive headers
+                    (Authorization, Cookie, ...) and body_sensitive bodies are
+                    extracted, encrypted at rest and redacted in all API
+                    responses.
+                  properties:
+                    url: {type: string, format: uri}
+                    method: {type: string, enum: [GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS]}
+                    headers: {type: object, additionalProperties: {type: string}}
+                    body: {type: string}
+                    expected_status_codes: {type: array, items: {type: integer}}
+                    tls_skip_verify: {type: boolean, default: false}
+                    response_body_assertions: {type: array, items: {type: string}}
+                    response_header_assertions: {type: object, additionalProperties: {type: string}}
+                    latency_threshold_ms: {type: integer}
+                    redirect_policy: {type: string, enum: [follow, none]}
+                    body_sensitive: {type: boolean}
+                    sensitive_headers: {type: array, items: {type: string}}
+      responses:
+        '201':
+          description: Created
+        '409': {$ref: '#/components/responses/Error'}
+  /monitors/{id}:
+    get:
+      tags: [monitors]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+    patch:
+      tags: [monitors]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [monitors]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+  /monitors/{id}/results:
+    get:
+      tags: [monitors]
+      summary: Recent check results for a monitor
+      security: [{Bearer: []}]
+      parameters:
+        - $ref: '#/components/parameters/Reliasorg'
+        - {name: limit, in: query, schema: {type: integer, maximum: 200}}
+        - {name: since, in: query, schema: {type: string, format: date-time}}
+      responses:
+        '200':
+          description: OK
+  /regions:
+    get:
+      tags: [monitors]
+      summary: List active observation regions
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+  /incidents:
+    get:
+      tags: [incidents]
+      security: [{Bearer: []}]
+      parameters:
+        - $ref: '#/components/parameters/Reliasorg'
+        - {name: project_id, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {type: string, enum: [candidate, investigating, confirmed, resolved, false_positive]}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 200}}
+        - {name: offset, in: query, schema: {type: integer}}
+      responses:
+        '200':
+          description: OK
+  /incidents/{id}:
+    get:
+      tags: [incidents]
+      summary: Incident detail (uuid or INC-YYYY-NNNNNN), with transition history
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+  /incidents/{id}/evidence:
+    post:
+      tags: [evidence]
+      summary: Queue evidence generation (async). Idempotency-Key supported.
+      security: [{Bearer: []}]
+      parameters:
+        - $ref: '#/components/parameters/Reliasorg'
+        - {name: Idempotency-Key, in: header, schema: {type: string}}
+      responses:
+        '202':
+          description: Accepted
+    get:
+      tags: [evidence]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+  /evidence/{id}:
+    get:
+      tags: [evidence]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+  /evidence/{id}/verify:
+    get:
+      tags: [evidence]
+      summary: Verify artifact integrity (exists + SHA-256 matches + version)
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK - verification passed
+        '422':
+          description: Verification failed
+  /evidence/{id}/download:
+    get:
+      tags: [evidence]
+      summary: Download the JSON or PDF artifact
+      security: [{Bearer: []}]
+      parameters:
+        - $ref: '#/components/parameters/Reliasorg'
+        - {name: format, in: query, schema: {type: string, enum: [json, pdf]}}
+      responses:
+        '200':
+          description: OK
+  /api-keys:
+    get:
+      tags: [api-keys]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [api-keys]
+      summary: Create an API key. The secret is returned exactly once.
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string}
+                scopes:
+                  type: array
+                  items:
+                    type: string
+                    enum: [monitor:read, monitor:write, incident:read, evidence:read, evidence:write, project:admin, check_result:read]
+      responses:
+        '201':
+          description: Created
+  /api-keys/{id}:
+    delete:
+      tags: [api-keys]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: Revoked
+  /notification-channels:
+    get:
+      tags: [notification-channels]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [notification-channels]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, name]
+              properties:
+                type: {type: string, enum: [email, slack]}
+                name: {type: string}
+                enabled: {type: boolean}
+                config:
+                  type: object
+                  description: email -> {"to": "..."}; slack -> {"webhook_url": "..."} (encrypted at rest)
+      responses:
+        '200':
+          description: OK
+  /notification-channels/{id}:
+    delete:
+      tags: [notification-channels]
+      security: [{Bearer: []}]
+      parameters: [{$ref: '#/components/parameters/Reliasorg'}]
+      responses:
+        '200':
+          description: OK
+  /audit-logs:
+    get:
+      tags: [audit]
+      security: [{Bearer: []}]
+      parameters:
+        - $ref: '#/components/parameters/Reliasorg'
+        - {name: limit, in: query, schema: {type: integer, maximum: 200}}
+        - {name: offset, in: query, schema: {type: integer}}
+      responses:
+        '200':
+          description: OK
+  /vendors:
+    get:
+      tags: [public]
+      summary: Public vendor catalog (no authentication)
+      responses:
+        '200':
+          description: OK
+  /vendors/{slug}:
+    get:
+      tags: [public]
+      responses:
+        '200':
+          description: OK
+  /vendors/{slug}/status:
+    get:
+      tags: [public]
+      parameters:
+        - {name: window, in: query, schema: {type: string, example: 24h}}
+      responses:
+        '200':
+          description: OK
+  /vendors/{slug}/observations:
+    get:
+      tags: [public]
+      parameters:
+        - {name: from, in: query, schema: {type: string, format: date-time}}
+        - {name: to, in: query, schema: {type: string, format: date-time}}
+      responses:
+        '200':
+          description: OK
+  /health/live:
+    get:
+      tags: [public]
+      summary: Liveness (never depends on PostgreSQL)
+      responses:
+        '200':
+          description: OK
+  /health/ready:
+    get:
+      tags: [public]
+      summary: Readiness (checks required dependencies)
+      responses:
+        '200':
+          description: OK
+        '503':
+          description: Not ready
+components:
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+  parameters:
+    Reliasorg:
+      name: X-Reliasorg
+      in: header
+      description: Current organization id for user sessions
+      schema: {type: string}
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code: {type: string}
+                  message: {type: string}
+                  request_id: {type: string}
+                  details: {type: object, nullable: true}
+              request_id: {type: string}
+  schemas:
+    User:
+      type: object
+      properties:
+        id: {type: string}
+        email: {type: string}
+        name: {type: string}
+        status: {type: string}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
