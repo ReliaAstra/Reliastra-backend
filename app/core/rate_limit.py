@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import time
 import logging
-from typing import Optional
 from fastapi import Request
 from app.core.exceptions import RateLimitExceededException
 
@@ -57,7 +58,7 @@ ip_limiter = SlidingWindowRateLimiter(limit=100, window_seconds=60, key_prefix="
 public_vendor_limiter = SlidingWindowRateLimiter(limit=60, window_seconds=60, key_prefix="rl_vendor")
 
 
-async def enforce_rate_limit(request: Request, limiter: SlidingWindowRateLimiter, identifier: Optional[str] = None) -> None:
+async def enforce_rate_limit(request: Request, limiter: SlidingWindowRateLimiter, identifier: str | None = None) -> None:
     if identifier is None:
         client = request.client
         identifier = client.host if client else "unknown_ip"

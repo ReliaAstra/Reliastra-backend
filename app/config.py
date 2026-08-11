@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import base64
 import hashlib
+from typing import Any
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -67,7 +71,11 @@ class Settings(BaseSettings):
     )
     CORS_ORIGINS: list[str] = Field(
         default=["http://localhost:3000", "http://localhost:8000"],
-        description="Allowed CORS origins",
+        description="Allowed CORS origins (must be explicit when credentials=True)",
+    )
+    CORS_ALLOW_CREDENTIALS: bool = Field(
+        default=True,
+        description="Whether to allow cookies/credentials in CORS requests",
     )
 
     @property
