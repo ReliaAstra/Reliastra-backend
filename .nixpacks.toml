@@ -7,25 +7,19 @@ nixLibs = ["zlib", "stdenv.cc.cc.lib"]
 
 [phases.install]
 dependsOn = ["setup"]
-# Empty onlyIncludeFiles so the full project context is available during install
 onlyIncludeFiles = []
 cmds = [
-    "python -m venv --copies /opt/venv",
-    ". /opt/venv/bin/activate",
-    "pip install --upgrade pip setuptools build",
-    "pip install poetry",
-    "poetry config virtualenvs.create false",
-    "poetry install --no-interaction --no-ansi --only main"
+    "pip install --no-cache-dir -r requirements.txt",
+    "pip install --no-cache-dir playwright",
+    "playwright install --with-deps chromium || true"
 ]
 
 [phases.build]
 dependsOn = ["install"]
-cmds = [
-    "playwright install --with-deps chromium || true"
-]
+cmds = []
 
 [start]
-cmd = ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+cmd = "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
 
 [variables]
 NIXPACKS_PATH = "/opt/venv/bin:$PATH"
