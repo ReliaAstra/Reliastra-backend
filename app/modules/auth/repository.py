@@ -11,15 +11,14 @@ class AuthRepository:
     def _hash_token(token: str) -> str:
         return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
-    @classmethod
+    @staticmethod
     async def create_refresh_token(
-        cls,
         session: AsyncSession,
         user_id: uuid.UUID,
         token_str: str,
         expires_at: datetime,
     ) -> RefreshToken:
-        token_hash = cls._hash_token(token_str)
+        token_hash = AuthRepository._hash_token(token_str)
         rt = RefreshToken(
             user_id=user_id,
             token_hash=token_hash,
@@ -30,20 +29,20 @@ class AuthRepository:
         await session.flush()
         return rt
 
-    @classmethod
+    @staticmethod
     async def get_refresh_token(
-        cls, session: AsyncSession, token_str: str
+        session: AsyncSession, token_str: str
     ) -> RefreshToken | None:
-        token_hash = cls._hash_token(token_str)
+        token_hash = AuthRepository._hash_token(token_str)
         query = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
         result = await session.execute(query)
         return result.scalar_one_or_none()
 
-    @classmethod
+    @staticmethod
     async def revoke_refresh_token(
-        cls, session: AsyncSession, token_str: str
+        session: AsyncSession, token_str: str
     ) -> bool:
-        rt = await cls.get_refresh_token(session, token_str)
+        rt = await AuthRepository.get_refresh_token(session, token_str)
         if rt:
             rt.is_revoked = True
             session.add(rt)

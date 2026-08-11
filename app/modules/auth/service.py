@@ -60,6 +60,13 @@ class AuthService:
 
         org_name = request.org_name or f"{request.full_name}'s Organization"
         slug = f"org-{user.id.hex[:8]}"
+        # Ensure slug uniqueness (append suffix if collision)
+        existing_slug = await self.org_repository.get_by_slug(session, slug)
+        suffix = 2
+        while existing_slug:
+            slug = f"org-{user.id.hex[:8]}-{suffix}"
+            existing_slug = await self.org_repository.get_by_slug(session, slug)
+            suffix += 1
         org = await self.org_repository.create(
             session=session,
             name=org_name,

@@ -60,6 +60,12 @@ def upgrade() -> None:
     )
     op.create_index(op.f("ix_organization_members_org_id"), "organization_members", ["org_id"])
     op.create_index(op.f("ix_organization_members_user_id"), "organization_members", ["user_id"])
+    op.create_index(
+        "uq_organization_members_org_id_user_id",
+        "organization_members",
+        ["org_id", "user_id"],
+        unique=True,
+    )
 
     # 4. dependencies
     op.create_table(
@@ -330,6 +336,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_index("uq_organization_members_org_id_user_id", table_name="organization_members")
     op.drop_table("audit_logs")
     op.drop_table("refresh_tokens")
     op.drop_table("api_keys")

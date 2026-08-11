@@ -43,16 +43,14 @@ class CheckRepository:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
     ) -> list[CheckResult]:
-        query = (
-            select(CheckResult)
-            .where(CheckResult.dependency_id == dependency_id)
-            .order_by(CheckResult.executed_at.desc())
-            .limit(limit)
+        query = select(CheckResult).where(
+            CheckResult.dependency_id == dependency_id
         )
         if start_time:
             query = query.where(CheckResult.executed_at >= start_time)
         if end_time:
             query = query.where(CheckResult.executed_at <= end_time)
+        query = query.order_by(CheckResult.executed_at.desc()).limit(limit)
         result = await session.execute(query)
         return list(result.scalars().all())
 
