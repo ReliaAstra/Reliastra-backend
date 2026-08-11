@@ -9,11 +9,24 @@ logger = logging.getLogger(__name__)
 
 
 def run_async(coro: Any) -> Any:
-    loop = asyncio.new_event_loop()
+    """Run an async coroutine in a sync context, using modern asyncio patterns.
+
+    Avoids the deprecated ``asyncio.get_event_loop()`` which raises DeprecationWarning
+    (and RuntimeError) in Python 3.10+ when no running loop exists.
+    """
     try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        # If called inside an already-running loop (e.g. a test), create a new thread
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(asyncio.run, coro)
+            return future.result()
+    else:
+        return asyncio.run(coro)
 
 
 @celery_app.task(name="app.modules.checks.tasks.schedule_checks")

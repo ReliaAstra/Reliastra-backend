@@ -109,8 +109,10 @@ def decrypt_jsonb(encrypted_str: str | None) -> dict[str, Any] | None:
         decrypted_bytes = fernet.decrypt(encrypted_str.encode("utf-8"))
         return json.loads(decrypted_bytes.decode("utf-8"))
     except Exception as exc:
+        # Log the decryption failure so it isn't silently swallowed;
+        # returning empty dict as a safe default for callers.
         import logging
         logging.getLogger(__name__).warning(
             "Failed to decrypt JSONB data — possibly rotated SECRET_KEY: %s", exc
         )
-        return None
+        return {}

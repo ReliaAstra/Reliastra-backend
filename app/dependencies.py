@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging
 import uuid
 from typing import Any, TYPE_CHECKING
@@ -17,7 +18,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 security_bearer = HTTPBearer(auto_error=False)
-security_api_key = APIKeyHeader(name="Authorization", auto_error=False)
+# Use a custom header name to avoid conflict with HTTPBearer which also
+# reads the "Authorization" header. Using "X-API-Key" allows both auth
+# mechanisms to coexist without ambiguity.
+security_api_key = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 async def get_current_user(
@@ -31,9 +35,11 @@ async def get_current_user(
     from app.modules.users.models import User
 
     auth_header = request.headers.get("authorization", "").strip()
+    api_key_header = request.headers.get("x-api-key", "").strip()
 
-    if auth_header.lower().startswith("apikey ") or auth_header.lower().startswith("rel_"):
-        raw_key = auth_header[7:].strip() if auth_header.lower().startswith("apikey ") else auth_header
+    # API key authentication via X-API-Key header or "rel_" prefixed Bearer token
+    if api_key_header or auth_header.lower().startswith("rel_"):
+        raw_key = api_key_header or auth_header
         api_key = await api_key_service.authenticate_key(db, raw_key)
         request.state.auth_method = "apikey"
         request.state.api_key_org_id = api_key.org_id
@@ -71,7 +77,7 @@ async def get_current_user(
         request.state.auth_method = "jwt"
         return user
 
-    raise UnauthorizedException("Authentication required (Bearer token or ApiKey header)")
+    raise UnauthorizedException("Authentication required (Bearer token or X-API-Key header)")
 
 
 async def get_current_org(

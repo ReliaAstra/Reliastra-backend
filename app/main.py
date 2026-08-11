@@ -112,10 +112,12 @@ def create_app() -> FastAPI:
 
     setup_exception_handlers(app)
 
+    # NOTE: Per the CORS spec, browsers reject allow_credentials=True when
+    # allow_origins is "*". Use a specific origin list or set credentials=False.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
-        allow_credentials=True,
+        allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
         allow_methods=["*"],
         allow_headers=["*"],
     )
