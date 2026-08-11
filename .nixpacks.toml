@@ -1,5 +1,5 @@
 # .nixpacks.toml
-# Custom Nixpacks configuration for Reliastra-backend
+# Nixpacks configuration for Reliastra-backend (Python FastAPI)
 
 [phases.setup]
 nixPkgs = ["python312", "gcc"]
@@ -7,25 +7,28 @@ nixLibs = ["zlib", "stdenv.cc.cc.lib"]
 
 [phases.install]
 dependsOn = ["setup"]
-# Copy the entire project directory first
+# Empty onlyIncludeFiles so the full project context is available during install
 onlyIncludeFiles = []
-# Set up the virtual environment and install dependencies
 cmds = [
-    "cp -r /build/. /app",
     "python -m venv --copies /opt/venv",
     ". /opt/venv/bin/activate",
-    "pip install --upgrade build setuptools",
-    "pip install ."
+    "pip install --upgrade pip setuptools build",
+    "pip install poetry",
+    "poetry config virtualenvs.create false",
+    "poetry install --no-interaction --no-ansi --only main"
 ]
 
 [phases.build]
 dependsOn = ["install"]
-cmds = ["docker-compose up -d --build"]
+cmds = [
+    "playwright install --with-deps chromium || true"
+]
 
-# Define NIXPACKS_PATH explicitly to avoid the warning
+[start]
+cmd = ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
 [variables]
 NIXPACKS_PATH = "/opt/venv/bin:$PATH"
 
-# Set the Python version
 [build]
 pythonVersion = "3.12"
