@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+@page { size: A4; margin: 0; }
+body { font-family: Inter, Arial, sans-serif; color: #172033; font-size: 12px; }
+header { border-bottom: 3px solid #5b5ce2; padding-bottom: 14px; margin-bottom: 24px; }
+h1 { font-size: 25px; margin: 0 0 5px; } h2 { color: #393aa5; margin-top: 24px; }
+.badge { display:inline-block; border-radius:14px; padding:4px 10px; background:#ececff; text-transform:uppercase; }
+.grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.card { background:#f5f7fb; padding:14px; border-radius:8px; }
+.value { font-size:20px; font-weight:700; margin-top:5px; }
+table { width:100%; border-collapse:collapse; } th,td { border-bottom:1px solid #dce1eb; padding:7px; text-align:left; }
+footer { margin-top:30px; word-break:break-all; font-family:monospace; font-size:9px; color:#566077; }
+</style>
+</head>
+<body>
+<header><h1>Reliastra SLA Evidence Report</h1><div>Independently observed service-degradation record</div></header>
+<div class="grid">
+  <div class="card">Incident<div class="value">{{ incident.id }}</div></div>
+  <div class="card">Severity<div class="value">{{ incident.severity }}</div></div>
+  <div class="card">Measured uptime<div class="value">{{ "%.3f"|format(measured_uptime * 100) }}%</div></div>
+</div>
+<h2>Incident timeline</h2>
+<p><span class="badge">{{ incident.status }}</span></p>
+<table><tr><th>Started</th><td>{{ incident.started_at }}</td></tr><tr><th>Resolved</th><td>{{ incident.resolved_at or "Open" }}</td></tr><tr><th>Root cause</th><td>{{ incident.root_cause }}</td></tr><tr><th>Description</th><td>{{ incident.description or "No operator description" }}</td></tr></table>
+<h2>Correlated dependencies</h2>
+<table><thead><tr><th>Dependency</th><th>Method</th><th>Confidence</th><th>Window</th></tr></thead><tbody>{% for item in incident.correlations %}<tr><td>{{ item.correlated_dependency_id }}</td><td>{{ item.correlation_method }}</td><td>{{ "%.0f"|format(item.correlation_confidence * 100) }}%</td><td>{{ item.time_window_seconds }} seconds</td></tr>{% else %}<tr><td colspan="4">No correlations</td></tr>{% endfor %}</tbody></table>
+<h2>Independent region observations (last 24 hours)</h2>
+<table><thead><tr><th>Timestamp</th><th>Region</th><th>Status</th><th>Latency</th></tr></thead><tbody>{% for check in checks %}<tr><td>{{ check.executed_at }}</td><td>{{ check.region }}</td><td>{{ "UP" if check.is_up else "DOWN" }}</td><td>{{ "%.1f"|format(check.latency_ms) }} ms</td></tr>{% endfor %}</tbody></table>
+<h2>SLA impact</h2><p>Impact ratio against planned 100% availability: <strong>{{ "%.5f"|format(sla_impact) }}</strong>.</p>
+<footer>Generated UTC: {{ generated_at }}<br>Canonical evidence-payload SHA-256: {{ payload_checksum }}<br>The PDF object SHA-256 is stored in Reliastra's immutable report metadata.</footer>
+</body>
+</html>

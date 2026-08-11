@@ -1,0 +1,63 @@
+[tool.poetry]
+name = "reliastra"
+version = "0.1.0"
+description = "External dependency intelligence and SLA evidence API"
+authors = ["Reliastra Engineering <engineering@reliastra.com>"]
+readme = "README.md"
+packages = [{ include = "app" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.116.0"
+uvicorn = {version = "^0.35.0", extras = ["standard"]}
+sqlalchemy = {version = "^2.0.41", extras = ["asyncio"]}
+asyncpg = "^0.30.0"
+psycopg = {version = "^3.2.0", extras = ["binary"]}
+alembic = "^1.16.0"
+pydantic = {version = "^2.11.0", extras = ["email"]}
+pydantic-settings = "^2.9.0"
+pyjwt = "^2.10.0"
+bcrypt = "^4.3.0"
+cryptography = "^45.0.0"
+redis = "^6.2.0"
+celery = {version = "^5.5.0", extras = ["redis"]}
+httpx = "^0.28.0"
+minio = "^7.2.0"
+playwright = "^1.52.0"
+jinja2 = "^3.1.0"
+aiosmtplib = "^4.0.0"
+python-multipart = "^0.0.20"
+prometheus-fastapi-instrumentator = "^7.1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.0"
+pytest-asyncio = "^1.0.0"
+pytest-cov = "^6.1.0"
+ruff = "^0.12.0"
+mypy = "^1.16.0"
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+  "integration: requires PostgreSQL and Redis",
+  "e2e: requires the complete Docker Compose stack",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
