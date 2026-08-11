@@ -1,0 +1,151 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: reliastra-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: reliastra
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d reliastra"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: reliastra-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: reliastra-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_DEFAULT_BUCKETS: reliastra-evidence
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: reliastra-mailhog
+    restart: always
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reliastra-api
+    restart: always
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/reliastra
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: reliastra-super-secret-key-that-is-at-least-32-characters-long-for-security
+      ACCESS_TOKEN_EXPIRE_MINUTES: 15
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: reliastra-evidence
+      MINIO_USE_SSL: "false"
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_FROM: noreply@reliastra.com
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      mailhog:
+        condition: service_started
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: celery_worker.dockerfile
+    container_name: reliastra-celery-worker
+    restart: always
+    command: celery -A app.infrastructure.celery_app.celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/reliastra
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: reliastra-super-secret-key-that-is-at-least-32-characters-long-for-security
+      ACCESS_TOKEN_EXPIRE_MINUTES: 15
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: reliastra-evidence
+      MINIO_USE_SSL: "false"
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_FROM: noreply@reliastra.com
+    depends_on:
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reliastra-celery-beat
+    restart: always
+    command: celery -A app.infrastructure.celery_app.celery_app beat --loglevel=info
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/reliastra
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: reliastra-super-secret-key-that-is-at-least-32-characters-long-for-security
+      ACCESS_TOKEN_EXPIRE_MINUTES: 15
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: reliastra-evidence
+      MINIO_USE_SSL: "false"
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_FROM: noreply@reliastra.com
+    depends_on:
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  minio_data:
