@@ -3,7 +3,6 @@ name = "reliastra-backend"
 version = "0.1.0"
 description = "Reliastra MVP - External dependency intelligence platform backend"
 authors = ["Reliastra Lead Engineer <engineering@reliastra.com>"]
-readme = "README.md"
 packages = [{include = "app"}]
 
 [tool.poetry.dependencies]
