@@ -1,0 +1,30 @@
+# .nixpacks.toml
+# Custom Nixpacks configuration for Reliastra-backend
+
+[phases.setup]
+nixPkgs = ["python312", "gcc"]
+nixLibs = ["zlib", "stdenv.cc.cc.lib"]
+
+[phases.install]
+dependsOn = ["setup"]
+cmds = [
+    # Copy the entire project directory first
+    "cp -r /build/. /app",
+    # Set up the virtual environment and install dependencies
+    "python -m venv --copies /opt/venv",
+    ". /opt/venv/bin/activate",
+    "pip install --upgrade build setuptools",
+    "pip install ."
+]
+
+[phases.build]
+dependsOn = ["install"]
+cmds = ["docker-compose up -d --build"]
+
+# Define NIXPACKS_PATH explicitly to avoid the warning
+[variables]
+NIXPACKS_PATH = "/opt/venv/bin:$PATH"
+
+# Set the Python version
+[build]
+pythonVersion = "3.12"
