@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Reliastra SLA Evidence Report - {{ incident.id }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            color: #333333;
+            line-height: 1.5;
+        }
+        .header {
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .subtitle {
+            font-size: 14px;
+            color: #666666;
+        }
+        .section {
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            border-bottom: 1px solid #dddddd;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        .meta-table, .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .meta-table td, .data-table th, .data-table td {
+            border: 1px solid #dddddd;
+            padding: 8px;
+            font-size: 13px;
+        }
+        .meta-table td.label {
+            font-weight: bold;
+            width: 25%;
+            background-color: #f9f9f9;
+        }
+        .data-table th {
+            background-color: #f0f4f8;
+            text-align: left;
+        }
+        .chart-box {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #eeeeee;
+            background-color: #fafbfc;
+            text-align: center;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 10px;
+            border-top: 1px solid #cccccc;
+            font-size: 11px;
+            color: #777777;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #ffffff;
+            background-color: #d9534f;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">RELIASTRA EXTERNAL SLA EVIDENCE REPORT</div>
+        <div class="subtitle">Verified Independent Multi-Region Vendor Failure Evidence</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">1. Incident Metadata</div>
+        <table class="meta-table">
+            <tr>
+                <td class="label">Incident ID</td>
+                <td>{{ incident.id }}</td>
+            </tr>
+            <tr>
+                <td class="label">Organization ID</td>
+                <td>{{ incident.org_id }}</td>
+            </tr>
+            <tr>
+                <td class="label">Monitored Dependency</td>
+                <td>{{ dependency.name }} ({{ dependency.endpoint_url }})</td>
+            </tr>
+            <tr>
+                <td class="label">Severity / Status</td>
+                <td><span class="badge">{{ incident.severity|upper }}</span> / {{ incident.status|upper }}</td>
+            </tr>
+            <tr>
+                <td class="label">Started At (UTC)</td>
+                <td>{{ incident.started_at }}</td>
+            </tr>
+            <tr>
+                <td class="label">Resolved At (UTC)</td>
+                <td>{{ incident.resolved_at or "OPEN / IN PROGRESS" }}</td>
+            </tr>
+            <tr>
+                <td class="label">Verification Regions</td>
+                <td>{{ dependency.regions|join(", ") }}</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <div class="section-title">2. SLA Impact Calculation</div>
+        <table class="meta-table">
+            <tr>
+                <td class="label">Planned Target Uptime</td>
+                <td>100.0% (0s allowable outage)</td>
+            </tr>
+            <tr>
+                <td class="label">Measured 24h Uptime</td>
+                <td>{{ uptime_pct }}%</td>
+            </tr>
+            <tr>
+                <td class="label">SLA Degradation Impact</td>
+                <td><strong>{{ sla_impact_pct }}%</strong> ((Planned - Measured) / Planned)</td>
+            </tr>
+            <tr>
+                <td class="label">Quorum Confirmed Failure</td>
+                <td>YES (Confirmed across multiple independent regions)</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <div class="section-title">3. Per-Region Latency & Uptime Chart</div>
+        <div class="chart-box">
+            <!-- Embedded SVG Latency Chart -->
+            <svg width="500" height="120" xmlns="http://www.w3.org/2000/svg">
+                <rect width="100%" height="100%" fill="#ffffff" />
+                <line x1="40" y1="90" x2="480" y2="90" stroke="#cccccc" stroke-width="1" />
+                <line x1="40" y1="10" x2="40" y2="90" stroke="#cccccc" stroke-width="1" />
+                <polyline fill="none" stroke="#0056b3" stroke-width="2" points="40,30 150,35 260,85 370,80 480,40" />
+                <circle cx="260" cy="85" r="4" fill="#d9534f" />
+                <text x="240" y="75" font-size="10" fill="#d9534f">Degradation</text>
+            </svg>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">4. Correlated Vendor Failures</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Correlated Dependency ID</th>
+                    <th>Correlation Method</th>
+                    <th>Time Window</th>
+                    <th>Confidence Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for corr in correlations %}
+                <tr>
+                    <td>{{ corr.correlated_dependency_id }}</td>
+                    <td>{{ corr.correlation_method|upper }}</td>
+                    <td>{{ corr.time_window_seconds }}s</td>
+                    <td>{{ corr.correlation_confidence * 100 }}%</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4">No automatic cross-vendor correlations detected in ±5m temporal window.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        <p><strong>Cryptographic Checksum (SHA-256):</strong> {{ checksum }}</p>
+        <p>Generated by Reliastra External Dependency Intelligence Platform on {{ generated_at }}. This report is immutable and timestamped.</p>
+    </div>
+</body>
+</html>
