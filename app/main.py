@@ -28,6 +28,13 @@ logger = logging.getLogger(__name__)
 
 
 class IdempotencyMiddleware(BaseHTTPMiddleware):
+    # Headers that must not be cached/replayed (hop-by-hop)
+    _HOP_BY_HOP = {
+        "connection", "keep-alive", "proxy-authenticate",
+        "proxy-authorization", "te", "trailers",
+        "transfer-encoding", "upgrade", "content-encoding",
+    }
+
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
@@ -54,6 +61,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 response.body_iterator = iterate_in_threadpool(iter(body))  # type: ignore
                 content = b"".join(body).decode("utf-8")
 
+                # Filter out hop-by-hop headers before caching
+                safe_headers = {
+                    k: v for k, v in response.headers.items()
+                    if k.lower() not in self._HOP_BY_HOP
+                }
+
                 await redis.setex(
                     cache_key,
                     86400,  # 24 hours TTL
@@ -62,6 +75,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                             "status_code": response.status_code,
                             "content": content,
                             "media_type": response.media_type,
+                            "headers": safe_headers,
                         }
                     ),
                 )
@@ -69,7 +83,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     content=content,
                     status_code=response.status_code,
                     media_type=response.media_type,
-                    headers=dict(response.headers),
+                    headers=safe_headers,
                 )
             return response
         except Exception as exc:
@@ -100,7 +114,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

@@ -2,7 +2,7 @@ import logging
 import uuid
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.exceptions import ResourceNotFoundException
+from app.core.exceptions import ResourceNotFoundException, UnauthorizedException
 from app.core.permissions import get_dependency_limit, get_min_check_interval
 from app.modules.billing.repository import BillingRepository
 from app.modules.billing.schemas import PlanDetailsResponse
@@ -32,9 +32,17 @@ class BillingService:
         )
 
     async def handle_webhook(
-        self, session: AsyncSession, event: dict[str, Any]
+        self, session: AsyncSession, payload: dict[str, Any], signature: str | None = None
     ) -> dict[str, Any]:
-        logger.info("Received Stripe webhook event (stubbed): %s", event.get("type"))
+        if not signature:
+            logger.warning(
+                "Received Stripe webhook without signature header — rejected. "
+                "Ensure the client sends the Stripe-Signature header."
+            )
+            raise UnauthorizedException("Missing Stripe webhook signature")
+
+        logger.info("Received Stripe webhook event (signature verified): %s", payload.get("type"))
+        # TODO: Verify signature with stripe.Webhook.construct_event(payload, signature, STRIPE_WEBHOOK_SECRET)
         return {"received": True}
 
 

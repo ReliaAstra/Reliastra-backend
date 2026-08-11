@@ -35,8 +35,12 @@ class DependencyRepository:
             .limit(limit)
         )
         if cursor:
-            # simple pagination filter if cursor ID provided
-            pass
+            query = query.where(Dependency.created_at < (
+                select(Dependency.created_at)
+                .where(Dependency.id == cursor)
+                .correlate(None)
+                .scalar_subquery()
+            ))
         result = await session.execute(query)
         return list(result.scalars().all())
 

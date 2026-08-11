@@ -1,6 +1,7 @@
 import hashlib
 import io
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -20,6 +21,9 @@ from app.modules.incidents.repository import IncidentRepository
 
 logger = logging.getLogger(__name__)
 
+# Resolve template directory relative to this file (not CWD)
+_TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), EVIDENCE_TEMPLATE_PATH)
+
 
 class EvidenceService:
     def __init__(
@@ -30,7 +34,7 @@ class EvidenceService:
         self.repository = repository
         self.inc_repository = inc_repository
         self.jinja_env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader("."),
+            loader=jinja2.FileSystemLoader(os.path.dirname(_TEMPLATE_DIR)),
             autoescape=True,
         )
 
@@ -44,7 +48,7 @@ class EvidenceService:
         checksum: str,
         generated_at: datetime,
     ) -> str:
-        template = self.jinja_env.get_template(EVIDENCE_TEMPLATE_PATH)
+        template = self.jinja_env.get_template(os.path.basename(_TEMPLATE_DIR))
         return template.render(
             incident=incident,
             dependency=dependency,

@@ -97,7 +97,7 @@ class CheckService:
 
         start_time = time.time()
         try:
-            async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
+            async with httpx.AsyncClient(timeout=timeout, verify=True) as client:
                 response = await client.request(
                     method=method,
                     url=url,

@@ -65,6 +65,10 @@ class Settings(BaseSettings):
         default="noreply@reliastra.com",
         description="Default sender email address",
     )
+    CORS_ORIGINS: list[str] = Field(
+        default=["http://localhost:3000", "http://localhost:8000"],
+        description="Allowed CORS origins",
+    )
 
     @property
     def fernet_key(self) -> bytes:
