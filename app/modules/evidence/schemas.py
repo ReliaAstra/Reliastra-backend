@@ -9,7 +9,6 @@ class EvidenceReportResponse(BaseModel):
     id: uuid.UUID
     org_id: uuid.UUID
     incident_id: uuid.UUID
-    file_path: str
     file_size_bytes: int
     checksum: str
     generated_at: datetime

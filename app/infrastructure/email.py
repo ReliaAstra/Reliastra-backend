@@ -46,8 +46,8 @@ class EmailClient:
             logger.info("Successfully sent email via SMTP %s:%s", self.smtp_host, self.smtp_port)
             return True
         except Exception as exc:
-            logger.warning("SMTP connect failed (%s), email logged to console only.", exc)
-            return True  # Stubbed for MVP: return True even if SMTP server is not running
+            logger.warning("SMTP connect failed (%s), email not sent.", exc)
+            return False
 
 
 email_client = EmailClient()

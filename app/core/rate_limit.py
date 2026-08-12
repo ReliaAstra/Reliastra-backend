@@ -48,8 +48,11 @@ class SlidingWindowRateLimiter:
         except RateLimitExceededException:
             raise
         except Exception as exc:
-            logger.warning("Rate limiter Redis check failed or fallback used: %s", exc)
-            return True
+            logger.error("Rate limiter Redis check failed: %s", exc)
+            # Fail closed: reject the request when Redis is unavailable
+            raise RateLimitExceededException(
+                message="Rate limit service temporarily unavailable"
+            )
 
 
 # Pre-configured rate limiters

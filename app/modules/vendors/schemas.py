@@ -9,7 +9,6 @@ class VendorResponse(BaseModel):
     id: uuid.UUID
     vendor_name: str
     display_name: str
-    endpoint_url: str
     category: str
     is_public: bool
     last_check_at: datetime | None = None

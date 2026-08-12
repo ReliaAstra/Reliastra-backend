@@ -25,9 +25,9 @@ celery_app.conf.update(
     task_track_started=True,
     task_always_eager=False,  # Can be set to True in tests
     beat_schedule={
-        "schedule-checks-every-10-seconds": {
+        "schedule-checks-periodic": {
             "task": "app.modules.checks.tasks.schedule_checks",
-            "schedule": 10.0,
+            "schedule": 30.0,
         },
     },
 )

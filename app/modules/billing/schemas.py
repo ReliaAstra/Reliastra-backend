@@ -8,6 +8,10 @@ class PlanDetailsResponse(BaseModel):
     plan: str
     max_dependencies: int
     min_check_interval_seconds: int
+
+
+class PlanInternalDetailsResponse(PlanDetailsResponse):
+    """Internal-only response that includes Stripe billing identifiers."""
     stripe_customer_id: str | None = None
     stripe_subscription_id: str | None = None
 

@@ -38,6 +38,7 @@ class Incident(UUIDMixin, TimestampMixin, Base):
     )
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     evidence_report_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("evidence_reports.id", ondelete="SET NULL"),
         nullable=True, index=True
     )
 
