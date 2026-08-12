@@ -21,14 +21,9 @@ class OrganizationResponse(BaseModel):
     name: str
     slug: str
     plan: str
+    has_agency_mode: bool = False
     created_at: datetime
     updated_at: datetime
-
-
-class OrganizationInternalResponse(OrganizationResponse):
-    """Internal-only response that includes Stripe billing identifiers."""
-    stripe_customer_id: str | None = None
-    stripe_subscription_id: str | None = None
 
 
 class OrganizationMemberResponse(BaseModel):

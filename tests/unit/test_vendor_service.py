@@ -21,7 +21,7 @@ async def test_seed_vendors():
 
 
 @pytest.mark.asyncio
-async def test_get_vendor_detail():
+async def test_get_vendor_detail(mocker):
     repo = MagicMock()
     now = datetime.now(timezone.utc)
     fake_vendor = MagicMock()
@@ -36,6 +36,15 @@ async def test_get_vendor_detail():
     fake_vendor.updated_at = now
 
     repo.get_by_name = AsyncMock(return_value=fake_vendor)
+    repo.list_vendor_endpoints = AsyncMock(return_value=[])
+    mocker.patch(
+        "app.modules.observations.repository.ObservationRepository.list_for_endpoints",
+        new=AsyncMock(return_value=[]),
+    )
+    mocker.patch(
+        "app.modules.checks.repository.CheckRepository.get_vendor_recent_status",
+        new=AsyncMock(return_value=[MagicMock(is_up=True)]),
+    )
 
     service = VendorService(repository=repo)
     session = AsyncMock()

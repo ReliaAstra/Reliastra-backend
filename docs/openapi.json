@@ -982,7 +982,9 @@
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": {},
+                  "items": {
+                    "$ref": "#/components/schemas/CheckResultResponse"
+                  },
                   "title": "Response Get Dependency Check Results V1 Orgs  Org Id  Dependencies  Dep Id  Results Get"
                 }
               }
@@ -1165,7 +1167,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "$ref": "#/components/schemas/IncidentStatus"
                 },
                 {
                   "type": "null"
@@ -1181,7 +1183,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "$ref": "#/components/schemas/IncidentSeverity"
                 },
                 {
                   "type": "null"
@@ -1451,9 +1453,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Incident Evidence V1 Orgs  Org Id  Incidents  Inc Id  Evidence Get"
+                  "$ref": "#/components/schemas/EvidenceReportResponse"
                 }
               }
             }
@@ -1743,6 +1743,118 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VendorHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/public/vendors/{vendor_name}/metrics": {
+      "get": {
+        "tags": [
+          "Public Vendors"
+        ],
+        "summary": "Get Vendor Metrics",
+        "operationId": "get_vendor_metrics_v1_public_vendors__vendor_name__metrics_get",
+        "parameters": [
+          {
+            "name": "vendor_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Vendor Name"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Window"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorMetricsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/public/vendors/{vendor_name}/incidents": {
+      "get": {
+        "tags": [
+          "Public Vendors"
+        ],
+        "summary": "Get Vendor Incidents",
+        "operationId": "get_vendor_incidents_v1_public_vendors__vendor_name__incidents_get",
+        "parameters": [
+          {
+            "name": "vendor_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Vendor Name"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorIncidentsResponse"
                 }
               }
             }
@@ -2147,6 +2259,132 @@
         }
       }
     },
+    "/v1/orgs/{org_id}/dashboard/latency": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Get Latency Timeseries",
+        "description": "Return organization-scoped latency observations for charting.",
+        "operationId": "get_latency_timeseries_v1_orgs__org_id__dashboard_latency_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 2160,
+              "minimum": 1,
+              "default": 24,
+              "title": "Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LatencyPointResponse"
+                  },
+                  "title": "Response Get Latency Timeseries V1 Orgs  Org Id  Dashboard Latency Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orgs/{org_id}/dashboard/sla-degradation": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Get Sla Degradation",
+        "description": "Aggregate observed degradation per dependency for the requested period.",
+        "operationId": "get_sla_degradation_v1_orgs__org_id__dashboard_sla_degradation_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "period_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Period Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SLADegradationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/orgs/{org_id}/dashboard/dependency-health": {
       "get": {
         "tags": [
@@ -2351,22 +2589,39 @@
         }
       }
     },
-    "/v1/billing/webhook": {
+    "/v1/orgs/{org_id}/billing/initialize": {
       "post": {
         "tags": [
           "Billing"
         ],
-        "summary": "Stripe Webhook",
-        "operationId": "stripe_webhook_v1_billing_webhook_post",
+        "summary": "Initialize Payment",
+        "operationId": "initialize_payment_v1_orgs__org_id__billing_initialize_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/StripeWebhookPayload"
+                "$ref": "#/components/schemas/InitializePaymentRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -2374,9 +2629,100 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Stripe Webhook V1 Billing Webhook Post"
+                  "$ref": "#/components/schemas/InitializePaymentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/billing/verify": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Verify Transaction",
+        "operationId": "verify_transaction_v1_billing_verify_post",
+        "parameters": [
+          {
+            "name": "reference",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "title": "Reference"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyTransactionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/billing/webhook": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Paystack Webhook",
+        "operationId": "paystack_webhook_v1_billing_webhook_post",
+        "parameters": [
+          {
+            "name": "x-paystack-signature",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Paystack-Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaystackWebhookResponse"
                 }
               }
             }
@@ -2553,6 +2899,514 @@
         }
       }
     },
+    "/v1/orgs/{org_id}/clients": {
+      "get": {
+        "tags": [
+          "Agency"
+        ],
+        "summary": "List Clients",
+        "operationId": "list_clients_v1_orgs__org_id__clients_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClientResponse"
+                  },
+                  "title": "Response List Clients V1 Orgs  Org Id  Clients Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Agency"
+        ],
+        "summary": "Create Client",
+        "operationId": "create_client_v1_orgs__org_id__clients_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orgs/{org_id}/clients/{client_id}/applications": {
+      "get": {
+        "tags": [
+          "Agency"
+        ],
+        "summary": "List Applications",
+        "operationId": "list_applications_v1_orgs__org_id__clients__client_id__applications_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Client Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApplicationResponse"
+                  },
+                  "title": "Response List Applications V1 Orgs  Org Id  Clients  Client Id  Applications Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Agency"
+        ],
+        "summary": "Create Application",
+        "operationId": "create_application_v1_orgs__org_id__clients__client_id__applications_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Client Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orgs/{org_id}/ai-providers": {
+      "get": {
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "List Ai Providers",
+        "operationId": "list_ai_providers_v1_orgs__org_id__ai_providers_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AIProviderResponse"
+                  },
+                  "title": "Response List Ai Providers V1 Orgs  Org Id  Ai Providers Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "Create Ai Provider",
+        "operationId": "create_ai_provider_v1_orgs__org_id__ai_providers_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIProviderCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orgs/{org_id}/ai-providers/{provider_id}": {
+      "patch": {
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "Update Ai Provider",
+        "operationId": "update_ai_provider_v1_orgs__org_id__ai_providers__provider_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIProviderUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "Delete Ai Provider",
+        "operationId": "delete_ai_provider_v1_orgs__org_id__ai_providers__provider_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Provider Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/verify/{verification_id}": {
+      "get": {
+        "tags": [
+          "Verification"
+        ],
+        "summary": "Verify Evidence",
+        "operationId": "verify_evidence_v1_verify__verification_id__get",
+        "parameters": [
+          {
+            "name": "verification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Verification Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Verify Evidence V1 Verify  Verification Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -2579,6 +3433,280 @@
   },
   "components": {
     "schemas": {
+      "AIProviderCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "provider_type": {
+            "type": "string",
+            "enum": [
+              "openai_compatible",
+              "anthropic",
+              "google"
+            ],
+            "title": "Provider Type"
+          },
+          "endpoint_url": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Endpoint Url"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "model_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Model Name"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          },
+          "max_tokens": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Max Tokens",
+            "default": 4096
+          },
+          "temperature": {
+            "type": "number",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "default": 0.3
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "provider_type",
+          "endpoint_url",
+          "model_name"
+        ],
+        "title": "AIProviderCreateRequest"
+      },
+      "AIProviderResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Organization Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "provider_type": {
+            "type": "string",
+            "title": "Provider Type"
+          },
+          "endpoint_url": {
+            "type": "string",
+            "title": "Endpoint Url"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "title": "Max Tokens"
+          },
+          "temperature": {
+            "type": "number",
+            "title": "Temperature"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "has_api_key": {
+            "type": "boolean",
+            "title": "Has Api Key",
+            "default": false
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "organization_id",
+          "name",
+          "provider_type",
+          "endpoint_url",
+          "model_name",
+          "is_default",
+          "max_tokens",
+          "temperature",
+          "enabled",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AIProviderResponse"
+      },
+      "AIProviderUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "provider_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "openai_compatible",
+                  "anthropic",
+                  "google"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Type"
+          },
+          "endpoint_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint Url"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Default"
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "title": "AIProviderUpdateRequest"
+      },
       "AlertConfigCreateRequest": {
         "properties": {
           "channel_type": {
@@ -2618,11 +3746,6 @@
             "type": "string",
             "title": "Channel Type"
           },
-          "config": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Config"
-          },
           "is_active": {
             "type": "boolean",
             "title": "Is Active"
@@ -2643,7 +3766,6 @@
           "id",
           "org_id",
           "channel_type",
-          "config",
           "is_active",
           "created_at",
           "updated_at"
@@ -2900,6 +4022,95 @@
         ],
         "title": "ApiKeyResponse"
       },
+      "ApplicationCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ApplicationCreateRequest"
+      },
+      "ApplicationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Org Id"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "org_id",
+          "client_id",
+          "name",
+          "description",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ApplicationResponse"
+      },
       "ChannelType": {
         "type": "string",
         "enum": [
@@ -2984,6 +4195,82 @@
         ],
         "title": "CheckResultResponse"
       },
+      "ClientCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ClientCreateRequest"
+      },
+      "ClientResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Org Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "org_id",
+          "name",
+          "description",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ClientResponse"
+      },
       "CorrelationMethod": {
         "type": "string",
         "enum": [
@@ -3025,7 +4312,21 @@
         "properties": {
           "name": {
             "type": "string",
+            "maxLength": 150,
+            "minLength": 1,
             "title": "Name"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
           },
           "endpoint_url": {
             "type": "string",
@@ -3059,11 +4360,15 @@
           },
           "timeout_seconds": {
             "type": "integer",
+            "maximum": 300.0,
+            "minimum": 1.0,
             "title": "Timeout Seconds",
             "default": 10
           },
           "check_interval_seconds": {
             "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 10.0,
             "title": "Check Interval Seconds",
             "default": 300
           },
@@ -3072,6 +4377,7 @@
               "type": "string"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Regions",
             "default": [
               "us-east",
@@ -3081,7 +4387,8 @@
           "alert_threshold_ms": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -3192,6 +4499,18 @@
             "format": "uuid",
             "title": "Org Id"
           },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          },
           "name": {
             "type": "string",
             "title": "Name"
@@ -3298,13 +4617,27 @@
           "name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 150,
+                "minLength": 1
               },
               {
                 "type": "null"
               }
             ],
             "title": "Name"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
           },
           "endpoint_url": {
             "anyOf": [
@@ -3356,7 +4689,9 @@
           "timeout_seconds": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 300.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -3367,7 +4702,9 @@
           "check_interval_seconds": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 86400.0,
+                "minimum": 10.0
               },
               {
                 "type": "null"
@@ -3392,7 +4729,8 @@
           "alert_threshold_ms": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -3431,10 +4769,6 @@
             "type": "string",
             "format": "uuid",
             "title": "Incident Id"
-          },
-          "file_path": {
-            "type": "string",
-            "title": "File Path"
           },
           "file_size_bytes": {
             "type": "integer",
@@ -3481,7 +4815,6 @@
           "id",
           "org_id",
           "incident_id",
-          "file_path",
           "file_size_bytes",
           "checksum",
           "generated_at",
@@ -3507,10 +4840,6 @@
             "type": "string",
             "format": "uuid",
             "title": "Incident Id"
-          },
-          "file_path": {
-            "type": "string",
-            "title": "File Path"
           },
           "file_size_bytes": {
             "type": "integer",
@@ -3553,7 +4882,6 @@
           "id",
           "org_id",
           "incident_id",
-          "file_path",
           "file_size_bytes",
           "checksum",
           "generated_at",
@@ -3920,6 +5248,92 @@
         "type": "object",
         "title": "IncidentUpdateRequest"
       },
+      "InitializePaymentRequest": {
+        "properties": {
+          "plan": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Plan"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan"
+        ],
+        "title": "InitializePaymentRequest"
+      },
+      "InitializePaymentResponse": {
+        "properties": {
+          "authorization_url": {
+            "type": "string",
+            "title": "Authorization Url"
+          },
+          "reference": {
+            "type": "string",
+            "title": "Reference"
+          },
+          "access_code": {
+            "type": "string",
+            "title": "Access Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "authorization_url",
+          "reference",
+          "access_code"
+        ],
+        "title": "InitializePaymentResponse"
+      },
+      "LatencyPointResponse": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "latency_ms": {
+            "type": "number",
+            "title": "Latency Ms"
+          },
+          "dependency_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dependency Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "region",
+          "latency_ms"
+        ],
+        "title": "LatencyPointResponse"
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -4062,27 +5476,10 @@
             "type": "string",
             "title": "Plan"
           },
-          "stripe_customer_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Stripe Customer Id"
-          },
-          "stripe_subscription_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Stripe Subscription Id"
+          "has_agency_mode": {
+            "type": "boolean",
+            "title": "Has Agency Mode",
+            "default": false
           },
           "created_at": {
             "type": "string",
@@ -4133,6 +5530,24 @@
         "type": "object",
         "title": "OrganizationUpdateRequest"
       },
+      "PaystackWebhookResponse": {
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "title": "Received"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "received",
+          "event_type"
+        ],
+        "title": "PaystackWebhookResponse"
+      },
       "Plan": {
         "type": "string",
         "enum": [
@@ -4162,7 +5577,7 @@
             "type": "integer",
             "title": "Min Check Interval Seconds"
           },
-          "stripe_customer_id": {
+          "subscription_status": {
             "anyOf": [
               {
                 "type": "string"
@@ -4171,18 +5586,19 @@
                 "type": "null"
               }
             ],
-            "title": "Stripe Customer Id"
+            "title": "Subscription Status"
           },
-          "stripe_subscription_id": {
+          "current_period_end": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Stripe Subscription Id"
+            "title": "Current Period End"
           }
         },
         "type": "object",
@@ -4262,29 +5678,28 @@
         ],
         "title": "RootCause"
       },
-      "StripeWebhookPayload": {
+      "SLADegradationResponse": {
         "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
+          "total_degradation_pct": {
+            "type": "number",
+            "title": "Total Degradation Pct"
           },
-          "type": {
-            "type": "string",
-            "title": "Type"
+          "affected_services": {
+            "type": "integer",
+            "title": "Affected Services"
           },
-          "data": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Data"
+          "period": {
+            "type": "string",
+            "title": "Period"
           }
         },
         "type": "object",
         "required": [
-          "id",
-          "type",
-          "data"
+          "total_degradation_pct",
+          "affected_services",
+          "period"
         ],
-        "title": "StripeWebhookPayload"
+        "title": "SLADegradationResponse"
       },
       "TokenResponse": {
         "properties": {
@@ -4334,10 +5749,6 @@
             "type": "boolean",
             "title": "Is Active"
           },
-          "is_superuser": {
-            "type": "boolean",
-            "title": "Is Superuser"
-          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -4355,7 +5766,6 @@
           "email",
           "full_name",
           "is_active",
-          "is_superuser",
           "created_at",
           "updated_at"
         ],
@@ -4456,10 +5866,6 @@
             "type": "string",
             "title": "Display Name"
           },
-          "endpoint_url": {
-            "type": "string",
-            "title": "Endpoint Url"
-          },
           "category": {
             "type": "string",
             "title": "Category"
@@ -4493,7 +5899,14 @@
           "recent_status": {
             "type": "string",
             "title": "Recent Status",
-            "default": "operational"
+            "default": "unknown"
+          },
+          "endpoints": {
+            "items": {
+              "$ref": "#/components/schemas/VendorEndpointResponse"
+            },
+            "type": "array",
+            "title": "Endpoints"
           }
         },
         "type": "object",
@@ -4501,13 +5914,61 @@
           "id",
           "vendor_name",
           "display_name",
-          "endpoint_url",
           "category",
           "is_public",
           "created_at",
           "updated_at"
         ],
         "title": "VendorDetailResponse"
+      },
+      "VendorEndpointResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "endpoint_url": {
+            "type": "string",
+            "title": "Endpoint Url"
+          },
+          "regions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Regions"
+          },
+          "health_status": {
+            "type": "string",
+            "title": "Health Status"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "last_check_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Check At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "endpoint_url",
+          "regions",
+          "health_status",
+          "is_active"
+        ],
+        "title": "VendorEndpointResponse"
       },
       "VendorHistoryResponse": {
         "properties": {
@@ -4517,25 +5978,127 @@
           },
           "uptime_percentage_24h": {
             "type": "number",
-            "title": "Uptime Percentage 24H",
-            "default": 99.99
+            "title": "Uptime Percentage 24H"
           },
           "avg_latency_ms_24h": {
             "type": "number",
-            "title": "Avg Latency Ms 24H",
-            "default": 45.0
+            "title": "Avg Latency Ms 24H"
           },
           "recent_checks_count": {
             "type": "integer",
-            "title": "Recent Checks Count",
-            "default": 288
+            "title": "Recent Checks Count"
           }
         },
         "type": "object",
         "required": [
-          "vendor_name"
+          "vendor_name",
+          "uptime_percentage_24h",
+          "avg_latency_ms_24h",
+          "recent_checks_count"
         ],
         "title": "VendorHistoryResponse"
+      },
+      "VendorIncidentResponse": {
+        "properties": {
+          "incident_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Incident Id"
+          },
+          "dependency_name": {
+            "type": "string",
+            "title": "Dependency Name"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "incident_id",
+          "dependency_name",
+          "started_at",
+          "resolved_at",
+          "severity",
+          "status",
+          "duration_seconds"
+        ],
+        "title": "VendorIncidentResponse"
+      },
+      "VendorIncidentsResponse": {
+        "properties": {
+          "vendor_name": {
+            "type": "string",
+            "title": "Vendor Name"
+          },
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/VendorIncidentResponse"
+            },
+            "type": "array",
+            "title": "Incidents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "vendor_name",
+          "incidents"
+        ],
+        "title": "VendorIncidentsResponse"
+      },
+      "VendorMetricsResponse": {
+        "properties": {
+          "vendor_name": {
+            "type": "string",
+            "title": "Vendor Name"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/VendorWindowMetrics"
+            },
+            "type": "object",
+            "title": "Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "vendor_name",
+          "metrics"
+        ],
+        "title": "VendorMetricsResponse"
       },
       "VendorResponse": {
         "properties": {
@@ -4551,10 +6114,6 @@
           "display_name": {
             "type": "string",
             "title": "Display Name"
-          },
-          "endpoint_url": {
-            "type": "string",
-            "title": "Endpoint Url"
           },
           "category": {
             "type": "string",
@@ -4592,13 +6151,74 @@
           "id",
           "vendor_name",
           "display_name",
-          "endpoint_url",
           "category",
           "is_public",
           "created_at",
           "updated_at"
         ],
         "title": "VendorResponse"
+      },
+      "VendorWindowMetrics": {
+        "properties": {
+          "window": {
+            "type": "string",
+            "title": "Window"
+          },
+          "total_observations": {
+            "type": "integer",
+            "title": "Total Observations"
+          },
+          "uptime_percentage": {
+            "type": "number",
+            "title": "Uptime Percentage"
+          },
+          "avg_latency_ms": {
+            "type": "number",
+            "title": "Avg Latency Ms"
+          },
+          "p95_latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Latency Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "window",
+          "total_observations",
+          "uptime_percentage",
+          "avg_latency_ms"
+        ],
+        "title": "VendorWindowMetrics"
+      },
+      "VerifyTransactionResponse": {
+        "properties": {
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "plan": {
+            "type": "string",
+            "title": "Plan"
+          },
+          "reference": {
+            "type": "string",
+            "title": "Reference"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verified",
+          "plan",
+          "reference"
+        ],
+        "title": "VerifyTransactionResponse"
       }
     },
     "securitySchemes": {

@@ -163,7 +163,7 @@ Use this endpoint for top-level KPI cards.
 ```
 
 ### 4.2 Multi-Region Latency Chart (`GET /v1/orgs/{org_id}/dashboard/latency?hours=24`)
-Returns time-series latency data suitable for charting libraries (**Recharts**, **Chart.js**, **Tremor**, or **ECharts**).
+**IMPLEMENTED IN PHASE 8.** Returns organization-scoped observation time-series data suitable for charting libraries (**Recharts**, **Chart.js**, **Tremor**, or **ECharts**).
 
 ```json
 // Response (200 OK)
@@ -181,7 +181,9 @@ Returns time-series latency data suitable for charting libraries (**Recharts**, 
 ]
 ```
 
-### 4.3 SLA Degradation Widget (`GET /v1/orgs/{org_id}/dashboard/sla-degradation`)
+### 4.3 SLA Degradation Widget (`GET /v1/orgs/{org_id}/dashboard/sla-degradation?period_days=30`)
+**IMPLEMENTED IN PHASE 8.** Aggregates degradation from immutable observations.
+
 ```json
 // Response (200 OK)
 {
@@ -275,11 +277,11 @@ Each incident object includes **Temporal Correlation** data showing if another v
 ]
 ```
 
-### 6.2 Resolve an Incident (`POST /v1/orgs/{org_id}/incidents/{id}/resolve`)
+### 6.2 Resolve an Incident (`PATCH /v1/orgs/{org_id}/incidents/{inc_id}`)
 ```json
 // Request Body
 {
-  "summary": "Vendor confirmed network recovery; quorum checks passing across us-east-1 and eu-west-1."
+  "status": "resolved"
 }
 
 // Response (200 OK)
@@ -290,27 +292,8 @@ Each incident object includes **Temporal Correlation** data showing if another v
 }
 ```
 
-### 6.3 Generate SLA Evidence Report (`POST /v1/orgs/{org_id}/evidence/generate`)
-Triggers asynchronous HTML-to-PDF rendering via Playwright with cryptographic SHA-256 integrity checksum calculation.
-
-```json
-// Request Body
-{
-  "incident_id": "90123456-789a-bcde-f012-3456789abcde",
-  "title": "SLA Degradation Report — Stripe Billing Outage",
-  "include_charts": true
-}
-
-// Response (201 Created)
-{
-  "id": "b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e",
-  "title": "SLA Degradation Report — Stripe Billing Outage",
-  "status": "completed",
-  "file_url": "http://localhost:9000/evidence-reports/b1c2d3e4...pdf",
-  "sha256_checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "created_at": "2026-08-11T17:15:00Z"
-}
-```
+### 6.3 SLA Evidence Generation (Automatic)
+There is no manual `POST /v1/orgs/{org_id}/evidence/generate` endpoint. Resolving an incident automatically runs deterministic attribution and queues immutable PDF and JSON evidence generation. Use `GET /v1/orgs/{org_id}/incidents/{inc_id}/evidence` to retrieve the generated report, and `/v1/verify/{verification_id}` for public cryptographic verification.
 
 ---
 
@@ -378,21 +361,23 @@ Creates SHA-256 hashed API keys for programmatic access. **Important for Fronten
 
 ---
 
-## 10. Billing & Plan Usage (`GET /v1/orgs/{org_id}/billing/plan`)
+## 10. Paystack Billing & Plan Usage
 
-Use this endpoint to render usage meters in the Organization Settings UI.
+Use `GET /v1/orgs/{org_id}/billing/plan` to render plan limits and subscription state.
 
 ```json
 // Response (200 OK)
 {
-  "plan_name": "pro",
+  "org_id": "11111111-1111-1111-1111-111111111111",
+  "plan": "standard",
   "max_dependencies": 25,
-  "current_dependencies": 12,
-  "max_team_members": 10,
-  "current_team_members": 3,
-  "can_add_dependency": true
+  "min_check_interval_seconds": 60,
+  "subscription_status": "active",
+  "current_period_end": "2026-09-12T00:00:00Z"
 }
 ```
+
+Initialize Paystack checkout with `POST /v1/orgs/{org_id}/billing/initialize` and body `{"plan":"standard","email":"owner@example.com"}`. After checkout, verify the Paystack reference with `POST /v1/billing/verify?reference={reference}`. Payment state is finalized from signed Paystack webhooks; never update an organization plan from client-side state alone.
 
 ---
 

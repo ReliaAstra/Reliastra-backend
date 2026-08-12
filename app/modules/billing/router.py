@@ -1,11 +1,20 @@
 import json
 import uuid
-from typing import Any
-from fastapi import APIRouter, Depends, Header, Request
+
+from fastapi import APIRouter, Depends, Header, Query, Request
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.dependencies import get_current_org
+
 from app.db.session import get_db
-from app.modules.billing.schemas import PlanDetailsResponse, StripeWebhookPayload, StripeWebhookResponse
+from app.dependencies import get_current_org, require_admin
+from app.modules.billing.schemas import (
+    InitializePaymentRequest,
+    InitializePaymentResponse,
+    PaystackWebhookPayload,
+    PaystackWebhookResponse,
+    PlanDetailsResponse,
+    VerifyTransactionResponse,
+)
 from app.modules.billing.service import BillingService, billing_service
 from app.modules.organizations.models import Organization
 
@@ -26,15 +35,49 @@ async def get_organization_plan(
     return await service.get_plan_details(db, org_id)
 
 
-@router.post("/billing/webhook", response_model=StripeWebhookResponse)
-async def stripe_webhook(
-    request: Request,
-    stripe_signature: str | None = Header(default=None, alias="Stripe-Signature"),
+@router.post(
+    "/orgs/{org_id}/billing/initialize",
+    response_model=InitializePaymentResponse,
+    dependencies=[Depends(require_admin)],
+)
+async def initialize_payment(
+    org_id: uuid.UUID,
+    request: InitializePaymentRequest,
+    db: AsyncSession = Depends(get_db),
+    current_org: Organization = Depends(get_current_org),
+    service: BillingService = Depends(get_bill_service),
+) -> InitializePaymentResponse:
+    return await service.initialize_payment(db, org_id, request)
+
+
+@router.post("/billing/verify", response_model=VerifyTransactionResponse)
+async def verify_transaction(
+    reference: str = Query(min_length=1, max_length=200),
     db: AsyncSession = Depends(get_db),
     service: BillingService = Depends(get_bill_service),
-) -> StripeWebhookResponse:
+) -> VerifyTransactionResponse:
+    return await service.verify_transaction(db, reference)
+
+
+@router.post("/billing/webhook", response_model=PaystackWebhookResponse)
+async def paystack_webhook(
+    request: Request,
+    x_paystack_signature: str | None = Header(
+        default=None, alias="x-paystack-signature"
+    ),
+    db: AsyncSession = Depends(get_db),
+    service: BillingService = Depends(get_bill_service),
+) -> PaystackWebhookResponse:
     raw_body = await request.body()
-    payload = StripeWebhookPayload.model_validate(json.loads(raw_body))
+    try:
+        payload = PaystackWebhookPayload.model_validate(json.loads(raw_body))
+    except (json.JSONDecodeError, UnicodeDecodeError, ValidationError) as exc:
+        from app.core.exceptions import ValidationException
+
+        raise ValidationException("Invalid Paystack webhook body") from exc
     return await service.handle_webhook(
-        db, payload.model_dump(), signature=stripe_signature, raw_body=raw_body
+        db,
+        payload.model_dump(),
+        signature=x_paystack_signature,
+        raw_body=raw_body,
     )

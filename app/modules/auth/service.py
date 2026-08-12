@@ -17,7 +17,6 @@ from app.modules.auth.schemas import (
     RegisterRequest,
     TokenResponse,
 )
-from app.modules.organizations.models import Organization
 from app.modules.organizations.repository import OrganizationRepository
 from app.modules.users.repository import UserRepository
 
@@ -78,6 +77,14 @@ class AuthService:
             org_id=org.id,
             user_id=user.id,
             role="owner",
+        )
+        from app.modules.agencies.repository import AgencyRepository
+
+        await AgencyRepository.create_application(
+            session,
+            org_id=org.id,
+            name="Default",
+            description="Default application",
         )
 
         tokens = self._generate_token_pair(user.id)

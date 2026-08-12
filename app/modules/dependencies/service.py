@@ -78,10 +78,35 @@ class DependencyService:
                 f"Dependency limit reached for plan '{org.plan}' ({max_deps})."
             )
 
+        from app.modules.agencies.repository import AgencyRepository
+
+        application_id = request.application_id
+        if application_id:
+            application = await AgencyRepository.get_application(
+                session, application_id
+            )
+            if not application or application.org_id != org_id:
+                raise ValidationException(
+                    "Application does not belong to this organization"
+                )
+        else:
+            application = await AgencyRepository.get_default_application(
+                session, org_id
+            )
+            if not application:
+                application = await AgencyRepository.create_application(
+                    session,
+                    org_id=org_id,
+                    name="Default",
+                    description="Default application",
+                )
+            application_id = application.id
+
         encoded_headers = self._encode_headers(request.headers)
         dep = await self.repository.create(
             session=session,
             org_id=org_id,
+            application_id=application_id,
             name=request.name,
             endpoint_url=request.endpoint_url,
             method=request.method.value,
@@ -123,6 +148,18 @@ class DependencyService:
                 )
 
         update_kwargs: dict[str, Any] = {}
+        if request.application_id is not None:
+            from app.modules.agencies.repository import AgencyRepository
+
+            application = await AgencyRepository.get_application(
+                session, request.application_id
+            )
+            if not application or application.org_id != org_id:
+                raise ValidationException(
+                    "Application does not belong to this organization"
+                )
+            update_kwargs["application_id"] = request.application_id
+
         for field in [
             "name",
             "endpoint_url",

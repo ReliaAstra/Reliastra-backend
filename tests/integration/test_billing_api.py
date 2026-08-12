@@ -1,12 +1,16 @@
+import hashlib
+import hmac
+
 import pytest
+
+from app.config import settings
 
 
 @pytest.mark.asyncio
-async def test_billing_endpoints(async_client, auth_data):
+async def test_billing_endpoints(async_client, auth_data, monkeypatch):
     headers = auth_data["headers"]
     org_id = auth_data["org_id"]
 
-    # GET /v1/orgs/{org_id}/billing/plan
     plan_res = await async_client.get(
         f"/v1/orgs/{org_id}/billing/plan", headers=headers
     )
@@ -14,15 +18,21 @@ async def test_billing_endpoints(async_client, auth_data):
     plan_data = plan_res.json()
     assert plan_data["plan"] == "free"
     assert plan_data["max_dependencies"] == 5
+    assert plan_data["subscription_status"] is None
 
-    # POST /v1/billing/webhook
+    secret = "integration-paystack-secret"
+    monkeypatch.setattr(settings, "PAYSTACK_SECRET_KEY", secret)
+    body = b'{"event":"integration.test","data":{}}'
+    signature = hmac.new(
+        secret.encode(), body, hashlib.sha512
+    ).hexdigest()
     webhook_res = await async_client.post(
         "/v1/billing/webhook",
-        json={
-            "id": "evt_12345",
-            "type": "invoice.payment_succeeded",
-            "data": {"customer": "cus_123"},
+        content=body,
+        headers={
+            "content-type": "application/json",
+            "x-paystack-signature": signature,
         },
     )
-    assert webhook_res.status_code == 200
+    assert webhook_res.status_code == 200, webhook_res.text
     assert webhook_res.json()["received"] is True

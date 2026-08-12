@@ -1,9 +1,11 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.modules.evidence.models import EvidenceReport
+
+from app.modules.evidence.models import EvidenceReport, EvidenceSnapshot
 
 
 class EvidenceRepository:
@@ -34,18 +36,21 @@ class EvidenceRepository:
     async def get_by_id(
         session: AsyncSession, report_id: uuid.UUID
     ) -> EvidenceReport | None:
-        query = select(EvidenceReport).where(EvidenceReport.id == report_id)
-        result = await session.execute(query)
+        result = await session.execute(
+            select(EvidenceReport).where(EvidenceReport.id == report_id)
+        )
         return result.scalar_one_or_none()
 
     @staticmethod
     async def get_by_incident(
         session: AsyncSession, incident_id: uuid.UUID
     ) -> EvidenceReport | None:
-        query = select(EvidenceReport).where(
-            EvidenceReport.incident_id == incident_id
+        result = await session.execute(
+            select(EvidenceReport)
+            .where(EvidenceReport.incident_id == incident_id)
+            .order_by(EvidenceReport.generated_at.desc())
+            .limit(1)
         )
-        result = await session.execute(query)
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -54,22 +59,44 @@ class EvidenceRepository:
         org_id: uuid.UUID,
         limit: int = 50,
     ) -> list[EvidenceReport]:
-        query = (
+        result = await session.execute(
             select(EvidenceReport)
             .where(EvidenceReport.org_id == org_id)
             .order_by(EvidenceReport.generated_at.desc())
             .limit(limit)
         )
-        result = await session.execute(query)
         return list(result.scalars().all())
 
+
+class EvidenceSnapshotRepository:
     @staticmethod
-    async def update(
-        session: AsyncSession, report: EvidenceReport, **kwargs: Any
-    ) -> EvidenceReport:
-        for key, value in kwargs.items():
-            if value is not None and hasattr(report, key):
-                setattr(report, key, value)
-        session.add(report)
+    async def create(
+        session: AsyncSession, **values: Any
+    ) -> EvidenceSnapshot:
+        snapshot = EvidenceSnapshot(**values)
+        session.add(snapshot)
         await session.flush()
-        return report
+        return snapshot
+
+    @staticmethod
+    async def get_by_verification_id(
+        session: AsyncSession, verification_id: str
+    ) -> EvidenceSnapshot | None:
+        result = await session.execute(
+            select(EvidenceSnapshot).where(
+                EvidenceSnapshot.verification_id == verification_id
+            )
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_latest_for_incident(
+        session: AsyncSession, incident_id: uuid.UUID
+    ) -> EvidenceSnapshot | None:
+        result = await session.execute(
+            select(EvidenceSnapshot)
+            .where(EvidenceSnapshot.incident_id == incident_id)
+            .order_by(EvidenceSnapshot.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
