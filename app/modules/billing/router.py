@@ -56,7 +56,15 @@ async def verify_transaction(
     db: AsyncSession = Depends(get_db),
     service: BillingService = Depends(get_bill_service),
 ) -> VerifyTransactionResponse:
-    return await service.verify_transaction(db, reference)
+    try:
+        return await service.verify_transaction(db, reference)
+    except Exception as exc:
+        from app.core.exceptions import ValidationException
+        # Return a structured response instead of a raw 500 when Paystack
+        # is unconfigured or the request fails for any infra-level reason.
+        raise ValidationException(
+            f"Transaction verification failed: {exc}"
+        ) from exc
 
 
 @router.post("/billing/webhook", response_model=PaystackWebhookResponse)

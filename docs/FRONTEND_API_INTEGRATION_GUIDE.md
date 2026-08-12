@@ -10,15 +10,17 @@ This guide provides frontend and dashboard developers with complete integration 
   - Local development: `http://localhost:8000/v1`
   - OpenAPI Spec: `http://localhost:8000/openapi.json` (exported locally to `docs/openapi.json`)
   - Swagger UI: `http://localhost:8000/docs`
-- **CORS**: The backend is configured to allow `http://localhost:3000`, `http://localhost:5173`, and `http://127.0.0.1:3000`.
+- **CORS**: The backend is configured via `CORS_ORIGINS` env var. Default: `http://localhost:3000`, `http://localhost:8000`. Set this to your production frontend domain when deploying.
 - **Idempotency Header**: For mutation requests (`POST`, `PUT`, `DELETE`), include a unique UUID in the `Idempotency-Key` HTTP header. The backend caches the response in Redis for 24 hours to prevent duplicate submissions on network retries.
 - **Error Responses**: Standardized JSON error envelope across all endpoints:
   ```json
   {
-    "error": "validation_error",
-    "message": "Input validation failed",
-    "details": {
-      "field": ["error description"]
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "Input validation failed",
+      "details": {
+        "errors": [{"loc": ["field"], "msg": "error description"}]
+      }
     }
   }
   ```
@@ -87,16 +89,13 @@ Rotate tokens transparently when an access token expires (`401 Unauthorized`).
 ```
 
 #### **POST /v1/auth/logout**
-Revokes the refresh token in Redis and postgres.
+Revokes the refresh token in Redis and PostgreSQL.
 ```json
 // Request Body
 {
   "refresh_token": "eyJhbGciOiJIUzI1NiIsIn..."
 }
-// Response (200 OK)
-{
-  "message": "Successfully logged out"
-}
+// Response (204 No Content — empty body)
 ```
 
 ---
@@ -293,18 +292,46 @@ Each incident object includes **Temporal Correlation** data showing if another v
 ```
 
 ### 6.3 SLA Evidence Generation (Automatic)
-There is no manual `POST /v1/orgs/{org_id}/evidence/generate` endpoint. Resolving an incident automatically runs deterministic attribution and queues immutable PDF and JSON evidence generation. Use `GET /v1/orgs/{org_id}/incidents/{inc_id}/evidence` to retrieve the generated report, and `/v1/verify/{verification_id}` for public cryptographic verification.
+Resolving an incident automatically runs deterministic 5-signal attribution and queues immutable PDF and JSON evidence generation. Use `GET /v1/orgs/{org_id}/incidents/{inc_id}/evidence` to retrieve the generated report.
+
+### 6.4 Public Evidence Verification (`GET /v1/verify/{verification_id}`)
+This public endpoint requires no authentication and provides cryptographic verification of any evidence snapshot:
+```json
+// Response (200 OK)
+{
+  "found": true,
+  "incident_id": "uuid",
+  "dependency_id": "uuid",
+  "org_id": "uuid",
+  "time_window": {
+    "start": "2026-08-11T16:00:00Z",
+    "end": "2026-08-11T17:00:00Z"
+  },
+  "data_hash": "sha256:...",
+  "report_checksum": "sha256:...",
+  "methodology_version": "1.0",
+  "created_at": "2026-08-11T17:05:00Z"
+}
+```
 
 ---
 
-## 7. Global Public Vendor Status Board (`GET /v1/public/vendors`)
+## 7. Global Public Vendor Status Board
 
-This public endpoint requires no authentication and returns real-time uptime status for 5 major third-party cloud services tracked by Reliastra:
-- **Stripe** (`stripe`)
-- **Auth0** (`auth0`)
-- **Cloudflare** (`cloudflare`)
-- **OpenAI** (`openai`)
-- **Twilio** (`twilio`)
+### 7.1 List Vendors (`GET /v1/public/vendors`)
+Public endpoint (no auth required). Returns tracked vendor status.
+
+### 7.2 Vendor Detail (`GET /v1/public/vendors/{vendor_name}`)
+Returns detailed status for a specific vendor.
+
+### 7.3 Vendor History (`GET /v1/public/vendors/{vendor_name}/history`)
+Returns historical uptime data.
+
+### 7.4 Vendor Incidents (`GET /v1/public/vendors/{vendor_name}/incidents`)
+Returns incidents associated with a vendor.
+
+### 7.5 Vendor Metrics (`GET /v1/public/vendors/{vendor_name}/metrics`)
+Returns uptime and latency metrics for charting.
 
 ```json
 // Response (200 OK)
