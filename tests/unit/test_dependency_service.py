@@ -5,14 +5,13 @@ import pytest
 from app.core.exceptions import ConflictException, ValidationException
 from app.modules.dependencies.schemas import (
     DependencyCreateRequest,
-    DependencyUpdateRequest,
 )
 from app.modules.dependencies.service import DependencyService
 from app.modules.dependencies.constants import HttpMethod
 
 
 @pytest.mark.asyncio
-async def test_create_dependency_success():
+async def test_create_dependency_success(mocker):
     dep_repo = MagicMock()
     org_repo = MagicMock()
     now = datetime.now(timezone.utc)
@@ -26,6 +25,7 @@ async def test_create_dependency_success():
     fake_dep = MagicMock()
     fake_dep.id = uuid.uuid4()
     fake_dep.org_id = org_id
+    fake_dep.application_id = uuid.uuid4()
     fake_dep.name = "Stripe API"
     fake_dep.endpoint_url = "https://api.stripe.com/health"
     fake_dep.method = "GET"
@@ -41,6 +41,12 @@ async def test_create_dependency_success():
     fake_dep.updated_at = now
 
     dep_repo.create = AsyncMock(return_value=fake_dep)
+    mocker.patch(
+        "app.modules.agencies.repository.AgencyRepository.get_default_application",
+        new=AsyncMock(
+            return_value=MagicMock(id=fake_dep.application_id, org_id=org_id)
+        ),
+    )
 
     service = DependencyService(repository=dep_repo, org_repository=org_repo)
     session = AsyncMock()

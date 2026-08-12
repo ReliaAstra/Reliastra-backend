@@ -7,7 +7,6 @@ from app.core.exceptions import (
     ResourceNotFoundException,
 )
 from app.core.permissions import Role
-from app.modules.organizations.models import Organization, OrganizationMember
 from app.modules.organizations.repository import OrganizationRepository
 from app.modules.organizations.schemas import (
     OrganizationCreateRequest,
@@ -62,6 +61,14 @@ class OrganizationService:
             org_id=org.id,
             user_id=user_id,
             role=Role.OWNER.value,
+        )
+        from app.modules.agencies.repository import AgencyRepository
+
+        await AgencyRepository.create_application(
+            session,
+            org_id=org.id,
+            name="Default",
+            description="Default application",
         )
         return OrganizationResponse.model_validate(org)
 

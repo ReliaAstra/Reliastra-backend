@@ -12,6 +12,8 @@ from app.config import settings
 from app.core.exceptions import setup_exception_handlers
 from app.db.session import get_engine
 from app.infrastructure.redis_client import close_redis, get_redis
+from app.modules.agencies.router import router as agencies_router
+from app.modules.ai_integration.router import router as ai_providers_router
 from app.modules.api_keys.router import router as api_keys_router
 from app.modules.auth.router import router as auth_router
 from app.modules.billing.router import router as billing_router
@@ -24,6 +26,7 @@ from app.modules.notifications.router import router as notifications_router
 from app.modules.organizations.router import router as organizations_router
 from app.modules.users.router import router as users_router
 from app.modules.vendors.router import router as vendors_router
+from app.modules.verification.router import router as verification_router
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +136,7 @@ def create_app() -> FastAPI:
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "X-API-Key", "X-Organization-ID", "Content-Type", "Idempotency-Key", "Stripe-Signature"],
+        allow_headers=["Authorization", "X-API-Key", "X-Organization-ID", "Content-Type", "Idempotency-Key", "x-paystack-signature"],
     )
 
     app.add_middleware(RequestIdMiddleware)
@@ -151,9 +154,12 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router)
     app.include_router(billing_router)
     app.include_router(api_keys_router)
+    app.include_router(agencies_router)
+    app.include_router(ai_providers_router)
+    app.include_router(verification_router)
 
     @app.get("/health", tags=["Health"])
-    async def health_check() -> dict[str, Any]:
+    async def health_check(response: Response) -> dict[str, Any]:
         checks: dict[str, Any] = {}
         overall_status = "ok"
 
@@ -177,7 +183,7 @@ def create_app() -> FastAPI:
             checks["redis"] = f"unavailable: {exc}"
             overall_status = "degraded"
 
-        status_code = 200 if overall_status == "ok" else 503
+        response.status_code = 200 if overall_status == "ok" else 503
         return {
             "status": overall_status,
             "service": "reliastra-backend",

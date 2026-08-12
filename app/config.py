@@ -3,8 +3,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import logging
-import os
-from typing import Any
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -89,9 +87,21 @@ class Settings(BaseSettings):
         default=True,
         description="Whether to allow cookies/credentials in CORS requests",
     )
-    STRIPE_WEBHOOK_SECRET: str = Field(
+    PAYSTACK_SECRET_KEY: str = Field(
         default="",
-        description="Stripe webhook signing secret for event verification",
+        description="Paystack secret key used for API calls and webhook signing",
+    )
+    PAYSTACK_PUBLIC_KEY: str = Field(
+        default="",
+        description="Paystack public key for payment initialization",
+    )
+    PAYSTACK_BASE_URL: str = Field(
+        default="https://api.paystack.co",
+        description="Paystack API base URL",
+    )
+    SMTP_USE_TLS: bool = Field(
+        default=False,
+        description="Whether to negotiate SMTP TLS when supported",
     )
     ENVIRONMENT: str = Field(
         default="development",

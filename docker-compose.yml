@@ -79,6 +79,8 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: reliastra-evidence
       MINIO_USE_SSL: "false"
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+      PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
       SMTP_FROM: noreply@reliastra.com
@@ -110,6 +112,8 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: reliastra-evidence
       MINIO_USE_SSL: "false"
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+      PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
       SMTP_FROM: noreply@reliastra.com
@@ -137,6 +141,8 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: reliastra-evidence
       MINIO_USE_SSL: "false"
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+      PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
       SMTP_FROM: noreply@reliastra.com

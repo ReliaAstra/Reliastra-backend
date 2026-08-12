@@ -74,6 +74,7 @@ class DependencyRepository:
         org_id: uuid.UUID,
         name: str,
         endpoint_url: str,
+        application_id: uuid.UUID | None,
         method: str,
         headers: dict[str, Any] | None,
         expected_status_codes: list[int],
@@ -85,6 +86,7 @@ class DependencyRepository:
     ) -> Dependency:
         dep = Dependency(
             org_id=org_id,
+            application_id=application_id,
             name=name,
             endpoint_url=endpoint_url,
             method=method,

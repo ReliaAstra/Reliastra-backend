@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Any
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.modules.dependencies.constants import (
     DEFAULT_EXPECTED_STATUS_CODES,
     DEFAULT_REGIONS,
@@ -12,6 +12,7 @@ from app.modules.dependencies.constants import (
 
 class DependencyCreateRequest(BaseModel):
     name: str = Field(max_length=150, min_length=1)
+    application_id: uuid.UUID | None = None
     endpoint_url: str
     method: HttpMethod = HttpMethod.GET
     headers: dict[str, Any] | None = None
@@ -33,7 +34,8 @@ class DependencyCreateRequest(BaseModel):
     @classmethod
     def validate_headers(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
         if v is not None:
-            forbidden = {"authorization", "cookie", "host"}
+            # Authorization values are encrypted at rest by DependencyService.
+            forbidden = {"cookie", "host"}
             lower_keys = {k.lower() for k in v.keys()}
             if forbidden & lower_keys:
                 raise ValueError(f"Headers cannot contain: {', '.join(sorted(forbidden))}")
@@ -42,6 +44,7 @@ class DependencyCreateRequest(BaseModel):
 
 class DependencyUpdateRequest(BaseModel):
     name: str | None = Field(default=None, max_length=150, min_length=1)
+    application_id: uuid.UUID | None = None
     endpoint_url: str | None = None
     method: HttpMethod | None = None
     headers: dict[str, Any] | None = None
@@ -63,7 +66,8 @@ class DependencyUpdateRequest(BaseModel):
     @classmethod
     def validate_headers(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
         if v is not None:
-            forbidden = {"authorization", "cookie", "host"}
+            # Authorization values are encrypted at rest by DependencyService.
+            forbidden = {"cookie", "host"}
             lower_keys = {k.lower() for k in v.keys()}
             if forbidden & lower_keys:
                 raise ValueError(f"Headers cannot contain: {', '.join(sorted(forbidden))}")
@@ -75,6 +79,7 @@ class DependencyResponse(BaseModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
+    application_id: uuid.UUID | None = None
     name: str
     endpoint_url: str
     method: str
@@ -104,6 +109,7 @@ class DependencyInternalDTO(BaseModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
+    application_id: uuid.UUID | None = None
     name: str
     endpoint_url: str
     method: str

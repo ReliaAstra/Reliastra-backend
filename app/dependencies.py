@@ -24,6 +24,41 @@ security_bearer = HTTPBearer(auto_error=False)
 security_api_key = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
+def _infer_scope(request: Request) -> str | None:
+    """Map organization API routes to their programmatic access scope."""
+    path = request.url.path
+    write = request.method not in {"GET", "HEAD", "OPTIONS"}
+    mappings = (
+        ("/evidence", "evidence"),
+        ("/dependencies", "dependencies"),
+        ("/checks", "checks"),
+        ("/incidents", "incidents"),
+        ("/billing", "billing"),
+        ("/notifications", "notifications"),
+        ("/api-keys", "api_keys"),
+    )
+    for marker, resource in mappings:
+        if marker in path:
+            # Evidence currently exposes read/regeneration but has no write scope.
+            action = "read" if resource == "evidence" else "write" if write else "read"
+            return f"{action}:{resource}"
+    if any(marker in path for marker in ("/clients", "/ai-providers")):
+        return f"{'write' if write else 'read'}:organizations"
+    if "/dashboard/" in path:
+        return "read:checks"
+    if path.startswith("/v1/orgs"):
+        return f"{'write' if write else 'read'}:organizations"
+    return None
+
+
+def _has_scope(scopes: list[str], required_scope: str) -> bool:
+    if required_scope in scopes or "*" in scopes:
+        return True
+    action, _, resource = required_scope.partition(":")
+    # A write grant implies read access to the same resource.
+    return action == "read" and f"write:{resource}" in scopes
+
+
 async def get_current_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -37,14 +72,34 @@ async def get_current_user(
     auth_header = request.headers.get("authorization", "").strip()
     api_key_header = request.headers.get("x-api-key", "").strip()
 
-    # API key authentication via X-API-Key header or "rel_" prefixed Bearer token
-    if api_key_header or auth_header.lower().startswith("rel_"):
-        raw_key = api_key_header or auth_header
+    # API key authentication supports X-API-Key, a raw rel_ Authorization
+    # value, or the conventional `Authorization: ApiKey rel_...` form.
+    raw_key: str | None = api_key_header or None
+    if not raw_key and auth_header.lower().startswith("rel_"):
+        raw_key = auth_header
+    if (
+        not raw_key
+        and bearer
+        and bearer.credentials.startswith("rel_")
+        and bearer.scheme.lower() in {"apikey", "bearer"}
+    ):
+        raw_key = bearer.credentials
+    if not raw_key and auth_header.lower().startswith("apikey "):
+        raw_key = auth_header.split(None, 1)[1].strip()
+
+    if raw_key:
         api_key = await api_key_service.authenticate_key(db, raw_key)
         request.state.auth_method = "apikey"
         request.state.api_key_org_id = api_key.org_id
         request.state.api_key_scopes = api_key.scopes
         request.state.current_role = Role.ADMIN.value
+
+        required_scope = getattr(request.state, "required_scope", None)
+        required_scope = required_scope or _infer_scope(request)
+        if required_scope and not _has_scope(api_key.scopes, required_scope):
+            raise ForbiddenException(
+                f"API key lacks required scope: {required_scope}"
+            )
 
         org_repo = OrganizationRepository()
         members = await org_repo.list_members(db, api_key.org_id)
@@ -131,6 +186,24 @@ async def get_current_org(
     member = await org_repo.get_member(db, org.id, current_user.id)
     request.state.current_role = member.role if member else Role.VIEWER.value
     return org
+
+
+def require_scope(scope: str) -> Any:
+    """Require an API-key scope while leaving JWT users governed by RBAC."""
+
+    async def scope_checker(
+        request: Request,
+        current_org: Organization = Depends(get_current_org),
+    ) -> Organization:
+        if getattr(request.state, "auth_method", "") == "apikey":
+            scopes = getattr(request.state, "api_key_scopes", [])
+            if not _has_scope(scopes, scope):
+                raise ForbiddenException(
+                    f"API key lacks required scope: {scope}"
+                )
+        return current_org
+
+    return scope_checker
 
 
 def require_role(min_role: Role) -> Any:

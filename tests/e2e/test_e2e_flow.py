@@ -1,10 +1,8 @@
 import http.server
 import threading
 import uuid
-from datetime import datetime, timezone
 import pytest
 from app.modules.checks.service import check_service
-from app.modules.incidents.service import incident_service
 
 
 from app.infrastructure.email import email_client
@@ -32,6 +30,11 @@ def test_http_server():
 
 @pytest.mark.asyncio
 async def test_full_e2e_flow(async_client, db_session, test_http_server, mocker):
+    # This test intentionally uses a loopback HTTP fixture. Bypass URL
+    # validation only in the test; production SSRF protection remains enabled.
+    mocker.patch(
+        "app.modules.checks.service.validate_outbound_url", return_value=None
+    )
     # Spy on notification sending
     send_email_spy = mocker.spy(email_client, "send_email")
 

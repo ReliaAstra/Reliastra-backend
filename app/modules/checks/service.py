@@ -28,6 +28,60 @@ class CheckService:
         self.repository = repository
         self.dep_repository = dep_repository
 
+    async def _record_observation(
+        self,
+        session: AsyncSession,
+        result: CheckResult,
+        endpoint_url: str,
+        method: str,
+    ) -> None:
+        """Dual-write a check into the unified immutable observation stream.
+
+        A savepoint isolates the legacy check write from an observation failure,
+        which keeps rollout backward compatible while still surfacing failures.
+        """
+        try:
+            from app.modules.observations.schemas import ObservationCreateDTO
+            from app.modules.observations.service import observation_service
+
+            error_type = None
+            if result.error_message:
+                error_type = (
+                    result.error_message.split(":", 1)[0]
+                    .strip()
+                    .lower()
+                    .replace(" ", "_")[:50]
+                )
+            async with session.begin_nested():
+                await observation_service.record_observation(
+                    session,
+                    ObservationCreateDTO(
+                        timestamp=result.executed_at,
+                        source_type="customer_check",
+                        source_id=result.dependency_id,
+                        org_id=result.org_id,
+                        region=result.region,
+                        endpoint_url=endpoint_url,
+                        latency_ms=result.latency_ms,
+                        response_time_ms=result.latency_ms,
+                        status_code=result.status_code,
+                        error_type=error_type,
+                        error_message=result.error_message,
+                        metadata={
+                            "method": method,
+                            "is_up": result.is_up,
+                            "quorum_confirmed": result.quorum_confirmed,
+                            "check_result_id": str(result.id),
+                        },
+                    ),
+                )
+        except Exception as exc:
+            logger.warning(
+                "Failed to record observation for dependency %s: %s",
+                result.dependency_id,
+                exc,
+            )
+
     async def list_results_for_dependency(
         self,
         session: AsyncSession,
@@ -116,6 +170,7 @@ class CheckService:
                 error_message=error_message,
                 quorum_confirmed=False,
             )
+            await self._record_observation(session, result, url, method)
             return result
 
         # Reset timer for actual HTTP request
@@ -206,6 +261,7 @@ class CheckService:
                         org_id=open_incident.org_id,
                     )
 
+        await self._record_observation(session, result, url, method)
         return result
 
 
