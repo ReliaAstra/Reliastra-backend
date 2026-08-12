@@ -21,10 +21,14 @@ class OrganizationResponse(BaseModel):
     name: str
     slug: str
     plan: str
-    stripe_customer_id: str | None = None
-    stripe_subscription_id: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class OrganizationInternalResponse(OrganizationResponse):
+    """Internal-only response that includes Stripe billing identifiers."""
+    stripe_customer_id: str | None = None
+    stripe_subscription_id: str | None = None
 
 
 class OrganizationMemberResponse(BaseModel):

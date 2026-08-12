@@ -1,9 +1,12 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -11,16 +14,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml /app/
-
+COPY requirements.txt /app/
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir poetry \
-    && poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --only main \
-    || pip install --no-cache-dir fastapi uvicorn "sqlalchemy[asyncio]" asyncpg alembic pydantic pydantic-settings celery redis httpx jinja2 playwright xhtml2pdf pyjwt bcrypt cryptography minio email-validator python-multipart
+    && pip install --no-cache-dir -r requirements.txt
 
 RUN playwright install --with-deps chromium || true
 
 COPY . /app/
+
+RUN chown -R appuser:appuser /app
+
+USER appuser
 
 CMD ["celery", "-A", "app.infrastructure.celery_app.celery_app", "worker", "--loglevel=info"]

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_current_org, require_member
 from app.db.session import get_db
+from app.modules.incidents.constants import IncidentSeverity, IncidentStatus
 from app.modules.incidents.schemas import (
     IncidentCorrelateRequest,
     IncidentCorrelationResponse,
@@ -25,14 +26,14 @@ def get_inc_service() -> IncidentService:
 async def list_incidents(
     org_id: uuid.UUID,
     limit: int = Query(default=50, ge=1, le=100),
-    status: str | None = Query(default=None),
-    severity: str | None = Query(default=None),
+    status: IncidentStatus | None = Query(default=None),
+    severity: IncidentSeverity | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: IncidentService = Depends(get_inc_service),
 ) -> list[IncidentResponse]:
     return await service.list_incidents(
-        db, org_id, limit=limit, status=status, severity=severity
+        db, org_id, limit=limit, status=status.value if status else None, severity=severity.value if severity else None
     )
 
 

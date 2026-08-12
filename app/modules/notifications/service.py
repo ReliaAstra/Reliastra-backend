@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ResourceNotFoundException
+from app.core.ssrf_protection import validate_outbound_url
 from app.infrastructure.email import email_client
 from app.modules.notifications.constants import ChannelType
 from app.modules.notifications.models import AlertConfig
@@ -45,6 +46,12 @@ class SlackChannel(BaseNotificationChannel):
         if not webhook_url:
             logger.warning("SlackChannel config missing 'webhook_url'")
             return False
+        # SSRF protection
+        try:
+            validate_outbound_url(webhook_url)
+        except ValueError as exc:
+            logger.warning("Slack webhook URL blocked by SSRF protection: %s", exc)
+            return False
         payload = {
             "text": f"*{alert.title}* [{alert.severity.upper()}]\n{alert.body}"
         }
@@ -53,8 +60,8 @@ class SlackChannel(BaseNotificationChannel):
                 resp = await client.post(webhook_url, json=payload)
                 return resp.status_code < 400
         except Exception as exc:
-            logger.warning("Slack webhook send failed (logged only): %s", exc)
-            return True  # Avoid failing test environments without outbound internet
+            logger.warning("Slack webhook send failed: %s", exc)
+            return False
 
 
 class PagerDutyChannel(BaseNotificationChannel):
@@ -77,13 +84,19 @@ class WebhookChannel(BaseNotificationChannel):
         if not url:
             logger.warning("WebhookChannel config missing 'url'")
             return False
+        # SSRF protection
+        try:
+            validate_outbound_url(url)
+        except ValueError as exc:
+            logger.warning("Webhook URL blocked by SSRF protection: %s", exc)
+            return False
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 resp = await client.post(url, json=alert.model_dump(mode="json"))
                 return resp.status_code < 400
         except Exception as exc:
-            logger.warning("Webhook send failed (logged only): %s", exc)
-            return True
+            logger.warning("Webhook send failed: %s", exc)
+            return False
 
 
 CHANNEL_REGISTRY: dict[str, type[BaseNotificationChannel]] = {

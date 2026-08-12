@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -25,6 +26,19 @@ from app.modules.users.router import router as users_router
 from app.modules.vendors.router import router as vendors_router
 
 logger = logging.getLogger(__name__)
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """Injects a unique X-Request-ID into every incoming request for distributed tracing."""
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
 
 class IdempotencyMiddleware(BaseHTTPMiddleware):
@@ -118,10 +132,11 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "X-API-Key", "X-Organization-ID", "Content-Type", "Idempotency-Key", "Stripe-Signature"],
     )
 
+    app.add_middleware(RequestIdMiddleware)
     app.add_middleware(IdempotencyMiddleware)
 
     app.include_router(auth_router)
@@ -139,7 +154,35 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["Health"])
     async def health_check() -> dict[str, Any]:
-        return {"status": "ok", "service": "reliastra-backend"}
+        checks: dict[str, Any] = {}
+        overall_status = "ok"
+
+        # Database connectivity check
+        try:
+            engine = get_engine()
+            from sqlalchemy import text
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            checks["database"] = "ok"
+        except Exception as exc:
+            checks["database"] = f"unavailable: {exc}"
+            overall_status = "degraded"
+
+        # Redis connectivity check
+        try:
+            redis = get_redis()
+            await redis.ping()
+            checks["redis"] = "ok"
+        except Exception as exc:
+            checks["redis"] = f"unavailable: {exc}"
+            overall_status = "degraded"
+
+        status_code = 200 if overall_status == "ok" else 503
+        return {
+            "status": overall_status,
+            "service": "reliastra-backend",
+            "checks": checks,
+        }
 
     return app
 

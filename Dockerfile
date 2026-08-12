@@ -31,6 +31,9 @@ RUN python -m venv --copies /opt/venv && \
 # Use the virtual environment in the final image
 FROM python:3.12-slim
 
+# Create a non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
+
 # Copy the virtual environment from the builder stage
 COPY --from=builder /opt/venv /opt/venv
 
@@ -43,8 +46,14 @@ WORKDIR /app
 # Copy the application code
 COPY . .
 
+# Create required directories and set ownership
+RUN mkdir -p /app/templates && chown -R appuser:appuser /app
+
 # Expose the port the app runs on
 EXPOSE 8000
+
+# Switch to non-root user
+USER appuser
 
 # Run the application
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

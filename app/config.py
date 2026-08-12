@@ -2,10 +2,22 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import logging
+import os
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+_KNOWN_INSECURE_SECRETS = {
+    "reliastra-super-secret-key-that-is-at-least-32-characters-long-for-security",
+    "reliastra-dev-only-change-in-production-key",
+    "changeme",
+    "secret",
+    "your-secret-key-here",
+}
 
 
 class Settings(BaseSettings):
@@ -77,6 +89,26 @@ class Settings(BaseSettings):
         default=True,
         description="Whether to allow cookies/credentials in CORS requests",
     )
+    STRIPE_WEBHOOK_SECRET: str = Field(
+        default="",
+        description="Stripe webhook signing secret for event verification",
+    )
+    ENVIRONMENT: str = Field(
+        default="development",
+        description="Current environment (development, staging, production)",
+    )
+
+    @model_validator(mode="after")
+    def _reject_insecure_defaults_in_production(self) -> type[Settings]:
+        if self.ENVIRONMENT == "production":
+            if self.SECRET_KEY in _KNOWN_INSECURE_SECRETS:
+                raise ValueError(
+                    "SECRET_KEY must be changed from the default value in production. "
+                    "Set a cryptographically random SECRET_KEY environment variable."
+                )
+            if self.MINIO_SECRET_KEY == "minioadmin":
+                logger.warning("MINIO_SECRET_KEY is set to the default 'minioadmin' in production")
+        return self
 
     @property
     def fernet_key(self) -> bytes:

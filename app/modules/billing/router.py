@@ -1,6 +1,6 @@
 import uuid
 from typing import Any
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_current_org
 from app.db.session import get_db
@@ -27,9 +27,13 @@ async def get_organization_plan(
 
 @router.post("/billing/webhook", response_model=dict[str, Any])
 async def stripe_webhook(
-    payload: StripeWebhookPayload,
+    request: Request,
     stripe_signature: str | None = Header(default=None, alias="Stripe-Signature"),
     db: AsyncSession = Depends(get_db),
     service: BillingService = Depends(get_bill_service),
 ) -> dict[str, Any]:
-    return await service.handle_webhook(db, payload.model_dump(), signature=stripe_signature)
+    raw_body = await request.body()
+    payload = StripeWebhookPayload.model_validate(await request.json())
+    return await service.handle_webhook(
+        db, payload.model_dump(), signature=stripe_signature, raw_body=raw_body
+    )

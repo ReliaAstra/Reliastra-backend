@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.ssrf_protection import validate_outbound_url
 from app.modules.checks.constants import (
     CONSECUTIVE_RECOVERY_CHECKS,
     QUORUM_MIN_REGIONS,
@@ -94,6 +95,27 @@ class CheckService:
         status_code: int | None = None
         is_up = False
         error_message: str | None = None
+
+        # SSRF protection: block requests to private/internal IPs
+        try:
+            validate_outbound_url(url)
+        except ValueError as exc:
+            logger.warning("SSRF check blocked URL for dep %s: %s", dependency_id, exc)
+            is_up = False
+            error_message = f"URL blocked by security policy: {exc}"
+            latency_ms = (time.time() - start_time) * 1000.0
+            result = await self.repository.create(
+                session=session,
+                dependency_id=dependency_id,
+                org_id=dep_dto.org_id,
+                region=region,
+                latency_ms=latency_ms,
+                is_up=is_up,
+                status_code=None,
+                error_message=error_message,
+                quorum_confirmed=False,
+            )
+            return result
 
         start_time = time.time()
         try:
