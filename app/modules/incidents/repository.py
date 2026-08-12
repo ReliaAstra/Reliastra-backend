@@ -4,6 +4,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.incidents.models import Incident, IncidentCorrelation
+from app.modules.incidents.constants import IncidentSeverity, IncidentStatus
 
 
 class IncidentRepository:
@@ -20,7 +21,7 @@ class IncidentRepository:
             dependency_id=dependency_id,
             started_at=datetime.now(timezone.utc),
             severity=severity,
-            status="open",
+            status=IncidentStatus.OPEN.value,
             root_cause="unknown",
             description=description,
         )
@@ -42,7 +43,7 @@ class IncidentRepository:
     ) -> Incident | None:
         query = select(Incident).where(
             Incident.dependency_id == dependency_id,
-            Incident.status == "open",
+            Incident.status == IncidentStatus.OPEN.value,
         )
         result = await session.execute(query)
         return result.scalar_one_or_none()
@@ -82,7 +83,7 @@ class IncidentRepository:
             Incident.org_id == org_id,
             Incident.started_at >= start,
             Incident.started_at <= end,
-            Incident.status == "open",
+            Incident.status == IncidentStatus.OPEN.value,
         )
         if exclude_incident_id:
             query = query.where(Incident.id != exclude_incident_id)
@@ -131,3 +132,47 @@ class IncidentRepository:
         )
         result = await session.execute(query)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def list_with_correlations_for_org(
+        session: AsyncSession,
+        org_id: uuid.UUID,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Fetch incidents for an org with their correlations in a batched manner.
+
+        Returns a list of dicts with 'incident' and 'correlations' keys
+        to avoid N+1 queries in the dashboard timeline.
+        """
+        incidents_query = (
+            select(Incident)
+            .where(Incident.org_id == org_id)
+            .order_by(Incident.started_at.desc())
+            .limit(limit)
+        )
+        inc_result = await session.execute(incidents_query)
+        incidents = list(inc_result.scalars().all())
+
+        if not incidents:
+            return []
+
+        incident_ids = [inc.id for inc in incidents]
+        corr_query = (
+            select(IncidentCorrelation)
+            .where(IncidentCorrelation.incident_id.in_(incident_ids))
+            .order_by(IncidentCorrelation.correlation_confidence.desc())
+        )
+        corr_result = await session.execute(corr_query)
+        all_correlations = list(corr_result.scalars().all())
+
+        corr_by_incident: dict[uuid.UUID, list[IncidentCorrelation]] = {}
+        for c in all_correlations:
+            corr_by_incident.setdefault(c.incident_id, []).append(c)
+
+        return [
+            {
+                "incident": inc,
+                "correlations": corr_by_incident.get(inc.id, []),
+            }
+            for inc in incidents
+        ]

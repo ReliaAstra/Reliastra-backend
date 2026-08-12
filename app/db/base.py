@@ -57,3 +57,4 @@ def import_all_models() -> None:
     import app.modules.notifications.models  # noqa: F401
     import app.modules.api_keys.models  # noqa: F401
     import app.modules.billing.models  # noqa: F401
+    import app.modules.dashboard.models  # noqa: F401

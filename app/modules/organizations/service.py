@@ -6,6 +6,7 @@ from app.core.exceptions import (
     ForbiddenException,
     ResourceNotFoundException,
 )
+from app.core.permissions import Role
 from app.modules.organizations.models import Organization, OrganizationMember
 from app.modules.organizations.repository import OrganizationRepository
 from app.modules.organizations.schemas import (
