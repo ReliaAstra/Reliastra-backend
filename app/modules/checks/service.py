@@ -91,6 +91,7 @@ class CheckService:
             else [200]
         )
 
+        start_time = time.time()
         latency_ms = 0.0
         status_code: int | None = None
         is_up = False
@@ -117,6 +118,7 @@ class CheckService:
             )
             return result
 
+        # Reset timer for actual HTTP request
         start_time = time.time()
         try:
             async with httpx.AsyncClient(timeout=timeout, verify=True) as client:

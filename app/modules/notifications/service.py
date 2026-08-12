@@ -1,4 +1,5 @@
 import abc
+import asyncio
 import logging
 import uuid
 from typing import Any
@@ -33,11 +34,13 @@ class EmailChannel(BaseNotificationChannel):
         if not recipient:
             logger.warning("EmailChannel config missing 'email' or 'recipient'")
             return False
-        return email_client.send_email(
+        result = await asyncio.to_thread(
+            email_client.send_email,
             to_email=recipient,
             subject=f"[{alert.severity.upper()}] {alert.title}",
             body=f"{alert.body}\n\nIncident ID: {alert.incident_id or 'N/A'}\nMetadata: {alert.metadata}",
         )
+        return result
 
 
 class SlackChannel(BaseNotificationChannel):

@@ -1,6 +1,7 @@
 import uuid
 from typing import Any
 from fastapi import APIRouter, Depends, Query, status
+from app.modules.evidence.schemas import EvidenceReportResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_current_org, require_member
 from app.db.session import get_db
@@ -81,12 +82,12 @@ async def correlate_incident(
     return await service.manually_correlate(db, org_id, inc_id, request)
 
 
-@router.get("/{inc_id}/evidence", response_model=dict[str, Any])
+@router.get("/{inc_id}/evidence", response_model=EvidenceReportResponse)
 async def get_incident_evidence(
     org_id: uuid.UUID,
     inc_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: IncidentService = Depends(get_inc_service),
-) -> dict[str, Any]:
+) -> EvidenceReportResponse:
     return await service.get_or_trigger_evidence(db, org_id, inc_id)

@@ -4,6 +4,7 @@ from typing import Any
 from sqlalchemy import select, func, update, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.checks.models import CheckResult
+from app.modules.dependencies.models import Dependency
 
 
 class CheckRepository:
@@ -137,3 +138,59 @@ class CheckRepository:
             .values(quorum_confirmed=confirmed)
         )
         await session.execute(stmt)
+
+    @staticmethod
+    async def get_vendor_aggregated_stats(
+        session: AsyncSession,
+        endpoint_url: str,
+        window_hours: int = 24,
+    ) -> dict[str, Any]:
+        """Get aggregated check stats across all dependencies pointing to the same vendor endpoint."""
+        since = datetime.now(timezone.utc) - timedelta(hours=window_hours)
+        query = select(
+            func.count(CheckResult.id).label("total_checks"),
+            func.avg(CheckResult.latency_ms).label("avg_latency"),
+            func.sum(func.cast(CheckResult.is_up, Integer)).label("total_up"),
+        ).join(
+            Dependency, CheckResult.dependency_id == Dependency.id
+        ).where(
+            Dependency.endpoint_url == endpoint_url,
+            CheckResult.executed_at >= since,
+        )
+        res = await session.execute(query)
+        row = res.one_or_none()
+        if not row or not row.total_checks:
+            return {
+                "uptime_percentage": 100.0,
+                "avg_latency_ms": 0.0,
+                "total_checks": 0,
+                "total_up": 0,
+                "total_down": 0,
+            }
+        total_checks = int(row.total_checks or 0)
+        total_up = int(row.total_up or 0)
+        total_down = total_checks - total_up
+        uptime_pct = (total_up / total_checks) * 100.0 if total_checks > 0 else 100.0
+        avg_latency = float(row.avg_latency or 0.0)
+        return {
+            "uptime_percentage": round(uptime_pct, 2),
+            "avg_latency_ms": round(avg_latency, 2),
+            "total_checks": total_checks,
+            "total_up": total_up,
+            "total_down": total_down,
+        }
+
+    @staticmethod
+    async def get_vendor_recent_status(
+        session: AsyncSession,
+        endpoint_url: str,
+        limit: int = 5,
+    ) -> list[CheckResult]:
+        """Get the most recent check results for a vendor endpoint across all deps."""
+        query = select(CheckResult).join(
+            Dependency, CheckResult.dependency_id == Dependency.id
+        ).where(
+            Dependency.endpoint_url == endpoint_url,
+        ).order_by(CheckResult.executed_at.desc()).limit(limit)
+        result = await session.execute(query)
+        return list(result.scalars().all())

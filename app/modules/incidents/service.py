@@ -240,22 +240,22 @@ class IncidentService:
         session: AsyncSession,
         org_id: uuid.UUID,
         inc_id: uuid.UUID,
-    ) -> dict[str, Any]:
+    ) -> EvidenceReportResponse:
         incident = await self.repository.get_by_id(session, inc_id)
         if not incident or incident.org_id != org_id:
             raise ResourceNotFoundException("Incident not found")
 
         from app.modules.evidence.repository import EvidenceRepository
-        from app.modules.evidence.schemas import EvidenceReportResponse
+        from app.modules.evidence.schemas import EvidenceReportResponse as Err
 
         report = await EvidenceRepository.get_by_incident(session, inc_id)
         if report:
-            return EvidenceReportResponse.model_validate(report).model_dump()
+            return Err.model_validate(report)
 
         from app.modules.evidence.service import evidence_service
 
         report = await evidence_service.generate_for_incident(session, inc_id)
-        return EvidenceReportResponse.model_validate(report).model_dump()
+        return Err.model_validate(report)
 
 
 incident_service = IncidentService()

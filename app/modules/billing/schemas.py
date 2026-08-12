@@ -20,3 +20,8 @@ class StripeWebhookPayload(BaseModel):
     id: str
     type: str
     data: dict[str, Any]
+
+
+class StripeWebhookResponse(BaseModel):
+    received: bool
+    event_type: str

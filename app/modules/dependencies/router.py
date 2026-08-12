@@ -1,9 +1,9 @@
 import uuid
-from typing import Any
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_current_org, require_member
 from app.db.session import get_db
+from app.modules.checks.schemas import CheckResultResponse
 from app.modules.dependencies.schemas import (
     DependencyCreateRequest,
     DependencyHistoryResponse,
@@ -89,7 +89,7 @@ async def delete_dependency(
     await service.delete_dependency(db, org_id, dep_id)
 
 
-@router.get("/{dep_id}/results", response_model=list[Any])
+@router.get("/{dep_id}/results", response_model=list[CheckResultResponse])
 async def get_dependency_check_results(
     org_id: uuid.UUID,
     dep_id: uuid.UUID,
@@ -97,7 +97,7 @@ async def get_dependency_check_results(
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: DependencyService = Depends(get_dep_service),
-) -> list[Any]:
+) -> list[CheckResultResponse]:
     # First verify dependency belongs to org
     await service.get_dependency(db, org_id, dep_id)
     from app.modules.checks.service import check_service
