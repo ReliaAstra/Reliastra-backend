@@ -23,6 +23,24 @@ security_bearer = HTTPBearer(auto_error=False)
 # mechanisms to coexist without ambiguity.
 security_api_key = APIKeyHeader(name="X-API-Key", auto_error=False)
 
+# Scopes that confer admin-level access (I-08).
+_ADMIN_SCOPES = {"admin", "*", "write:*", "admin:*"}
+
+
+def _api_key_role(scopes: list[str] | None) -> str:
+    """Resolve an API key's effective role from its declared scopes.
+
+    Empty/unrestricted keys retain full admin access for backward
+    compatibility; keys that declare scopes only reach admin when a scope
+    explicitly grants it.
+    """
+    scopes = scopes or []
+    if not scopes:
+        return Role.ADMIN.value
+    if _ADMIN_SCOPES.intersection({s.lower() for s in scopes}):
+        return Role.ADMIN.value
+    return Role.MEMBER.value
+
 
 async def get_current_user(
     request: Request,
@@ -37,14 +55,32 @@ async def get_current_user(
     auth_header = request.headers.get("authorization", "").strip()
     api_key_header = request.headers.get("x-api-key", "").strip()
 
-    # API key authentication via X-API-Key header or "rel_" prefixed Bearer token
-    if api_key_header or auth_header.lower().startswith("rel_"):
-        raw_key = api_key_header or auth_header
+    # Resolve the raw API key from either the X-API-Key header or an
+    # Authorization header using one of the accepted schemes:
+    #   Authorization: ApiKey rel_xxxxxxxx
+    #   Authorization: Bearer rel_xxxxxxxx
+    #   Authorization: rel_xxxxxxxx
+    raw_key = api_key_header
+    if not raw_key:
+        auth_lower = auth_header.lower()
+        for scheme in ("apikey ", "bearer "):
+            if auth_lower.startswith(scheme):
+                raw_key = auth_header.split(" ", 1)[1].strip()
+                break
+        else:
+            if auth_lower.startswith("rel_"):
+                raw_key = auth_header
+
+    # API key authentication via X-API-Key header or "rel_" prefixed token
+    if raw_key and raw_key.startswith("rel_"):
         api_key = await api_key_service.authenticate_key(db, raw_key)
         request.state.auth_method = "apikey"
         request.state.api_key_org_id = api_key.org_id
         request.state.api_key_scopes = api_key.scopes
-        request.state.current_role = Role.ADMIN.value
+        # Scope-aware role resolution (I-08): a key only attains admin/owner
+        # level when its declared scopes explicitly grant it, instead of the
+        # previous behaviour of unconditionally elevating every API key to ADMIN.
+        request.state.current_role = _api_key_role(api_key.scopes)
 
         org_repo = OrganizationRepository()
         members = await org_repo.list_members(db, api_key.org_id)
@@ -111,7 +147,10 @@ async def get_current_org(
         org = await org_repo.get_by_id(db, org_id_val)
         if not org:
             raise ResourceNotFoundException("Organization not found")
-        request.state.current_role = Role.ADMIN.value
+        # Preserve the scope-derived role rather than re-elevating to ADMIN.
+        request.state.current_role = _api_key_role(
+            getattr(request.state, "api_key_scopes", None)
+        )
         return org
 
     if org_id_val:

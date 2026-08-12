@@ -17,3 +17,4 @@ cryptography>=42.0.0
 minio>=7.2.0
 email-validator>=2.1.0
 python-multipart>=0.0.9
+paystack>=0.8.0

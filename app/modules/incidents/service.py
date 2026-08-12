@@ -14,6 +14,7 @@ from app.modules.incidents.constants import (
 )
 from app.modules.incidents.models import Incident, IncidentCorrelation
 from app.modules.incidents.repository import IncidentRepository
+from app.modules.evidence.schemas import EvidenceReportResponse
 from app.modules.incidents.schemas import (
     IncidentCorrelateRequest,
     IncidentCorrelationResponse,
@@ -246,16 +247,15 @@ class IncidentService:
             raise ResourceNotFoundException("Incident not found")
 
         from app.modules.evidence.repository import EvidenceRepository
-        from app.modules.evidence.schemas import EvidenceReportResponse as Err
 
         report = await EvidenceRepository.get_by_incident(session, inc_id)
         if report:
-            return Err.model_validate(report)
+            return EvidenceReportResponse.model_validate(report)
 
         from app.modules.evidence.service import evidence_service
 
         report = await evidence_service.generate_for_incident(session, inc_id)
-        return Err.model_validate(report)
+        return EvidenceReportResponse.model_validate(report)
 
 
 incident_service = IncidentService()

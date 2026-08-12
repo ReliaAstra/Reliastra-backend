@@ -2,7 +2,12 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_notifications_endpoints(async_client, auth_data):
+async def test_notifications_endpoints(async_client, auth_data, mocker):
+    # No SMTP server in CI — stub the email client so the test alert succeeds.
+    mocker.patch(
+        "app.modules.notifications.service.email_client.send_email",
+        return_value=True,
+    )
     headers = auth_data["headers"]
     org_id = auth_data["org_id"]
 

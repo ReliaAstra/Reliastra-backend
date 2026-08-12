@@ -58,3 +58,9 @@ def import_all_models() -> None:
     import app.modules.api_keys.models  # noqa: F401
     import app.modules.billing.models  # noqa: F401
     import app.modules.dashboard.models  # noqa: F401
+    import app.modules.observations.models  # noqa: F401
+    import app.modules.attribution.models  # noqa: F401
+    import app.modules.evidence.models  # noqa: F401
+    import app.modules.ai_integration.models  # noqa: F401
+    import app.modules.vendors.vendor_models  # noqa: F401
+    import app.modules.organizations.agency_models  # noqa: F401

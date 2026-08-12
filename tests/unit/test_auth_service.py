@@ -20,6 +20,7 @@ async def test_register_success(mocker):
     user_repo.create = AsyncMock(return_value=fake_user)
 
     fake_org = MagicMock(id=uuid.uuid4(), name="My Org", slug="my-org")
+    org_repo.get_by_slug = AsyncMock(return_value=None)
     org_repo.create = AsyncMock(return_value=fake_org)
     org_repo.add_member = AsyncMock()
 

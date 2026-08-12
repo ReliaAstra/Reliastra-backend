@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, ForeignKey, DateTime
+from sqlalchemy import String, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, UUIDMixin, TimestampMixin
 
@@ -20,6 +20,11 @@ class Organization(UUIDMixin, TimestampMixin, Base):
     )
     stripe_subscription_id: Mapped[str | None] = mapped_column(
         String(100), nullable=True
+    )
+    # Deprecated Stripe columns above are kept for backward compatibility.
+    # The subscriptions table (billing module) is the source of truth going forward.
+    has_agency_mode: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
     )
 
     members: Mapped[list["OrganizationMember"]] = relationship(

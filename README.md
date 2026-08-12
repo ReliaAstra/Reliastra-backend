@@ -188,3 +188,52 @@ The test suite runs with **zero external dependencies required** by leveraging e
 ### ADR-005: Why Playwright over WeasyPrint for PDF Evidence Reports?
 - **Decision**: Use Playwright headless browser rendering for PDF evidence report generation, with an automatic `xhtml2pdf` fallback for offline or lightweight test sandboxes.
 - **Rationale**: Evidence reports must be pixel-perfect with embedded SVG latency charts and responsive tables. Playwright renders HTML and CSS exactly like a modern web browser, supporting flexbox and complex CSS features where WeasyPrint falls short. The automatic fallback ensures tests and lightweight containers remain resilient even if Chromium binaries are absent.
+
+---
+
+## 🛠️ Refurbishment (v0.2) — Dependency Intelligence & Evidence Platform
+
+This release implements the executable upgrade plan from the
+*Reliastra Backend Full Refurbishment Mandate* (v1.0, 2026-08-12), transforming
+the MVP into a Dependency Intelligence and Evidence Platform. It preserves the
+modular monolith (FastAPI / SQLAlchemy / PostgreSQL / Redis / Celery / MinIO) and
+adds the missing architectural layers. All migrations are zero-downtime and
+independently reversible (revisions `0002`–`0007`).
+
+### New / Rebuilt Domains
+
+| Domain | Phase | What changed |
+|---|---|---|
+| **Observation Engine** | 2 | New unified `observations` table (range-partitioned) recording every measurement with TLS/DNS/error classification. Customer checks now dual-write observations. Retention task (`purge_old_observations`). |
+| **Vendor Intelligence** | 3 | Canonical `vendors` (slug + icon_url), `vendor_endpoints`, `probe_configs`, `vendor_incidents`, `vendor_metrics_daily` + public metrics/incidents endpoints. |
+| **Attribution Engine** | 6 | Deterministic 5-signal scoring model (temporal alignment, multi-region consensus, error-type consistency, historical reliability, shared-endpoint reuse) with immutable `attribution_results`. |
+| **Evidence System** | 5 | Immutable `evidence_snapshots` with SHA-256 `data_hash` and public `verification_id`; unauthenticated verification API (`/v1/verify/...`). |
+| **Agency Management** | 6 | `clients` and `applications` hierarchy under organizations; `dependencies.application_id` linkage. |
+| **Billing (Paystack)** | 9 | Payment-provider abstraction layer; `subscriptions` table decouples org from provider; Paystack initialize/verify/webhook endpoints. `ManualProvider` dev fallback. |
+| **AI Integration** | 8 | Provider-agnostic LLM config (`ai_providers`, Fernet-encrypted keys) with explain-only `generate_explanation` + template fallback. |
+| **Dashboard** | 11 | Implemented previously-documented `latency` and `sla-degradation` endpoints, resolving the doc/code mismatch. |
+
+### Phase 1 Production Blockers resolved
+- **Billing** rewritten from broken Stripe to a working Paystack provider abstraction (I-01).
+- **API key scopes now enforced** — keys no longer auto-elevate to ADMIN; only `admin`/`write:*`/`*` scopes confer admin (I-08).
+- Added `.env.example`; **SMTP TLS/SSL/STARTTLS + auth** support; configurable **SSRF loopback** policy.
+- Fixed pre-existing runtime bugs (evidence template path, incident evidence return-type, notification schema, `ApiKey <rel_...>` auth parsing, dependency `Authorization` headers, async `scalars` usages).
+- `FRONTEND_API_INTEGRATION_GUIDE.md` corrected to match the implemented endpoints.
+
+### New Routes
+- Agency: `GET/POST /orgs/{id}/clients`, `.../clients/{cid}/applications`, `.../applications`
+- Observation: `GET /orgs/{id}/dependencies/{did}/observations`, `GET /observations/{oid}`
+- Attribution: `POST/GET /orgs/{id}/incidents/{iid}/attribution`, `GET /attributions/{aid}`
+- Verification (public): `GET /verify/{vid}`, `GET /verify/{vid}/hash`, `GET /verify/{vid}/evidence`
+- AI config: `GET/POST /orgs/{id}/ai-providers`, `PATCH/DELETE .../ai-providers/{pid}`
+- Billing: `GET /orgs/{id}/billing/subscription`, `POST .../billing/initialize-payment`, `POST .../billing/verify-transaction`
+- Vendor intel (public): `GET /public/vendors/{slug}/metrics`, `.../incidents`
+- Dashboard: `GET /orgs/{id}/dashboard/latency`, `.../sla-degradation`
+
+### Environment
+Copy `.env.example` → `.env`. Key additions:
+`PAYMENT_PROVIDER`, `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY`, `PAYSTACK_WEBHOOK_SECRET`,
+`SMTP_TLS`/`SMTP_SSL`/`SMTP_USERNAME`/`SMTP_PASSWORD`, `SSRF_ALLOW_LOOPBACK`.
+
+### Migration chain
+`0001_initial → 0002_agency_hierarchy → 0003_observations → 0004_vendor_intel → 0005_attribution_evidence → 0006_billing_subscriptions → 0007_ai_providers`

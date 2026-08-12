@@ -16,3 +16,15 @@ class DependencyHealthResponse(BaseModel):
     current_status: str
     uptime_percentage_24h: float
     avg_latency_ms_24h: float
+
+
+class LatencyPointResponse(BaseModel):
+    timestamp: str
+    region: str
+    latency_ms: float
+
+
+class SLADegradationResponse(BaseModel):
+    total_degradation_pct: float
+    affected_services: int
+    period: str

@@ -56,6 +56,20 @@ class DependencyRepository:
         return int(result.scalar() or 0)
 
     @staticmethod
+    async def count_by_endpoint(
+        session: AsyncSession, endpoint_url: str, exclude_id: uuid.UUID | None = None
+    ) -> int:
+        """Count other active dependencies pointing at the same endpoint."""
+        query = select(func.count(Dependency.id)).where(
+            Dependency.endpoint_url == endpoint_url,
+            Dependency.is_deleted == False,  # noqa: E712
+        )
+        if exclude_id is not None:
+            query = query.where(Dependency.id != exclude_id)
+        result = await session.execute(query)
+        return int(result.scalar() or 0)
+
+    @staticmethod
     async def get_due_dependencies(
         session: AsyncSession,
     ) -> list[Dependency]:

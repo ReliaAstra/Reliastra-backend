@@ -275,11 +275,16 @@ Each incident object includes **Temporal Correlation** data showing if another v
 ]
 ```
 
-### 6.2 Resolve an Incident (`POST /v1/orgs/{org_id}/incidents/{id}/resolve`)
+### 6.2 Resolve an Incident (`PATCH /v1/orgs/{org_id}/incidents/{id}`)
+Resolving is done by updating the incident status to `resolved` via `PATCH`
+(note: `PATCH`, not `POST`). Resolving automatically triggers SLA evidence
+report + immutable evidence snapshot generation.
+
 ```json
 // Request Body
 {
-  "summary": "Vendor confirmed network recovery; quorum checks passing across us-east-1 and eu-west-1."
+  "status": "resolved",
+  "resolution_summary": "Vendor confirmed network recovery; quorum checks passing across us-east-1 and eu-west-1."
 }
 
 // Response (200 OK)
@@ -290,27 +295,41 @@ Each incident object includes **Temporal Correlation** data showing if another v
 }
 ```
 
-### 6.3 Generate SLA Evidence Report (`POST /v1/orgs/{org_id}/evidence/generate`)
-Triggers asynchronous HTML-to-PDF rendering via Playwright with cryptographic SHA-256 integrity checksum calculation.
+### 6.3 SLA Evidence Report
+Evidence is **generated automatically on incident resolution** (there is no
+`POST .../evidence/generate` endpoint). Fetch the report for an incident or list
+all reports for the org:
+
+- `GET /v1/orgs/{org_id}/incidents/{id}/evidence` — the report for one incident (generates it if missing).
+- `GET /v1/orgs/{org_id}/evidence` — list all evidence reports.
+- `GET /v1/orgs/{org_id}/evidence/{report_id}` — download info (presigned URL).
+- `POST /v1/orgs/{org_id}/evidence/{report_id}/regenerate` — regenerate a report.
 
 ```json
-// Request Body
-{
-  "incident_id": "90123456-789a-bcde-f012-3456789abcde",
-  "title": "SLA Degradation Report — Stripe Billing Outage",
-  "include_charts": true
-}
-
-// Response (201 Created)
+// Response (200 OK) — GET /v1/orgs/{org_id}/incidents/{id}/evidence
 {
   "id": "b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e",
-  "title": "SLA Degradation Report — Stripe Billing Outage",
-  "status": "completed",
-  "file_url": "http://localhost:9000/evidence-reports/b1c2d3e4...pdf",
-  "sha256_checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "created_at": "2026-08-11T17:15:00Z"
+  "org_id": "c1a01c80-60b5-4b35-8664-884bf6a2de62",
+  "incident_id": "90123456-789a-bcde-f012-3456789abcde",
+  "file_size_bytes": 48231,
+  "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "generated_at": "2026-08-11T17:15:00Z"
 }
 ```
+
+### 6.4 Public Evidence Verification
+Every resolved incident produces an **immutable evidence snapshot** with a short
+public verification ID. Third parties can independently verify evidence with no
+account or auth:
+
+- `GET /v1/verify/{verification_id}` — metadata + whether the stored hashes match the downloaded evidence.
+- `GET /v1/verify/{verification_id}/hash` — the `data_hash` and `report_checksum` for independent verification.
+- `GET /v1/verify/{verification_id}/evidence` — the machine-readable JSON evidence (observations, attribution, methodology).
+
+### 6.5 Incident Attribution
+- `POST /v1/orgs/{org_id}/incidents/{incident_id}/attribution` — run deterministic attribution scoring.
+- `GET /v1/orgs/{org_id}/incidents/{incident_id}/attribution` — fetch the stored attribution result.
+- `GET /v1/attributions/{attribution_id}` — fetch by attribution id.
 
 ---
 

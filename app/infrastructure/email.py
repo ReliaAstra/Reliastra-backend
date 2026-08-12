@@ -17,6 +17,10 @@ class EmailClient:
         self.smtp_host = smtp_host or settings.SMTP_HOST
         self.smtp_port = smtp_port or settings.SMTP_PORT
         self.smtp_from = smtp_from or settings.SMTP_FROM
+        self.smtp_username = settings.SMTP_USERNAME or None
+        self.smtp_password = settings.SMTP_PASSWORD or None
+        self.smtp_tls = settings.SMTP_TLS
+        self.smtp_ssl = settings.SMTP_SSL
 
     def send_email(
         self,
@@ -41,9 +45,26 @@ class EmailClient:
             msg.attach(MIMEText(html_body, "html"))
 
         try:
-            with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=3) as server:
+            if self.smtp_ssl:
+                server = smtplib.SMTP_SSL(
+                    self.smtp_host, self.smtp_port, timeout=3
+                )
+            else:
+                server = smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=3)
+                if self.smtp_tls:
+                    server.starttls()
+            try:
+                if self.smtp_username and self.smtp_password:
+                    server.login(self.smtp_username, self.smtp_password)
                 server.send_message(msg)
-            logger.info("Successfully sent email via SMTP %s:%s", self.smtp_host, self.smtp_port)
+            finally:
+                server.quit()
+            logger.info(
+                "Successfully sent email via SMTP %s:%s%s",
+                self.smtp_host,
+                self.smtp_port,
+                " (TLS)" if self.smtp_tls else (" (SSL)" if self.smtp_ssl else ""),
+            )
             return True
         except Exception as exc:
             logger.warning("SMTP connect failed (%s), email not sent.", exc)

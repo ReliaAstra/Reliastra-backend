@@ -81,6 +81,22 @@ class Settings(BaseSettings):
         default="noreply@reliastra.com",
         description="Default sender email address",
     )
+    SMTP_USERNAME: str = Field(
+        default="",
+        description="SMTP username for authenticated relaying (optional)",
+    )
+    SMTP_PASSWORD: str = Field(
+        default="",
+        description="SMTP password for authenticated relaying (optional)",
+    )
+    SMTP_TLS: bool = Field(
+        default=False,
+        description="Enable STARTTLS (RFC 3207) on the SMTP connection (recommended for production)",
+    )
+    SMTP_SSL: bool = Field(
+        default=False,
+        description="Use implicit TLS/SSL on the SMTP connection (SMTPS on a dedicated port)",
+    )
     CORS_ORIGINS: list[str] = Field(
         default=["http://localhost:3000", "http://localhost:8000"],
         description="Allowed CORS origins (must be explicit when credentials=True)",
@@ -91,7 +107,39 @@ class Settings(BaseSettings):
     )
     STRIPE_WEBHOOK_SECRET: str = Field(
         default="",
-        description="Stripe webhook signing secret for event verification",
+        description="Deprecated: Stripe webhook signing secret (kept for legacy compat)",
+    )
+    # Payment provider abstraction — default provider is Paystack (see Phase 9).
+    PAYMENT_PROVIDER: str = Field(
+        default="paystack",
+        description="Active payment provider: 'paystack', 'stripe', or 'manual'",
+    )
+    PAYSTACK_SECRET_KEY: str = Field(
+        default="",
+        description="Paystack secret key for server-side API calls",
+    )
+    PAYSTACK_PUBLIC_KEY: str = Field(
+        default="",
+        description="Paystack public key for client-side Paystack.js integration",
+    )
+    PAYSTACK_WEBHOOK_SECRET: str = Field(
+        default="",
+        description="Paystack webhook signing secret for event verification",
+    )
+    PAYSTACK_CALLBACK_URL: str = Field(
+        default="http://localhost:3000/billing/callback",
+        description="URL Paystack redirects the customer to after payment",
+    )
+    # SSRF protection tuning. Loopback is allowed by default for local
+    # development and integration tests, but must be disabled in production
+    # to prevent internal-service probing.
+    SSRF_ALLOW_LOOPBACK: bool = Field(
+        default=True,
+        description="Allow requests to loopback (127.0.0.1) addresses",
+    )
+    SSRF_ALLOWED_CIDRS: list[str] = Field(
+        default=[],
+        description="Extra CIDR ranges allowed through SSRF protection (development only)",
     )
     ENVIRONMENT: str = Field(
         default="development",
@@ -108,6 +156,11 @@ class Settings(BaseSettings):
                 )
             if self.MINIO_SECRET_KEY == "minioadmin":
                 logger.warning("MINIO_SECRET_KEY is set to the default 'minioadmin' in production")
+            if self.SSRF_ALLOW_LOOPBACK:
+                logger.warning(
+                    "SSRF_ALLOW_LOOPBACK is enabled in production; "
+                    "loopback should be blocked in production environments"
+                )
         return self
 
     @property

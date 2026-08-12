@@ -5,6 +5,8 @@ from app.modules.dashboard.repository import DashboardRepository
 from app.modules.dashboard.schemas import (
     DashboardSummaryResponse,
     DependencyHealthResponse,
+    LatencyPointResponse,
+    SLADegradationResponse,
 )
 from app.modules.incidents.repository import IncidentRepository
 from app.modules.incidents.schemas import (
@@ -27,6 +29,20 @@ class DashboardService:
     ) -> DashboardSummaryResponse:
         stats = await self.repository.get_summary_stats(session, org_id)
         return DashboardSummaryResponse.model_validate(stats)
+
+    async def get_latency(
+        self, session: AsyncSession, org_id: uuid.UUID, hours: int = 24
+    ) -> list[LatencyPointResponse]:
+        rows = await self.repository.get_latency_series(session, org_id, hours=hours)
+        return [LatencyPointResponse(**r) for r in rows]
+
+    async def get_sla_degradation(
+        self, session: AsyncSession, org_id: uuid.UUID, days: int = 30
+    ) -> SLADegradationResponse:
+        data = await self.repository.get_sla_degradation(
+            session, org_id, period_days=days
+        )
+        return SLADegradationResponse(**data)
 
     async def get_dependency_health(
         self, session: AsyncSession, org_id: uuid.UUID

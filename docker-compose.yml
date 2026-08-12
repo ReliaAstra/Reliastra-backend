@@ -82,6 +82,12 @@ services:
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
       SMTP_FROM: noreply@reliastra.com
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-paystack}
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+      PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
+      PAYSTACK_WEBHOOK_SECRET: ${PAYSTACK_WEBHOOK_SECRET:-}
+      PAYSTACK_CALLBACK_URL: ${PAYSTACK_CALLBACK_URL:-http://localhost:3000/billing/callback}
+      SSRF_ALLOW_LOOPBACK: ${SSRF_ALLOW_LOOPBACK:-true}
     depends_on:
       postgres:
         condition: service_healthy

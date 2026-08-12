@@ -34,7 +34,7 @@ class AlertConfigCreateRequest(BaseModel):
         return config
 
     @classmethod
-    def model_validate(cls, *args: Any, **kwargs: Any) -> AlertConfigCreateRequest:
+    def model_validate(cls, *args: Any, **kwargs: Any) -> "AlertConfigCreateRequest":
         """Override to add config validation on create."""
         instance = super().model_validate(*args, **kwargs)
         instance.config = instance._redact_config(instance.config, instance.channel_type)

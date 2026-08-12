@@ -21,6 +21,9 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+# Use the manual payment provider in tests (no gateway credentials needed).
+os.environ.setdefault("PAYMENT_PROVIDER", "manual")
+
 from app.config import settings
 from app.db.session import get_db, set_test_engine
 from app.infrastructure.redis_client import set_test_redis
@@ -54,6 +57,16 @@ async def test_engine(setup_test_db_server: str) -> AsyncGenerator[AsyncEngine, 
     async with engine.begin() as conn:
         for table in [
             "audit_logs",
+            "evidence_snapshots",
+            "attribution_results",
+            "ai_providers",
+            "subscriptions",
+            "vendor_incidents",
+            "vendor_metrics_daily",
+            "probe_configs",
+            "vendor_endpoints",
+            "vendors",
+            "observations",
             "refresh_tokens",
             "api_keys",
             "alert_configs",
@@ -61,6 +74,8 @@ async def test_engine(setup_test_db_server: str) -> AsyncGenerator[AsyncEngine, 
             "incident_correlations",
             "incidents",
             "check_results",
+            "applications",
+            "clients",
             "dependencies",
             "organization_members",
             "organizations",

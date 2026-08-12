@@ -19,6 +19,58 @@ from app.modules.dependencies.service import dependency_service
 logger = logging.getLogger(__name__)
 
 
+def classify_error(error_message: str | None) -> str:
+    """Map a check error message to a canonical Observation error type."""
+    if not error_message:
+        return "none"
+    lowered = error_message.lower()
+    if "timeout" in lowered or "timed out" in lowered:
+        return "timeout"
+    if "dns" in lowered or "getaddrinfo" in lowered:
+        return "dns_failure"
+    if "ssl" in lowered or "tls" in lowered or "certificate" in lowered:
+        return "tls_failure"
+    if "connection refused" in lowered or "connect" in lowered:
+        return "connection_refused"
+    if "status code" in lowered or "unexpected status" in lowered:
+        return "http_error"
+    if "blocked by security policy" in lowered:
+        return "http_error"
+    return "http_error"
+
+
+async def _record_observation(
+    session,
+    *,
+    dependency_id,
+    org_id,
+    region,
+    endpoint_url,
+    latency_ms,
+    status_code,
+    error_message,
+) -> None:
+    """Best-effort write of a unified Observation for a customer check."""
+    from app.modules.observations.constants import ObservationSourceType
+    from app.modules.observations.repository import ObservationRepository
+
+    try:
+        await ObservationRepository.create(
+            session,
+            source_type=ObservationSourceType.CUSTOMER_CHECK.value,
+            source_id=dependency_id,
+            org_id=org_id,
+            region=region,
+            endpoint_url=endpoint_url,
+            latency_ms=latency_ms,
+            status_code=status_code,
+            error_type=classify_error(error_message),
+            error_message=error_message,
+        )
+    except Exception as exc:  # Observation write must not break the check path.
+        logger.warning("Failed to record observation for dep %s: %s", dependency_id, exc)
+
+
 class CheckService:
     def __init__(
         self,
@@ -116,6 +168,16 @@ class CheckService:
                 error_message=error_message,
                 quorum_confirmed=False,
             )
+            await _record_observation(
+                session,
+                dependency_id=dependency_id,
+                org_id=dep_dto.org_id,
+                region=region,
+                endpoint_url=url,
+                latency_ms=latency_ms,
+                status_code=None,
+                error_message=error_message,
+            )
             return result
 
         # Reset timer for actual HTTP request
@@ -150,6 +212,17 @@ class CheckService:
             status_code=status_code,
             error_message=error_message,
             quorum_confirmed=False,
+        )
+
+        await _record_observation(
+            session,
+            dependency_id=dependency_id,
+            org_id=dep_dto.org_id,
+            region=region,
+            endpoint_url=url,
+            latency_ms=latency_ms,
+            status_code=status_code,
+            error_message=error_message,
         )
 
         # Evaluate Quorum Logic

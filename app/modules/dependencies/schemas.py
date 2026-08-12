@@ -32,8 +32,11 @@ class DependencyCreateRequest(BaseModel):
     @field_validator("headers")
     @classmethod
     def validate_headers(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        # 'authorization' is permitted (and stored encrypted at rest) because
+        # authenticated dependency health checks require bearer tokens. Hop-by-hop
+        # headers that would conflict with the outbound request are forbidden.
         if v is not None:
-            forbidden = {"authorization", "cookie", "host"}
+            forbidden = {"cookie", "host", "content-length", "transfer-encoding"}
             lower_keys = {k.lower() for k in v.keys()}
             if forbidden & lower_keys:
                 raise ValueError(f"Headers cannot contain: {', '.join(sorted(forbidden))}")
@@ -62,8 +65,10 @@ class DependencyUpdateRequest(BaseModel):
     @field_validator("headers")
     @classmethod
     def validate_headers(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        # 'authorization' is permitted (and stored encrypted at rest) because
+        # authenticated dependency health checks require bearer tokens.
         if v is not None:
-            forbidden = {"authorization", "cookie", "host"}
+            forbidden = {"cookie", "host", "content-length", "transfer-encoding"}
             lower_keys = {k.lower() for k in v.keys()}
             if forbidden & lower_keys:
                 raise ValueError(f"Headers cannot contain: {', '.join(sorted(forbidden))}")

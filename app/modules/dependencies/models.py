@@ -14,6 +14,11 @@ class Dependency(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
         nullable=False,
         index=True,
     )
+    application_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("applications.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     endpoint_url: Mapped[str] = mapped_column(String(500), nullable=False)
     method: Mapped[str] = mapped_column(String(10), default="GET", nullable=False)

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from app.modules.vendors.service import VendorService
 from app.modules.vendors.constants import SEED_VENDORS
@@ -39,7 +39,11 @@ async def test_get_vendor_detail():
 
     service = VendorService(repository=repo)
     session = AsyncMock()
-    res = await service.get_vendor_detail(session, "stripe")
+    with patch(
+        "app.modules.vendors.service.CheckRepository.get_vendor_recent_status",
+        new=AsyncMock(return_value=[]),
+    ):
+        res = await service.get_vendor_detail(session, "stripe")
 
     assert res.vendor_name == "stripe"
-    assert res.recent_status == "operational"
+    assert res.recent_status == "unknown"

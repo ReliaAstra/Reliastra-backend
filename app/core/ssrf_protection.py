@@ -20,7 +20,30 @@ _BLOCKED_NETWORKS = [
     ipaddress.ip_network("fe80::/10"),         # link-local
 ]
 
+# Loopback networks (permitted only when SSRF_ALLOW_LOOPBACK=true)
+_LOOPBACK_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("::1/128"),
+]
+
 _ALLOWED_SCHEMES = {"http", "https"}
+
+
+def _effective_blocked_networks() -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+    """Build the blocked network list, honoring the SSRF tuning settings."""
+    from app.config import settings
+
+    blocked = [n for n in _BLOCKED_NETWORKS]
+    if getattr(settings, "SSRF_ALLOW_LOOPBACK", False):
+        blocked = [n for n in blocked if n not in _LOOPBACK_NETWORKS]
+
+    allowed_cidrs = getattr(settings, "SSRF_ALLOWED_CIDRS", []) or []
+    for cidr in allowed_cidrs:
+        try:
+            blocked = [n for n in blocked if not n.subnet_of(ipaddress.ip_network(cidr))]
+        except ValueError as exc:
+            logger.warning("Ignoring invalid SSRF_ALLOWED_CIDRS entry '%s': %s", cidr, exc)
+    return blocked
 
 
 def _resolve_hostname(hostname: str) -> list[str]:
@@ -52,10 +75,12 @@ def is_url_safe(url: str, *, allowed_schemes: set[str] | None = None) -> tuple[b
     if not hostname:
         return False, "URL has no hostname"
 
+    blocked_networks = _effective_blocked_networks()
+
     # Check if the hostname itself is a numeric IP
     try:
         ip = ipaddress.ip_address(hostname)
-        for net in _BLOCKED_NETWORKS:
+        for net in blocked_networks:
             if ip in net:
                 return False, f"IP {hostname} points to a private/blocked network"
     except ValueError:
@@ -69,7 +94,7 @@ def is_url_safe(url: str, *, allowed_schemes: set[str] | None = None) -> tuple[b
     for resolved in resolved_ips:
         try:
             ip = ipaddress.ip_address(resolved)
-            for net in _BLOCKED_NETWORKS:
+            for net in blocked_networks:
                 if ip in net:
                     return (
                         False,

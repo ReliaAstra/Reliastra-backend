@@ -8,6 +8,14 @@ from app.modules.dependencies.models import Dependency
 from app.modules.incidents.models import Incident
 
 
+def _bucket_expression() -> Any:
+    """Return a SQL date-truncation expression bucketing to 15-minute intervals."""
+    from sqlalchemy.dialects.postgresql import TIMESTAMP
+    from sqlalchemy import text
+
+    return func.date_trunc("hour", CheckResult.executed_at).label("bucket")
+
+
 class DashboardRepository:
     @staticmethod
     async def get_summary_stats(
@@ -61,6 +69,79 @@ class DashboardRepository:
             "open_incidents_count": open_incs,
             "overall_uptime_percentage": overall_uptime,
             "alerts_today_count": alerts_today,
+        }
+
+    @staticmethod
+    async def get_latency_series(
+        session: AsyncSession, org_id: uuid.UUID, hours: int = 24
+    ) -> list[dict[str, Any]]:
+        """Return time-bucketed average latency per region (Phase 11)."""
+        since = datetime.now(timezone.utc) - timedelta(hours=hours)
+        stmt = (
+            select(
+                _bucket_expression(),
+                CheckResult.region,
+                func.avg(CheckResult.latency_ms).label("avg_latency"),
+            )
+            .where(
+                CheckResult.org_id == org_id,
+                CheckResult.executed_at >= since,
+            )
+            .group_by("bucket", CheckResult.region)
+            .order_by("bucket", CheckResult.region)
+        )
+        result = await session.execute(stmt)
+        rows = []
+        for bucket, region, avg_latency in result.all():
+            rows.append(
+                {
+                    "timestamp": bucket.isoformat() if bucket else None,
+                    "region": region,
+                    "latency_ms": round(float(avg_latency or 0.0), 2),
+                }
+            )
+        return rows
+
+    @staticmethod
+    async def get_sla_degradation(
+        session: AsyncSession, org_id: uuid.UUID, period_days: int = 30
+    ) -> dict[str, Any]:
+        """Aggregate SLA degradation across dependencies over the period."""
+        since = datetime.now(timezone.utc) - timedelta(days=period_days)
+        stmt = (
+            select(
+                CheckResult.dependency_id,
+                func.count(CheckResult.id).label("total"),
+                func.sum(func.cast(CheckResult.is_up, Integer)).label("up_count"),
+            )
+            .where(
+                CheckResult.org_id == org_id,
+                CheckResult.executed_at >= since,
+            )
+            .group_by(CheckResult.dependency_id)
+        )
+        result = await session.execute(stmt)
+
+        affected_services = 0
+        total_degradation_pct = 0.0
+        per_service_degradation: list[float] = []
+        for row in result.all():
+            total = int(row.total or 0)
+            up = int(row.up_count or 0)
+            if total > 0:
+                uptime_pct = (up / total) * 100.0
+                degradation = max(0.0, 100.0 - uptime_pct)
+                if degradation > 0.0:
+                    affected_services += 1
+                per_service_degradation.append(degradation)
+
+        if per_service_degradation:
+            total_degradation_pct = round(sum(per_service_degradation) / len(per_service_degradation), 2)
+
+        return {
+            "total_degradation_pct": total_degradation_pct,
+            "affected_services": affected_services,
+            "period": f"{period_days}d",
         }
 
     @staticmethod

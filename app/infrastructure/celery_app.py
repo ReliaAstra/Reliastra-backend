@@ -13,6 +13,8 @@ celery_app = Celery(
         "app.modules.incidents.tasks",
         "app.modules.evidence.tasks",
         "app.modules.notifications.tasks",
+        "app.modules.observations.tasks",
+        "app.modules.vendors.tasks",
     ],
 )
 
@@ -28,6 +30,10 @@ celery_app.conf.update(
         "schedule-checks-periodic": {
             "task": "app.modules.checks.tasks.schedule_checks",
             "schedule": 30.0,
+        },
+        "purge-old-observations-daily": {
+            "task": "app.modules.observations.tasks.purge_old_observations",
+            "schedule": 86400.0,  # once per day
         },
     },
 )
