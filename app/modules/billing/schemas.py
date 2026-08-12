@@ -12,6 +12,10 @@ class PlanDetailsResponse(BaseModel):
     min_check_interval_seconds: int
     subscription_status: str | None = None
     current_period_end: datetime | None = None
+    is_founding_customer: bool = False
+    founding_discount_pct: int = 0
+    price_usd: int = 0
+    discounted_price_usd: int | None = None
 
 
 class PaystackWebhookPayload(BaseModel):
