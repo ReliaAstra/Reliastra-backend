@@ -136,7 +136,17 @@ def create_app() -> FastAPI:
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "X-API-Key", "X-Organization-ID", "Content-Type", "Idempotency-Key", "x-paystack-signature"],
+        allow_headers=[
+            "Authorization",
+            "X-API-Key",
+            "X-Organization-ID",
+            "Content-Type",
+            "Accept",
+            "Accept-Language",
+            "Idempotency-Key",
+            "X-Request-ID",
+            "x-paystack-signature",
+        ],
     )
 
     app.add_middleware(RequestIdMiddleware)
@@ -171,7 +181,11 @@ def create_app() -> FastAPI:
                 await conn.execute(text("SELECT 1"))
             checks["database"] = "ok"
         except Exception as exc:
-            checks["database"] = f"unavailable: {exc}"
+            msg = str(exc)
+            # Truncate long connection error messages for cleanliness
+            if "Connect call failed" in msg:
+                msg = "connection refused"
+            checks["database"] = f"unavailable: {msg}"
             overall_status = "degraded"
 
         # Redis connectivity check
@@ -180,13 +194,17 @@ def create_app() -> FastAPI:
             await redis.ping()
             checks["redis"] = "ok"
         except Exception as exc:
-            checks["redis"] = f"unavailable: {exc}"
+            msg = str(exc)
+            if "Connect call failed" in msg or "Error 111" in msg:
+                msg = "connection refused"
+            checks["redis"] = f"unavailable: {msg}"
             overall_status = "degraded"
 
         response.status_code = 200 if overall_status == "ok" else 503
         return {
             "status": overall_status,
             "service": "reliastra-backend",
+            "version": "0.1.0",
             "checks": checks,
         }
 

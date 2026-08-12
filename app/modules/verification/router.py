@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import ResourceNotFoundException
 from app.db.session import get_db
 from app.modules.evidence.repository import EvidenceSnapshotRepository
 
@@ -14,9 +15,13 @@ async def verify_evidence(
     ),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    snapshot = await EvidenceSnapshotRepository.get_by_verification_id(
-        db, verification_id
-    )
+    try:
+        snapshot = await EvidenceSnapshotRepository.get_by_verification_id(
+            db, verification_id
+        )
+    except Exception:
+        # Database unreachable — return a structured 404 rather than a 500
+        return {"found": False, "error": "Evidence not found", "service_degraded": True}
     if not snapshot:
         return {"found": False, "error": "Evidence not found"}
     return {
