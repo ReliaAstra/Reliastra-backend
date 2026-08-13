@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.rate_limit import ip_limiter, enforce_rate_limit
 from app.db.session import get_db
 from app.modules.auth.schemas import (
+    ForgotPasswordRequest,
     GitHubAuthRequest,
     GitHubAuthResponse,
     GitHubAuthUrlResponse,
@@ -14,7 +15,12 @@ from app.modules.auth.schemas import (
     OAuthAuthResponse,
     RefreshRequest,
     RegisterRequest,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
+    SendVerificationRequest,
     TokenResponse,
+    VerifyEmailRequest,
+    VerifyEmailResponse,
 )
 from app.modules.auth.service import AuthService, auth_service
 from app.modules.auth.google_service import (
@@ -24,6 +30,10 @@ from app.modules.auth.google_service import (
 from app.modules.auth.github_service import (
     GitHubAuthService,
     github_auth_service,
+)
+from app.modules.auth.email_service import (
+    EmailAuthService,
+    email_auth_service,
 )
 from app.modules.users.repository import UserRepository
 
@@ -40,6 +50,10 @@ def get_google_auth_service() -> GoogleAuthService:
 
 def get_github_auth_service() -> GitHubAuthService:
     return github_auth_service
+
+
+def get_email_auth_service() -> EmailAuthService:
+    return email_auth_service
 
 
 # ── Email Auth ──────────────────────────────────────────────
@@ -183,3 +197,58 @@ async def github_auth_callback(
         email=user.email,
         full_name=user.full_name,
     )
+
+
+# ── Email Verification ────────────────────────────────────────
+
+
+@router.post("/send-verification", status_code=status.HTTP_200_OK)
+async def send_verification_email(
+    request: Request,
+    body: SendVerificationRequest,
+    db: AsyncSession = Depends(get_db),
+    service: EmailAuthService = Depends(get_email_auth_service),
+) -> dict:
+    """Send an email verification link to the user's email address."""
+    await enforce_rate_limit(request, ip_limiter)
+    return await service.send_verification_email(db, body.email)
+
+
+@router.post("/verify-email", response_model=VerifyEmailResponse)
+async def verify_email(
+    body: VerifyEmailRequest,
+    db: AsyncSession = Depends(get_db),
+    service: EmailAuthService = Depends(get_email_auth_service),
+) -> VerifyEmailResponse:
+    """Verify a user's email using the token from the verification link."""
+    result = await service.verify_email(db, body.token)
+    return VerifyEmailResponse(**result)
+
+
+# ── Password Reset ──────────────────────────────────────────────
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+async def forgot_password(
+    request: Request,
+    body: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    service: EmailAuthService = Depends(get_email_auth_service),
+) -> dict:
+    """
+    Send a password reset link to the user's email.
+    Always returns the same message to prevent email enumeration.
+    """
+    await enforce_rate_limit(request, ip_limiter)
+    return await service.send_password_reset_email(db, body.email)
+
+
+@router.post("/reset-password", response_model=ResetPasswordResponse)
+async def reset_password(
+    body: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    service: EmailAuthService = Depends(get_email_auth_service),
+) -> ResetPasswordResponse:
+    """Reset a user's password using the token from the reset email."""
+    result = await service.reset_password(db, body.token, body.new_password)
+    return ResetPasswordResponse(**result)
