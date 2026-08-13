@@ -21,8 +21,11 @@ Reliastra is an **external dependency intelligence platform** that monitors thir
    ```
    Owner (40) > Admin (30) > Member (20) > Viewer (10)
    ```
-6. **Dual Authentication**:
-   - JWT Access (`15m` expiry) and Refresh (`7d` expiry) tokens for human users.
+6. **Triple Authentication**:
+   - **Email/Password** registration and login with bcrypt-hashed passwords.
+   - **Google OAuth 2.0** — authorization code flow with automatic account creation, email-based account linking, and verified email enforcement.
+   - **GitHub OAuth 2.0** — authorization code flow with parallel user info + email fetching, multi-tier email resolution (public → primary verified → any verified → noreply fallback), and automatic account creation.
+   - JWT Access (`15m` expiry) and Refresh (`7d` expiry) tokens for all human user flows.
    - Hashed API keys (SHA-256) for programmatic and CI/CD access (`rel_...`).
 7. **SLA Evidence Generation**:
    - Renders structured incident metadata, per-region latency charts (embedded SVG), SLA degradation percentages, and cross-vendor correlations into pixel-perfect PDF evidence reports.
@@ -40,7 +43,7 @@ Reliastra is an **external dependency intelligence platform** that monitors thir
 | **Cache / Queue** | Redis 7+ | Celery broker/backend, idempotency cache, rate limiting |
 | **Task Queue** | Celery + Celery Beat | Check scheduler (every 10s), evidence PDF generation, alert dispatch |
 | **Object Storage** | MinIO (S3-Compatible) | Storage for generated evidence PDF reports |
-| **Auth** | JWT + API Keys | Stateless, organization-scoped, RBAC-ready |
+| **Auth** | JWT + API Keys + OAuth 2.0 | Stateless, organization-scoped, RBAC-ready; Google & GitHub OAuth support |
 | **PDF Generation** | Playwright / HTML | High-fidelity HTML to PDF rendering with automatic local fallback |
 
 ---
@@ -66,7 +69,7 @@ reliastra/
 │   │   ├── base.py             # DeclarativeBase, mixins (UUIDMixin, TimestampMixin, SoftDeleteMixin)
 │   │   └── migrations/         # Alembic migration scripts and env.py
 │   ├── modules/                # Self-contained domain modules
-│   │   ├── auth/               # Register, login, refresh, logout
+│   │   ├── auth/               # Email auth, Google OAuth, GitHub OAuth, refresh, logout
 │   │   ├── users/              # Current user profile (/me)
 │   │   ├── organizations/      # Organizations & RBAC members management
 │   │   ├── dependencies/       # External endpoints monitoring configurations
@@ -167,6 +170,52 @@ The test suite runs with **zero external dependencies required** by leveraging e
 
 ---
 
+## 🔐 OAuth Configuration (Google & GitHub)
+
+OAuth providers are disabled by default. To enable, set the following environment variables:
+
+```bash
+# Google OAuth 2.0
+GOOGLE_AUTH_ENABLED=true
+GOOGLE_CLIENT_ID="your-google-client-id.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="GOCSPX-xxxxxxxxxx"
+GOOGLE_REDIRECT_URI="https://yourapp.com/auth/google/callback"
+
+# GitHub OAuth 2.0
+GITHUB_AUTH_ENABLED=true
+GITHUB_CLIENT_ID="Ov23li_xxxxxxxx"
+GITHUB_CLIENT_SECRET="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+GITHUB_REDIRECT_URI="https://yourapp.com/auth/github/callback"
+```
+
+### OAuth Flow Summary
+
+Both providers follow the **authorization code flow**:
+
+1. **Frontend** calls `GET /v1/auth/{provider}/url` → receives an `authorization_url` + `state` token.
+2. **Frontend** redirects the user to the provider's consent screen.
+3. **Provider** redirects back to the frontend with a `code` query parameter.
+4. **Frontend** sends `POST /v1/auth/{provider}` with `{ "code": "..." }`.
+5. **Backend** exchanges the code for an access token, fetches user profile, finds or creates the local user, and returns JWT tokens.
+
+### OAuth Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/v1/auth/google/url` | Get Google OAuth authorization URL + state token |
+| `POST` | `/v1/auth/google` | Exchange Google auth code for JWT tokens |
+| `GET` | `/v1/auth/github/url` | Get GitHub OAuth authorization URL + state token |
+| `POST` | `/v1/auth/github` | Exchange GitHub auth code for JWT tokens |
+
+### Account Linking Behavior
+
+If a user with the same email already exists (e.g., registered via email/password or the other OAuth provider), the OAuth flow **links** the new provider identity to the existing account rather than creating a duplicate. This means:
+- A user who signs up with email can later sign in with Google or GitHub using the same email.
+- A Google OAuth user can later sign in with GitHub if both use the same email.
+- The `auth_provider` field is updated to reflect the most recently used provider.
+
+---
+
 ## 🏛️ Architecture Decision Records (ADRs)
 
 ### ADR-001: Why FastAPI + SQLAlchemy 2.0 Async?
@@ -188,3 +237,11 @@ The test suite runs with **zero external dependencies required** by leveraging e
 ### ADR-005: Why Playwright over WeasyPrint for PDF Evidence Reports?
 - **Decision**: Use Playwright headless browser rendering for PDF evidence report generation, with an automatic `xhtml2pdf` fallback for offline or lightweight test sandboxes.
 - **Rationale**: Evidence reports must be pixel-perfect with embedded SVG latency charts and responsive tables. Playwright renders HTML and CSS exactly like a modern web browser, supporting flexbox and complex CSS features where WeasyPrint falls short. The automatic fallback ensures tests and lightweight containers remain resilient even if Chromium binaries are absent.
+
+### ADR-006: Why Authorization Code Flow for OAuth (not Implicit/PKCE)?
+- **Decision**: Implement both Google and GitHub OAuth using the server-side authorization code flow, where the backend exchanges the code for tokens and the frontend never handles provider access tokens directly.
+- **Rationale**: The authorization code flow keeps OAuth client secrets server-side (never exposed to the browser), eliminates token leakage risk on the frontend, and allows the backend to perform account linking and user creation atomically within a single database transaction. This is more secure than the implicit flow (deprecated by OAuth 2.1) and simpler than PKCE for server-rendered API backends. The backend acts as a trusted intermediary, exchanging the short-lived authorization code for provider tokens, fetching user profiles, and returning only Reliastra JWTs to the frontend.
+
+### ADR-007: Why Email-Based Account Linking Across OAuth Providers?
+- **Decision**: When a user authenticates via Google or GitHub and an existing user with the same email already exists, automatically link the OAuth identity to the existing account instead of creating a duplicate.
+- **Rationale**: Users expect to use the same account across sign-in methods. Without email-based linking, a user who signs up with email and later tries Google SSO would get a confusing "account already exists" error. The linking approach reduces friction and matches the behavior of major platforms (GitHub, GitLab, Notion). The trade-off is that an attacker who controls an unverified email on a provider could potentially link to another user's account — this is mitigated by requiring verified emails on Google and prioritizing verified emails on GitHub.

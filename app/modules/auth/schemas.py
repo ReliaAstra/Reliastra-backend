@@ -1,3 +1,5 @@
+import uuid
+
 from pydantic import BaseModel, EmailStr, field_validator
 from app.modules.auth.constants import TOKEN_TYPE_BEARER
 
@@ -34,3 +36,34 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = TOKEN_TYPE_BEARER
     expires_in: int
+
+
+class GoogleAuthUrlResponse(BaseModel):
+    authorization_url: str
+    state: str
+
+
+class GoogleAuthRequest(BaseModel):
+    code: str
+
+
+class GitHubAuthUrlResponse(BaseModel):
+    authorization_url: str
+    state: str
+
+
+class GitHubAuthRequest(BaseModel):
+    code: str
+
+
+class OAuthAuthResponse(TokenResponse):
+    """Shared response for both Google and GitHub OAuth."""
+    is_new_user: bool = False
+    user_id: uuid.UUID
+    email: str
+    full_name: str
+
+
+# Aliases so existing Google code still works
+GoogleAuthResponse = OAuthAuthResponse
+GitHubAuthResponse = OAuthAuthResponse
