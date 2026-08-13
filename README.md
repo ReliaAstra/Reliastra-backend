@@ -38,10 +38,12 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    ```
    Owner (40) > Admin (30) > Member (20) > Viewer (10)
    ```
-6. **Triple Authentication**:
+6. **Triple Authentication & Account Security**:
    - **Email/Password** registration and login with bcrypt-hashed passwords.
    - **Google OAuth 2.0** — authorization code flow with automatic account creation, email-based account linking, and verified email enforcement.
    - **GitHub OAuth 2.0** — authorization code flow with parallel user info + email fetching, multi-tier email resolution (public → primary verified → any verified → noreply fallback), and automatic account creation.
+   - **Email Verification** — one-time link sent to user's inbox, SHA-256 hashed tokens with 60-minute expiry, automatic revocation of prior tokens on re-send.
+   - **Password Reset** — anti-enumeration forgot-password flow (generic success message regardless of email existence), SHA-256 hashed tokens with 15-minute expiry, single-use tokens with automatic revocation.
    - JWT Access (`15m` expiry) and Refresh (`7d` expiry) tokens for all human user flows.
    - Hashed API keys (SHA-256) for programmatic and CI/CD access (`rel_...`).
 7. **SLA Evidence Generation**:
@@ -82,6 +84,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 | `SMTP_HOST` | `localhost` | SMTP server for notifications |
 | `SMTP_PORT` | `1025` | SMTP port |
 | `SMTP_FROM` | `noreply@reliastra.com` | Sender email address |
+| `FRONTEND_BASE_URL` | `http://localhost:3000` | Frontend base URL for email verification & password reset links |
+| `SMTP_USE_TLS` | `false` | Enable TLS for SMTP (STARTTLS on port 587) |
 
 ### Deployment Checklist
 
@@ -116,7 +120,7 @@ The codebase follows a modular monolith pattern. Each module contains its own ro
 
 | Module | Prefix | Auth | Description |
 |--------|--------|------|-------------|
-| Authentication | `/v1/auth` | Public | Register, login, refresh, logout, Google & GitHub OAuth |
+| Authentication | `/v1/auth` | Public | Register, login, refresh, logout, Google & GitHub OAuth, email verification, password reset |
 | Users | `/v1/users` | JWT/API Key | User profile management |
 | Organizations | `/v1/orgs` | JWT/API Key | Multi-tenant org and member management |
 | Dependencies | `/v1/orgs/{id}/dependencies` | JWT/API Key | External API monitoring targets |
@@ -141,6 +145,8 @@ Three authentication methods are supported for human users:
 - **GitHub OAuth**: `GET /v1/auth/github/url` → `POST /v1/auth/github`
 - **JWT**: `Authorization: Bearer <token>` — 15min access, 7-day refresh
 - **API Keys**: `X-API-Key: rel_xxxxxxxx` — SHA-256 hashed, scope-enforced
+- **Email Verification**: `POST /v1/auth/send-verification` → `POST /v1/auth/verify-email`
+- **Password Reset**: `POST /v1/auth/forgot-password` → `POST /v1/auth/reset-password`
 
 ### RBAC Hierarchy
 
@@ -242,7 +248,7 @@ Reliastra-backend/
 │   │   ├── base.py             # DeclarativeBase, mixins (UUIDMixin, TimestampMixin, SoftDeleteMixin)
 │   │   └── migrations/         # Alembic migration scripts and env.py
 │   ├── modules/                # Self-contained domain modules
-│   │   ├── auth/               # Email auth, Google OAuth, GitHub OAuth, refresh, logout
+│   │   ├── auth/               # Email auth, Google OAuth, GitHub OAuth, refresh, logout, email verification, password reset
 │   │   ├── users/              # Current user profile (/me)
 │   │   ├── organizations/      # Organizations & RBAC members management
 │   │   ├── dependencies/       # External endpoints monitoring configurations
@@ -258,7 +264,7 @@ Reliastra-backend/
 │       ├── celery_app.py       # Celery configuration and Beat check schedule
 │       ├── redis_client.py     # Shared async Redis client
 │       ├── storage.py          # S3/MinIO storage abstraction with fallback
-│       └── email.py            # SMTP/SES email sending client
+│       └── email.py            # SMTP email sending client (verification & password reset emails)
 ├── templates/evidence/      # Jinja2 evidence report template
 ├── tests/                   # Unit, integration, and E2E tests
 ├── docs/                    # OpenAPI spec and frontend integration guide
