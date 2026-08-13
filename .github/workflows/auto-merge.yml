@@ -1,0 +1,124 @@
+name: Auto-Merge — Merge Passing PRs
+
+on:
+  pull_request:
+    types: [labeled, unlabeled, synchronize, opened, reopened]
+  check_suite:
+    types: [completed]
+
+concurrency:
+  group: automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  auto-merge:
+    name: Auto-Merge on Green
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check if PR has automerge label
+        id: check-label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+            const hasAutoMerge = labels.includes('auto-merge');
+            core.setOutput('auto_merge', hasAutoMerge ? 'true' : 'false');
+            console.log(`Labels: ${labels.join(', ')}`);
+            console.log(`Auto-merge enabled: ${hasAutoMerge}`);
+
+      - name: Wait for CI checks to complete
+        if: steps.check-label.outputs.auto_merge == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const maxWaitMs = 30 * 60 * 1000; // 30 minutes
+            const pollIntervalMs = 15000; // 15 seconds
+            const startTime = Date.now();
+
+            async function getCheckStatus() {
+              const { data: checks } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: context.payload.pull_request.head.sha
+              });
+
+              const relevantChecks = checks.check_runs.filter(c =>
+                c.name.includes('CI') ||
+                c.name.includes('Lint') ||
+                c.name.includes('Security') ||
+                c.name.includes('Test') ||
+                c.name.includes('Import')
+              );
+
+              const completed = relevantChecks.filter(c => c.status === 'completed');
+              const pending = relevantChecks.filter(c => c.status !== 'completed');
+              const failed = completed.filter(c => c.conclusion !== 'success' && c.conclusion !== 'skipped');
+
+              return { completed, pending, failed, total: relevantChecks.length };
+            }
+
+            console.log(`Waiting for CI checks on PR #${prNumber}...`);
+
+            while (Date.now() - startTime < maxWaitMs) {
+              const { completed, pending, failed, total } = await getCheckStatus();
+
+              if (pending.length === 0) {
+                if (failed.length > 0) {
+                  core.setFailed(`${failed.length} check(s) failed. Auto-merge aborted.`);
+                  return;
+                }
+                console.log(`All ${total} checks passed.`);
+                return;
+              }
+
+              console.log(`${completed.length}/${total} completed, ${pending.length} pending...`);
+              await new Promise(r => setTimeout(r, pollIntervalMs));
+            }
+
+            core.setFailed('Timed out waiting for CI checks.');
+            return;
+
+      - name: Enable auto-merge
+        if: steps.check-label.outputs.auto_merge == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.pull_request.number,
+                merge_method: 'merge',
+                commit_title: `Auto-merge PR #${context.payload.pull_request.number}: ${context.payload.pull_request.title}`
+              });
+              console.log(`Successfully merged PR #${context.payload.pull_request.number}`);
+            } catch (error) {
+              console.log(`Merge attempt result: ${error.message}`);
+              if (error.status === 405) {
+                console.log('PR is not mergeable (draft, conflicts, or missing approvals). Skipping.');
+              } else if (error.status === 409) {
+                console.log('PR head branch is not up to date. Attempting update merge...');
+                await github.rest.pulls.updateBranch({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.payload.pull_request.number
+                });
+                // Retry merge after update
+                await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.payload.pull_request.number,
+                  merge_method: 'merge',
+                  commit_title: `Auto-merge PR #${context.payload.pull_request.number}: ${context.payload.pull_request.title}`
+                });
+                console.log(`Successfully merged PR #${context.payload.pull_request.number} after branch update`);
+              } else {
+                core.setFailed(`Failed to merge: ${error.message}`);
+              }
+            }
