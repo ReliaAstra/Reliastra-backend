@@ -14,7 +14,16 @@ from app.core.exceptions import (
     UnauthorizedException,
     ValidationException,
 )
-from app.core.permissions import Plan, get_dependency_limit, get_min_check_interval
+from app.core.permissions import (
+    FOUNDING_DISCOUNT_PCT,
+    FOUNDING_MAX_SPOTS,
+    PLAN_AMOUNTS,
+    Plan,
+    get_dependency_limit,
+    get_discounted_price_usd,
+    get_min_check_interval,
+    get_plan_price_usd,
+)
 from app.modules.billing.repository import BillingRepository
 from app.modules.billing.schemas import (
     InitializePaymentRequest,
@@ -86,11 +95,14 @@ class PaystackClient:
 
 paystack_client = PaystackClient()
 
-# Amounts are in kobo. Product pricing has not yet been finalized; keeping the
-# mapping explicit prevents client-supplied amounts from ever reaching Paystack.
+# Amounts are in kobo (1 USD = 100 kobo).  Prices match the pricing page:
+#   Standard:   $49/mo  ->  4,900 kobo
+#   Professional: $99/mo  ->  9,900 kobo
+# Agency plans use custom pricing and are not self-serve.
+# Founding customers receive 40% off (applied at initialization).
 PLAN_AMOUNTS: dict[str, int] = {
-    Plan.STANDARD.value: 0,
-    Plan.PROFESSIONAL.value: 0,
+    Plan.STANDARD.value: 4900,
+    Plan.PROFESSIONAL.value: 9900,
     Plan.AGENCY.value: 0,
 }
 
@@ -139,6 +151,12 @@ class BillingService:
         if not org:
             raise ResourceNotFoundException("Organization not found")
         subscription = await self.repository.get_subscription(session, org_id)
+        is_founding = getattr(org, "is_founding_customer", False)
+        discount_pct = getattr(org, "founding_discount_pct", 0)
+        base_price = get_plan_price_usd(org.plan)
+        discounted_price = None
+        if is_founding and base_price > 0:
+            discounted_price = get_discounted_price_usd(org.plan)
         return PlanDetailsResponse(
             org_id=org.id,
             plan=org.plan,
@@ -148,6 +166,10 @@ class BillingService:
             current_period_end=(
                 subscription.current_period_end if subscription else None
             ),
+            is_founding_customer=is_founding,
+            founding_discount_pct=discount_pct,
+            price_usd=base_price,
+            discounted_price_usd=discounted_price,
         )
 
     async def initialize_payment(
@@ -163,6 +185,28 @@ class BillingService:
         plan = request.plan.lower()
         if plan not in PLAN_AMOUNTS:
             raise ValidationException(f"Invalid paid plan: {plan}")
+        if plan == Plan.AGENCY.value:
+            raise ValidationException(
+                "Agency plans require custom pricing. Please contact sales."
+            )
+
+        base_amount = PLAN_AMOUNTS[plan]
+        is_founding = getattr(org, "is_founding_customer", False)
+        discount_pct = 0
+
+        if is_founding and plan in (Plan.STANDARD.value, Plan.PROFESSIONAL.value):
+            discount_pct = FOUNDING_DISCOUNT_PCT
+            discounted_kobo = base_amount - (base_amount * discount_pct // 100)
+            logger.info(
+                "Founding customer discount applied: org=%s plan=%s "
+                "base=%dkobo discounted=%dkobo (%d%% off)",
+                org_id,
+                plan,
+                base_amount,
+                discounted_kobo,
+                discount_pct,
+            )
+            base_amount = discounted_kobo
 
         email = str(request.email) if request.email else None
         if not email:
@@ -182,9 +226,14 @@ class BillingService:
         try:
             result = await self.client.initialize_transaction(
                 email=email,
-                amount=PLAN_AMOUNTS[plan],
+                amount=base_amount,
                 plan=plan,
-                metadata={"org_id": str(org_id), "plan": plan},
+                metadata={
+                    "org_id": str(org_id),
+                    "plan": plan,
+                    "is_founding": str(is_founding).lower(),
+                    "discount_pct": str(discount_pct),
+                },
             )
         except httpx.HTTPError as exc:
             logger.warning("Paystack initialization failed: %s", exc)

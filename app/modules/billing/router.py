@@ -2,9 +2,28 @@ import json
 import uuid
 
 from fastapi import APIRouter, Depends, Header, Query, Request
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
+from app.core.exceptions import (
+    ResourceNotFoundException,
+    UnauthorizedException,
+    ValidationException,
+)
+from app.core.permissions import (
+    FOUNDING_DISCOUNT_PCT,
+    FOUNDING_MAX_SPOTS,
+    PLAN_AMOUNTS,
+    PLAN_DEPENDENCY_LIMITS,
+    PLAN_PRICES_USD,
+    Plan,
+    get_dependency_limit,
+    get_discounted_price_usd,
+    get_min_check_interval,
+    get_plan_price_usd,
+)
 from app.db.session import get_db
 from app.dependencies import get_current_org, require_admin
 from app.modules.billing.schemas import (
@@ -23,6 +42,80 @@ router = APIRouter(prefix="/v1", tags=["Billing"])
 
 def get_bill_service() -> BillingService:
     return billing_service
+
+
+# ── Public Endpoints (no auth required) ──────────────────────────────────────────
+
+
+class FoundingSpotsResponse(BaseModel):
+    total_spots: int
+    spots_taken: int
+    spots_remaining: int
+    founding_discount_pct: int
+    standard_price_usd: int
+    professional_price_usd: int
+    founding_standard_price_usd: int
+    founding_professional_price_usd: int
+
+
+@router.get("/public/founding-spots", response_model=FoundingSpotsResponse)
+async def get_founding_spots(
+    db: AsyncSession = Depends(get_db),
+) -> FoundingSpotsResponse:
+    """Public endpoint for the landing page showing founding customer spots remaining.
+    Returns pricing, discount information, and how many founding spots are left.
+    """
+    try:
+        result = await db.execute(
+            select(func.count()).select_from(Organization).where(
+                Organization.is_founding_customer.is_(True)
+            )
+        )
+        spots_taken = result.scalar() or 0
+    except Exception:
+        spots_taken = 0
+
+    return FoundingSpotsResponse(
+        total_spots=FOUNDING_MAX_SPOTS,
+        spots_taken=spots_taken,
+        spots_remaining=max(0, FOUNDING_MAX_SPOTS - spots_taken),
+        founding_discount_pct=FOUNDING_DISCOUNT_PCT,
+        standard_price_usd=PLAN_PRICES_USD.get(Plan.STANDARD.value, 0),
+        professional_price_usd=PLAN_PRICES_USD.get(Plan.PROFESSIONAL.value, 0),
+        founding_standard_price_usd=get_discounted_price_usd(Plan.STANDARD.value),
+        founding_professional_price_usd=get_discounted_price_usd(Plan.PROFESSIONAL.value),
+    )
+
+
+class PricingPlansResponse(BaseModel):
+    plans: list[dict]
+
+
+@router.get("/public/pricing", response_model=PricingPlansResponse)
+async def get_pricing_plans() -> PricingPlansResponse:
+    """Public endpoint returning all plan details for the pricing page."""
+    plans = []
+    for plan_enum in Plan:
+        p = plan_enum.value
+        base_price = PLAN_PRICES_USD.get(p, 0)
+        plans.append({
+            "plan": p,
+            "max_dependencies": PLAN_DEPENDENCY_LIMITS.get(p, 0),
+            "min_check_interval_seconds": {
+                k: v for k, v in {
+                    Plan.FREE.value: 60,
+                    Plan.STANDARD.value: 15,
+                    Plan.PROFESSIONAL.value: 5,
+                    Plan.AGENCY.value: 5,
+                }.items() if k == p
+            }.get(p, 60),
+            "price_usd": base_price,
+            "founding_price_usd": get_discounted_price_usd(p) if base_price > 0 else 0,
+        })
+    return PricingPlansResponse(plans=plans)
+
+
+# ── Authenticated Endpoints ──────────────────────────────────────────────────────
 
 
 @router.get("/orgs/{org_id}/billing/plan", response_model=PlanDetailsResponse)
@@ -59,9 +152,6 @@ async def verify_transaction(
     try:
         return await service.verify_transaction(db, reference)
     except Exception as exc:
-        from app.core.exceptions import ValidationException
-        # Return a structured response instead of a raw 500 when Paystack
-        # is unconfigured or the request fails for any infra-level reason.
         raise ValidationException(
             f"Transaction verification failed: {exc}"
         ) from exc
@@ -80,8 +170,6 @@ async def paystack_webhook(
     try:
         payload = PaystackWebhookPayload.model_validate(json.loads(raw_body))
     except (json.JSONDecodeError, UnicodeDecodeError, ValidationError) as exc:
-        from app.core.exceptions import ValidationException
-
         raise ValidationException("Invalid Paystack webhook body") from exc
     return await service.handle_webhook(
         db,
