@@ -19,18 +19,38 @@ class UserRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_google_id(session: AsyncSession, google_id: str) -> User | None:
+        query = select(User).where(User.google_id == google_id)
+        result = await session.execute(query)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_by_github_id(session: AsyncSession, github_id: str) -> User | None:
+        query = select(User).where(User.github_id == github_id)
+        result = await session.execute(query)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def create(
         session: AsyncSession,
         email: str,
         password_hash: str,
         full_name: str,
         is_superuser: bool = False,
+        google_id: str | None = None,
+        github_id: str | None = None,
+        avatar_url: str | None = None,
+        auth_provider: str | None = None,
     ) -> User:
         user = User(
             email=email.lower(),
             password_hash=password_hash,
             full_name=full_name,
             is_superuser=is_superuser,
+            google_id=google_id,
+            github_id=github_id,
+            avatar_url=avatar_url,
+            auth_provider=auth_provider,
         )
         session.add(user)
         await session.flush()

@@ -29,9 +29,13 @@ This guide provides frontend and dashboard developers with complete integration 
 
 ## 2. Authentication & Session Lifecycle
 
-The platform supports **Dual Authentication**:
-1. **JWT Access & Refresh Tokens** for human users in browser dashboards.
-2. **API Keys** (`rel_...`) for automated CI/CD and script integrations.
+The platform supports **Triple Authentication**:
+1. **Email/Password** — traditional registration and login with bcrypt-hashed passwords.
+2. **Google OAuth 2.0** — one-click sign-up/sign-in via Google account.
+3. **GitHub OAuth 2.0** — one-click sign-up/sign-in via GitHub account.
+4. **API Keys** (`rel_...`) for automated CI/CD and script integrations.
+
+All human-facing auth methods (email, Google, GitHub) return the same JWT token pair (`access_token` + `refresh_token`). OAuth flows also return additional user metadata (`is_new_user`, `user_id`, `email`, `full_name`).
 
 ### 2.1 HTTP Authentication Headers
 - For user sessions:  
@@ -97,6 +101,105 @@ Revokes the refresh token in Redis and PostgreSQL.
 }
 // Response (204 No Content — empty body)
 ```
+
+### 2.3 Google OAuth 2.0 Flow
+
+#### **GET /v1/auth/google/url**
+Returns the Google OAuth consent screen URL and a CSRF `state` token.
+```json
+// Response (200 OK)
+{
+  "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...&scope=openid+email+profile&...",
+  "state": "random_csrf_state_token_32_bytes"
+}
+```
+
+**Frontend implementation:**
+1. Call this endpoint to get the URL and state.
+2. Store the `state` in session storage (for CSRF validation).
+3. Redirect `window.location.href` to the `authorization_url`.
+4. Google redirects back to your `GOOGLE_REDIRECT_URI` with `?code=...&state=...`.
+5. Verify the `state` matches, then call `/v1/auth/google` with the code.
+
+#### **POST /v1/auth/google**
+Exchange the Google authorization code for Reliastra JWT tokens.
+```json
+// Request Body
+{
+  "code": "4/0AX4XfWg..."
+}
+
+// Response (200 OK)
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsIn...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsIn...",
+  "token_type": "bearer",
+  "expires_in": 900,
+  "is_new_user": true,
+  "user_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "email": "user@gmail.com",
+  "full_name": "John Doe"
+}
+```
+
+**Key response fields:**
+- `is_new_user`: `true` if this was a first-time Google sign-up (new account created). `false` if the user already existed (sign-in or account link).
+- Use `is_new_user` to show a "Welcome! Complete your profile" onboarding flow vs. a direct redirect to the dashboard.
+- Store tokens in `localStorage` exactly like email auth (same token format).
+
+### 2.4 GitHub OAuth 2.0 Flow
+
+#### **GET /v1/auth/github/url**
+Returns the GitHub OAuth authorization URL and a CSRF `state` token.
+```json
+// Response (200 OK)
+{
+  "authorization_url": "https://github.com/login/oauth/authorize?client_id=...&scope=read:user+user:email&...",
+  "state": "random_csrf_state_token_32_bytes"
+}
+```
+
+**Frontend implementation:**
+1. Call this endpoint to get the URL and state.
+2. Store the `state` in session storage (for CSRF validation).
+3. Redirect `window.location.href` to the `authorization_url`.
+4. GitHub redirects back to your `GITHUB_REDIRECT_URI` with `?code=...&state=...`.
+5. Verify the `state` matches, then call `/v1/auth/github` with the code.
+
+#### **POST /v1/auth/github**
+Exchange the GitHub authorization code for Reliastra JWT tokens.
+```json
+// Request Body
+{
+  "code": "a28f3eb5e6b1e7d2c9a0..."
+}
+
+// Response (200 OK)
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsIn...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsIn...",
+  "token_type": "bearer",
+  "expires_in": 900,
+  "is_new_user": true,
+  "user_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "email": "user@users.noreply.github.com",
+  "full_name": "octocat"
+}
+```
+
+**GitHub-specific notes:**
+- GitHub users can keep their email private. The backend uses a multi-tier resolution: public profile email > primary verified email > any verified email > `login@users.noreply.github.com`.
+- If the response email is a `noreply.github.com` address, prompt the user to update their email in account settings.
+- The `full_name` field uses the GitHub `name` if available, otherwise falls back to the GitHub `login` (username).
+
+### 2.5 Account Linking Across Providers
+
+All three auth methods (email, Google, GitHub) are unified by **email address**. If a user registers with `admin@reliastra.dev` via email and later signs in with Google using the same email, the Google identity is linked to the existing account — no duplicate is created. The same applies for GitHub.
+
+**Frontend UX recommendations:**
+- On the login page, show "Continue with Google" and "Continue with GitHub" buttons alongside the email/password form.
+- After OAuth redirect, check `is_new_user` to route to either onboarding or dashboard.
+- In account settings, display the user's linked providers (show badges for Google, GitHub, Email).
 
 ---
 
@@ -503,4 +606,142 @@ export const getDashboardLatency = async (orgId: string, hours = 24): Promise<La
   const { data } = await apiClient.get<LatencyPoint[]>(`/orgs/${orgId}/dashboard/latency?hours=${hours}`);
   return data;
 };
+```
+
+### 11.3 OAuth Typed API Functions (`src/services/authService.ts`)
+
+```typescript
+import { apiClient } from "@/lib/api";
+
+// ── Shared OAuth Types ──────────────────────────────────────────────
+
+export interface OAuthUrlResponse {
+  authorization_url: string;
+  state: string;
+}
+
+export interface OAuthCallbackResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+  is_new_user: boolean;
+  user_id: string;
+  email: string;
+  full_name: string;
+}
+
+// ── Google OAuth ──────────────────────────────────────────────────────
+
+export const getGoogleAuthUrl = async (): Promise<OAuthUrlResponse> => {
+  const { data } = await apiClient.get<OAuthUrlResponse>("/auth/google/url");
+  return data;
+};
+
+export const exchangeGoogleCode = async (code: string): Promise<OAuthCallbackResponse> => {
+  const { data } = await apiClient.post<OAuthCallbackResponse>("/auth/google", { code });
+  return data;
+};
+
+/** Initiates Google OAuth flow: stores state, redirects to Google consent screen. */
+export const initiateGoogleLogin = async () => {
+  const { authorization_url, state } = await getGoogleAuthUrl();
+  sessionStorage.setItem("google_oauth_state", state);
+  window.location.href = authorization_url;
+};
+
+/** Handles Google OAuth callback: extracts code, exchanges for tokens. */
+export const handleGoogleCallback = async () => {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const returnedState = params.get("state");
+  const savedState = sessionStorage.getItem("google_oauth_state");
+
+  if (!code) throw new Error("No authorization code received from Google");
+  if (returnedState !== savedState) throw new Error("OAuth state mismatch — possible CSRF");
+
+  sessionStorage.removeItem("google_oauth_state");
+  return await exchangeGoogleCode(code);
+};
+
+// ── GitHub OAuth ──────────────────────────────────────────────────────
+
+export const getGitHubAuthUrl = async (): Promise<OAuthUrlResponse> => {
+  const { data } = await apiClient.get<OAuthUrlResponse>("/auth/github/url");
+  return data;
+};
+
+export const exchangeGitHubCode = async (code: string): Promise<OAuthCallbackResponse> => {
+  const { data } = await apiClient.post<OAuthCallbackResponse>("/auth/github", { code });
+  return data;
+};
+
+/** Initiates GitHub OAuth flow: stores state, redirects to GitHub consent screen. */
+export const initiateGitHubLogin = async () => {
+  const { authorization_url, state } = await getGitHubAuthUrl();
+  sessionStorage.setItem("github_oauth_state", state);
+  window.location.href = authorization_url;
+};
+
+/** Handles GitHub OAuth callback: extracts code, exchanges for tokens. */
+export const handleGitHubCallback = async () => {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const returnedState = params.get("state");
+  const savedState = sessionStorage.getItem("github_oauth_state");
+
+  if (!code) throw new Error("No authorization code received from GitHub");
+  if (returnedState !== savedState) throw new Error("OAuth state mismatch — possible CSRF");
+
+  sessionStorage.removeItem("github_oauth_state");
+  return await exchangeGitHubCode(code);
+};
+```
+
+### 11.4 OAuth Callback Page Example (`src/app/auth/callback/page.tsx`)
+
+```typescript
+"use client";
+
+import { useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { handleGoogleCallback, handleGitHubCallback } from "@/services/authService";
+
+export default function OAuthCallbackPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const provider = searchParams.get("provider"); // "google" or "github"
+
+  useEffect(() => {
+    const completeOAuth = async () => {
+      try {
+        const result = provider === "github"
+          ? await handleGitHubCallback()
+          : await handleGoogleCallback();
+
+        // Store JWT tokens
+        localStorage.setItem("reliastra_access_token", result.access_token);
+        localStorage.setItem("reliastra_refresh_token", result.refresh_token);
+
+        // Route based on whether this is a new user
+        if (result.is_new_user) {
+          router.push("/onboarding");
+        } else {
+          router.push("/dashboard");
+        }
+      } catch (error) {
+        console.error("OAuth callback failed:", error);
+        router.push("/login?error=oauth_failed");
+      }
+    };
+
+    completeOAuth();
+  }, [provider, router]);
+
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <p className="text-gray-500">Completing sign-in...</p>
+    </div>
+  );
+}
 ```

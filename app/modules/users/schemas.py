@@ -10,6 +10,9 @@ class UserResponse(BaseModel):
     email: EmailStr
     full_name: str
     is_active: bool
+    is_superuser: bool
+    avatar_url: str | None = None
+    auth_provider: str | None = None
     created_at: datetime
     updated_at: datetime
 

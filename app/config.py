@@ -120,6 +120,42 @@ class Settings(BaseSettings):
                 logger.warning("MINIO_SECRET_KEY is set to the default 'minioadmin' in production")
         return self
 
+    # Google OAuth settings
+    GOOGLE_CLIENT_ID: str | None = Field(
+        default=None,
+        description="Google OAuth 2.0 client ID",
+    )
+    GOOGLE_CLIENT_SECRET: str | None = Field(
+        default=None,
+        description="Google OAuth 2.0 client secret",
+    )
+    GOOGLE_REDIRECT_URI: str | None = Field(
+        default=None,
+        description="Google OAuth redirect URI (e.g. https://yourapp.com/auth/google/callback)",
+    )
+    GOOGLE_AUTH_ENABLED: bool = Field(
+        default=False,
+        description="Enable/disable Google OAuth authentication",
+    )
+
+    # GitHub OAuth settings
+    GITHUB_CLIENT_ID: str | None = Field(
+        default=None,
+        description="GitHub OAuth client ID",
+    )
+    GITHUB_CLIENT_SECRET: str | None = Field(
+        default=None,
+        description="GitHub OAuth client secret",
+    )
+    GITHUB_REDIRECT_URI: str | None = Field(
+        default=None,
+        description="GitHub OAuth redirect URI (e.g. https://yourapp.com/auth/github/callback)",
+    )
+    GITHUB_AUTH_ENABLED: bool = Field(
+        default=False,
+        description="Enable/disable GitHub OAuth authentication",
+    )
+
     @property
     def fernet_key(self) -> bytes:
         """Derive a 32-byte url-safe base64-encoded key from SECRET_KEY for Fernet encryption."""
