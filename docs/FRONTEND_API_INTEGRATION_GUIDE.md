@@ -192,7 +192,100 @@ Exchange the GitHub authorization code for Reliastra JWT tokens.
 - If the response email is a `noreply.github.com` address, prompt the user to update their email in account settings.
 - The `full_name` field uses the GitHub `name` if available, otherwise falls back to the GitHub `login` (username).
 
-### 2.5 Account Linking Across Providers
+### 2.5 Email Verification Flow
+
+New users are created with `is_email_verified=false`. To verify, the frontend triggers the two-step flow below.
+
+#### **POST /v1/auth/send-verification**
+Sends a verification email with a one-time link to the user's inbox. **Rate limited.** All previous unexpired tokens for this user are automatically revoked.
+```json
+// Request Body
+{
+  "email": "admin@reliastra.dev"
+}
+
+// Response (200 OK)
+{
+  "message": "Verification email sent. Check your inbox.",
+  "email": "admin@reliastra.dev"
+}
+
+// Error (404) — if no account exists with this email
+// Error (400, EMAIL_ALREADY_VERIFIED) — if email is already verified
+```
+
+#### **POST /v1/auth/verify-email**
+Consumes the token from the verification link and marks the user's email as verified.
+```json
+// Request Body
+{
+  "token": "token_from_email_link"
+}
+
+// Response (200 OK)
+{
+  "message": "Email verified successfully.",
+  "is_email_verified": true
+}
+
+// Error (422, INVALID_TOKEN) — token not found
+// Error (422, TOKEN_ALREADY_USED) — token was already consumed
+// Error (422, TOKEN_EXPIRED) — token expired (> 60 minutes)
+```
+
+**Frontend implementation:**
+1. After registration, show a "Verify your email" banner with a "Resend verification" button.
+2. On click, call `POST /v1/auth/send-verification` with the user's email.
+3. The email contains a link to `{FRONTEND_BASE_URL}/verify-email?token={token}`.
+4. On the verification page, extract the token from the URL query parameter and call `POST /v1/auth/verify-email`.
+5. On success, update the user's local state to reflect `is_email_verified: true`.
+
+### 2.6 Password Reset Flow
+
+The password reset flow uses anti-enumeration — the same generic message is returned whether or not the email exists in the database, preventing attackers from discovering which emails are registered.
+
+#### **POST /v1/auth/forgot-password**
+Sends a password reset email if an account exists with the given email. **Rate limited.** All previous unexpired tokens for this user are automatically revoked.
+```json
+// Request Body
+{
+  "email": "admin@reliastra.dev"
+}
+
+// Response (200 OK) — ALWAYS returns this, even if email doesn't exist
+{
+  "message": "If an account with this email exists, a password reset link has been sent."
+}
+```
+
+#### **POST /v1/auth/reset-password**
+Consumes the token from the reset link and sets the new password.
+```json
+// Request Body
+{
+  "token": "token_from_email_link",
+  "new_password": "NewSecurePassword123!"
+}
+
+// Response (200 OK)
+{
+  "message": "Password has been reset successfully. You can now log in with your new password."
+}
+
+// Validation Error (422) — password must be at least 8 characters
+// Error (422, INVALID_TOKEN) — token not found
+// Error (422, TOKEN_ALREADY_USED) — token was already consumed
+// Error (422, TOKEN_EXPIRED) — token expired (> 15 minutes)
+```
+
+**Frontend implementation:**
+1. On the "Forgot Password" page, collect the email and call `POST /v1/auth/forgot-password`.
+2. Always show the success message ("Check your inbox") regardless of the response — do not reveal whether the email exists.
+3. The email contains a link to `{FRONTEND_BASE_URL}/reset-password?token={token}`.
+4. On the reset password page, extract the token from the URL, collect the new password (with confirmation), and call `POST /v1/auth/reset-password`.
+5. On success, redirect to the login page with a success flash message.
+
+### 2.7 Account Linking Across Providers
 
 All three auth methods (email, Google, GitHub) are unified by **email address**. If a user registers with `admin@reliastra.dev` via email and later signs in with Google using the same email, the Google identity is linked to the existing account — no duplicate is created. The same applies for GitHub.
 
@@ -741,6 +834,235 @@ export default function OAuthCallbackPage() {
   return (
     <div className="flex items-center justify-center min-h-screen">
       <p className="text-gray-500">Completing sign-in...</p>
+    </div>
+  );
+}
+```
+
+### 11.5 Email Verification & Password Reset Typed Functions (`src/services/emailAuthService.ts`)
+
+```typescript
+import { apiClient } from "@/lib/api";
+
+// ── Email Verification ──────────────────────────────────────────────
+
+export interface SendVerificationResponse {
+  message: string;
+  email: string;
+}
+
+export interface VerifyEmailResponse {
+  message: string;
+  is_email_verified: boolean;
+}
+
+/** Requests a new email verification link. Rate limited (ip_limiter). */
+export const sendVerificationEmail = async (email: string): Promise<SendVerificationResponse> => {
+  const { data } = await apiClient.post<SendVerificationResponse>("/auth/send-verification", { email });
+  return data;
+};
+
+/** Verifies email using the token from the verification link. */
+export const verifyEmail = async (token: string): Promise<VerifyEmailResponse> => {
+  const { data } = await apiClient.post<VerifyEmailResponse>("/auth/verify-email", { token });
+  return data;
+};
+
+// ── Password Reset ──────────────────────────────────────────────────
+
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
+}
+
+/**
+ * Requests a password reset email. Always returns a generic success message
+ * (anti-enumeration — does not reveal whether the email exists). Rate limited.
+ */
+export const forgotPassword = async (email: string): Promise<ForgotPasswordResponse> => {
+  const { data } = await apiClient.post<ForgotPasswordResponse>("/auth/forgot-password", { email });
+  return data;
+};
+
+/** Resets the user's password using the token from the reset email link. */
+export const resetPassword = async (token: string, newPassword: string): Promise<ResetPasswordResponse> => {
+  const { data } = await apiClient.post<ResetPasswordResponse>("/auth/reset-password", {
+    token,
+    new_password: newPassword,
+  });
+  return data;
+};
+```
+
+### 11.6 Verification & Reset Page Example (`src/app/auth/verify-email/page.tsx`)
+
+```typescript
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { verifyEmail } from "@/services/emailAuthService";
+
+export default function VerifyEmailPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    const token = searchParams.get("token");
+    if (!token) {
+      setStatus("error");
+      setErrorMsg("No verification token found in URL.");
+      return;
+    }
+
+    const doVerify = async () => {
+      try {
+        const result = await verifyEmail(token);
+        if (result.is_email_verified) {
+          setStatus("success");
+          // Redirect to dashboard after a brief success message
+          setTimeout(() => router.push("/dashboard"), 2000);
+        }
+      } catch (error: any) {
+        setStatus("error");
+        setErrorMsg(error?.response?.data?.error?.message || "Verification failed. The link may have expired.");
+      }
+    };
+
+    doVerify();
+  }, [searchParams, router]);
+
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      {status === "loading" && <p className="text-gray-500">Verifying your email...</p>}
+      {status === "success" && (
+        <div className="text-center">
+          <p className="text-green-600 font-medium">Email verified successfully!</p>
+          <p className="text-gray-400 text-sm mt-1">Redirecting to dashboard...</p>
+        </div>
+      )}
+      {status === "error" && (
+        <div className="text-center">
+          <p className="text-red-500 font-medium">{errorMsg}</p>
+          <button
+            className="mt-4 text-sm text-blue-600 hover:underline"
+            onClick={() => router.push("/login")}
+          >
+            Go to Login
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### 11.7 Reset Password Page Example (`src/app/auth/reset-password/page.tsx`)
+
+```typescript
+"use client";
+
+import { useEffect, useState, FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { resetPassword } from "@/services/emailAuthService";
+
+export default function ResetPasswordPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [status, setStatus] = useState<"loading" | "form" | "success" | "error">("loading");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  useEffect(() => {
+    // If there's no token, show the "forgot password" entry point instead
+    const token = searchParams.get("token");
+    if (token) {
+      setStatus("form");
+    } else {
+      router.push("/forgot-password");
+    }
+  }, [searchParams, router]);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+
+    if (password.length < 8) {
+      setErrorMsg("Password must be at least 8 characters long.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setErrorMsg("Passwords do not match.");
+      return;
+    }
+
+    try {
+      const token = searchParams.get("token")!;
+      await resetPassword(token, password);
+      setStatus("success");
+      setTimeout(() => router.push("/login?reset=success"), 2000);
+    } catch (error: any) {
+      setStatus("error");
+      setErrorMsg(error?.response?.data?.error?.message || "Failed to reset password. The link may have expired.");
+    }
+  };
+
+  if (status === "loading") {
+    return <div className="flex items-center justify-center min-h-screen"><p className="text-gray-500">Loading...</p></div>;
+  }
+
+  if (status === "success") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-green-600 font-medium">Password reset successfully!</p>
+          <p className="text-gray-400 text-sm mt-1">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 p-6 bg-white rounded-lg shadow-md">
+        <h2 className="text-xl font-semibold text-center">Set New Password</h2>
+
+        {status === "error" && (
+          <p className="text-red-500 text-sm text-center">{errorMsg}</p>
+        )}
+
+        <input
+          type="password"
+          placeholder="New password (min. 8 characters)"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full px-3 py-2 border rounded-md"
+          minLength={8}
+          required
+        />
+
+        <input
+          type="password"
+          placeholder="Confirm new password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          className="w-full px-3 py-2 border rounded-md"
+          minLength={8}
+          required
+        />
+
+        <button
+          type="submit"
+          className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+        >
+          Reset Password
+        </button>
+      </form>
     </div>
   );
 }
