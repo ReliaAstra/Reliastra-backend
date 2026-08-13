@@ -67,3 +67,42 @@ class OAuthAuthResponse(TokenResponse):
 # Aliases so existing Google code still works
 GoogleAuthResponse = OAuthAuthResponse
 GitHubAuthResponse = OAuthAuthResponse
+
+
+# ── Email Verification ─────────────────────────────────────────────
+
+
+class SendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class VerifyEmailResponse(BaseModel):
+    message: str
+    is_email_verified: bool
+
+
+# ── Password Reset ─────────────────────────────────────────────────
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+
+
+class ResetPasswordResponse(BaseModel):
+    message: str

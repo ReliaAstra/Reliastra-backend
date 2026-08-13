@@ -156,6 +156,20 @@ class Settings(BaseSettings):
         description="Enable/disable GitHub OAuth authentication",
     )
 
+    # Email verification & password reset
+    FRONTEND_BASE_URL: str = Field(
+        default="http://localhost:3000",
+        description="Frontend base URL for email verification and password reset links",
+    )
+    EMAIL_VERIFICATION_EXPIRE_MINUTES: int = Field(
+        default=60,
+        description="Email verification token lifetime in minutes",
+    )
+    PASSWORD_RESET_EXPIRE_MINUTES: int = Field(
+        default=15,
+        description="Password reset token lifetime in minutes",
+    )
+
     @property
     def fernet_key(self) -> bytes:
         """Derive a 32-byte url-safe base64-encoded key from SECRET_KEY for Fernet encryption."""
