@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.ssrf_protection import validate_outbound_url
 from app.modules.checks.constants import (
     CONSECUTIVE_RECOVERY_CHECKS,
     QUORUM_MIN_REGIONS,
@@ -26,6 +27,60 @@ class CheckService:
     ) -> None:
         self.repository = repository
         self.dep_repository = dep_repository
+
+    async def _record_observation(
+        self,
+        session: AsyncSession,
+        result: CheckResult,
+        endpoint_url: str,
+        method: str,
+    ) -> None:
+        """Dual-write a check into the unified immutable observation stream.
+
+        A savepoint isolates the legacy check write from an observation failure,
+        which keeps rollout backward compatible while still surfacing failures.
+        """
+        try:
+            from app.modules.observations.schemas import ObservationCreateDTO
+            from app.modules.observations.service import observation_service
+
+            error_type = None
+            if result.error_message:
+                error_type = (
+                    result.error_message.split(":", 1)[0]
+                    .strip()
+                    .lower()
+                    .replace(" ", "_")[:50]
+                )
+            async with session.begin_nested():
+                await observation_service.record_observation(
+                    session,
+                    ObservationCreateDTO(
+                        timestamp=result.executed_at,
+                        source_type="customer_check",
+                        source_id=result.dependency_id,
+                        org_id=result.org_id,
+                        region=result.region,
+                        endpoint_url=endpoint_url,
+                        latency_ms=result.latency_ms,
+                        response_time_ms=result.latency_ms,
+                        status_code=result.status_code,
+                        error_type=error_type,
+                        error_message=result.error_message,
+                        metadata={
+                            "method": method,
+                            "is_up": result.is_up,
+                            "quorum_confirmed": result.quorum_confirmed,
+                            "check_result_id": str(result.id),
+                        },
+                    ),
+                )
+        except Exception as exc:
+            logger.warning(
+                "Failed to record observation for dependency %s: %s",
+                result.dependency_id,
+                exc,
+            )
 
     async def list_results_for_dependency(
         self,
@@ -90,11 +145,35 @@ class CheckService:
             else [200]
         )
 
+        start_time = time.time()
         latency_ms = 0.0
         status_code: int | None = None
         is_up = False
         error_message: str | None = None
 
+        # SSRF protection: block requests to private/internal IPs
+        try:
+            validate_outbound_url(url)
+        except ValueError as exc:
+            logger.warning("SSRF check blocked URL for dep %s: %s", dependency_id, exc)
+            is_up = False
+            error_message = f"URL blocked by security policy: {exc}"
+            latency_ms = (time.time() - start_time) * 1000.0
+            result = await self.repository.create(
+                session=session,
+                dependency_id=dependency_id,
+                org_id=dep_dto.org_id,
+                region=region,
+                latency_ms=latency_ms,
+                is_up=is_up,
+                status_code=None,
+                error_message=error_message,
+                quorum_confirmed=False,
+            )
+            await self._record_observation(session, result, url, method)
+            return result
+
+        # Reset timer for actual HTTP request
         start_time = time.time()
         try:
             async with httpx.AsyncClient(timeout=timeout, verify=True) as client:
@@ -182,6 +261,7 @@ class CheckService:
                         org_id=open_incident.org_id,
                     )
 
+        await self._record_observation(session, result, url, method)
         return result
 
 

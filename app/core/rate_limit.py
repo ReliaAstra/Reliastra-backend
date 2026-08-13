@@ -19,11 +19,23 @@ class SlidingWindowRateLimiter:
         self.window_seconds = window_seconds
         self.key_prefix = key_prefix
 
+    async def is_redis_available(self) -> bool:
+        """Check if Redis is reachable without raising."""
+        try:
+            from app.infrastructure.redis_client import get_redis
+            redis = get_redis()
+            await redis.ping()
+            return True
+        except Exception:
+            return False
+
     async def check(self, identifier: str) -> bool:
         """
         Check and record request for identifier.
         Raises RateLimitExceededException if limit is exceeded.
         Returns True if within limit.
+        When Redis is unavailable, the request is allowed through (fail-open)
+        to prevent Redis outages from blocking all public and auth endpoints.
         """
         try:
             from app.infrastructure.redis_client import get_redis
@@ -48,7 +60,13 @@ class SlidingWindowRateLimiter:
         except RateLimitExceededException:
             raise
         except Exception as exc:
-            logger.warning("Rate limiter Redis check failed or fallback used: %s", exc)
+            # Fail-open: allow the request when Redis is unavailable.
+            # This prevents a Redis outage from blocking all rate-limited
+            # endpoints (auth, public vendors, etc.). Log for alerting.
+            logger.warning(
+                "Rate limiter unavailable (Redis error), allowing request through: %s",
+                exc,
+            )
             return True
 
 

@@ -10,15 +10,17 @@ This guide provides frontend and dashboard developers with complete integration 
   - Local development: `http://localhost:8000/v1`
   - OpenAPI Spec: `http://localhost:8000/openapi.json` (exported locally to `docs/openapi.json`)
   - Swagger UI: `http://localhost:8000/docs`
-- **CORS**: The backend is configured to allow `http://localhost:3000`, `http://localhost:5173`, and `http://127.0.0.1:3000`.
+- **CORS**: The backend is configured via `CORS_ORIGINS` env var. Default: `http://localhost:3000`, `http://localhost:8000`. Set this to your production frontend domain when deploying.
 - **Idempotency Header**: For mutation requests (`POST`, `PUT`, `DELETE`), include a unique UUID in the `Idempotency-Key` HTTP header. The backend caches the response in Redis for 24 hours to prevent duplicate submissions on network retries.
 - **Error Responses**: Standardized JSON error envelope across all endpoints:
   ```json
   {
-    "error": "validation_error",
-    "message": "Input validation failed",
-    "details": {
-      "field": ["error description"]
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "Input validation failed",
+      "details": {
+        "errors": [{"loc": ["field"], "msg": "error description"}]
+      }
     }
   }
   ```
@@ -91,16 +93,13 @@ Rotate tokens transparently when an access token expires (`401 Unauthorized`).
 ```
 
 #### **POST /v1/auth/logout**
-Revokes the refresh token in Redis and postgres.
+Revokes the refresh token in Redis and PostgreSQL.
 ```json
 // Request Body
 {
   "refresh_token": "eyJhbGciOiJIUzI1NiIsIn..."
 }
-// Response (200 OK)
-{
-  "message": "Successfully logged out"
-}
+// Response (204 No Content — empty body)
 ```
 
 ### 2.3 Google OAuth 2.0 Flow
@@ -266,7 +265,7 @@ Use this endpoint for top-level KPI cards.
 ```
 
 ### 4.2 Multi-Region Latency Chart (`GET /v1/orgs/{org_id}/dashboard/latency?hours=24`)
-Returns time-series latency data suitable for charting libraries (**Recharts**, **Chart.js**, **Tremor**, or **ECharts**).
+**IMPLEMENTED IN PHASE 8.** Returns organization-scoped observation time-series data suitable for charting libraries (**Recharts**, **Chart.js**, **Tremor**, or **ECharts**).
 
 ```json
 // Response (200 OK)
@@ -284,7 +283,9 @@ Returns time-series latency data suitable for charting libraries (**Recharts**, 
 ]
 ```
 
-### 4.3 SLA Degradation Widget (`GET /v1/orgs/{org_id}/dashboard/sla-degradation`)
+### 4.3 SLA Degradation Widget (`GET /v1/orgs/{org_id}/dashboard/sla-degradation?period_days=30`)
+**IMPLEMENTED IN PHASE 8.** Aggregates degradation from immutable observations.
+
 ```json
 // Response (200 OK)
 {
@@ -378,11 +379,11 @@ Each incident object includes **Temporal Correlation** data showing if another v
 ]
 ```
 
-### 6.2 Resolve an Incident (`POST /v1/orgs/{org_id}/incidents/{id}/resolve`)
+### 6.2 Resolve an Incident (`PATCH /v1/orgs/{org_id}/incidents/{inc_id}`)
 ```json
 // Request Body
 {
-  "summary": "Vendor confirmed network recovery; quorum checks passing across us-east-1 and eu-west-1."
+  "status": "resolved"
 }
 
 // Response (200 OK)
@@ -393,38 +394,47 @@ Each incident object includes **Temporal Correlation** data showing if another v
 }
 ```
 
-### 6.3 Generate SLA Evidence Report (`POST /v1/orgs/{org_id}/evidence/generate`)
-Triggers asynchronous HTML-to-PDF rendering via Playwright with cryptographic SHA-256 integrity checksum calculation.
+### 6.3 SLA Evidence Generation (Automatic)
+Resolving an incident automatically runs deterministic 5-signal attribution and queues immutable PDF and JSON evidence generation. Use `GET /v1/orgs/{org_id}/incidents/{inc_id}/evidence` to retrieve the generated report.
 
+### 6.4 Public Evidence Verification (`GET /v1/verify/{verification_id}`)
+This public endpoint requires no authentication and provides cryptographic verification of any evidence snapshot:
 ```json
-// Request Body
+// Response (200 OK)
 {
-  "incident_id": "90123456-789a-bcde-f012-3456789abcde",
-  "title": "SLA Degradation Report — Stripe Billing Outage",
-  "include_charts": true
-}
-
-// Response (201 Created)
-{
-  "id": "b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e",
-  "title": "SLA Degradation Report — Stripe Billing Outage",
-  "status": "completed",
-  "file_url": "http://localhost:9000/evidence-reports/b1c2d3e4...pdf",
-  "sha256_checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "created_at": "2026-08-11T17:15:00Z"
+  "found": true,
+  "incident_id": "uuid",
+  "dependency_id": "uuid",
+  "org_id": "uuid",
+  "time_window": {
+    "start": "2026-08-11T16:00:00Z",
+    "end": "2026-08-11T17:00:00Z"
+  },
+  "data_hash": "sha256:...",
+  "report_checksum": "sha256:...",
+  "methodology_version": "1.0",
+  "created_at": "2026-08-11T17:05:00Z"
 }
 ```
 
 ---
 
-## 7. Global Public Vendor Status Board (`GET /v1/public/vendors`)
+## 7. Global Public Vendor Status Board
 
-This public endpoint requires no authentication and returns real-time uptime status for 5 major third-party cloud services tracked by Reliastra:
-- **Stripe** (`stripe`)
-- **Auth0** (`auth0`)
-- **Cloudflare** (`cloudflare`)
-- **OpenAI** (`openai`)
-- **Twilio** (`twilio`)
+### 7.1 List Vendors (`GET /v1/public/vendors`)
+Public endpoint (no auth required). Returns tracked vendor status.
+
+### 7.2 Vendor Detail (`GET /v1/public/vendors/{vendor_name}`)
+Returns detailed status for a specific vendor.
+
+### 7.3 Vendor History (`GET /v1/public/vendors/{vendor_name}/history`)
+Returns historical uptime data.
+
+### 7.4 Vendor Incidents (`GET /v1/public/vendors/{vendor_name}/incidents`)
+Returns incidents associated with a vendor.
+
+### 7.5 Vendor Metrics (`GET /v1/public/vendors/{vendor_name}/metrics`)
+Returns uptime and latency metrics for charting.
 
 ```json
 // Response (200 OK)
@@ -481,21 +491,23 @@ Creates SHA-256 hashed API keys for programmatic access. **Important for Fronten
 
 ---
 
-## 10. Billing & Plan Usage (`GET /v1/orgs/{org_id}/billing/plan`)
+## 10. Paystack Billing & Plan Usage
 
-Use this endpoint to render usage meters in the Organization Settings UI.
+Use `GET /v1/orgs/{org_id}/billing/plan` to render plan limits and subscription state.
 
 ```json
 // Response (200 OK)
 {
-  "plan_name": "pro",
+  "org_id": "11111111-1111-1111-1111-111111111111",
+  "plan": "standard",
   "max_dependencies": 25,
-  "current_dependencies": 12,
-  "max_team_members": 10,
-  "current_team_members": 3,
-  "can_add_dependency": true
+  "min_check_interval_seconds": 60,
+  "subscription_status": "active",
+  "current_period_end": "2026-09-12T00:00:00Z"
 }
 ```
+
+Initialize Paystack checkout with `POST /v1/orgs/{org_id}/billing/initialize` and body `{"plan":"standard","email":"owner@example.com"}`. After checkout, verify the Paystack reference with `POST /v1/billing/verify?reference={reference}`. Payment state is finalized from signed Paystack webhooks; never update an organization plan from client-side state alone.
 
 ---
 

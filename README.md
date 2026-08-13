@@ -1,10 +1,27 @@
-# RELIASTRA MVP — EXTERNAL DEPENDENCY INTELLIGENCE PLATFORM BACKEND
+# Reliastra — External Dependency Intelligence Platform
 
-Reliastra is an **external dependency intelligence platform** that monitors third-party vendor APIs and services from independent geographic locations, correlates vendor failures with customer-reported incidents, and generates timestamped SLA evidence reports.
+Reliastra monitors third-party vendor APIs and services, correlates failures with customer-reported incidents, attributes blame using a deterministic 5-signal engine, and generates cryptographically verifiable SLA evidence reports.
 
----
+## Quick Start
 
-## 🚀 Features & Core Tenets
+```bash
+# 1. Clone and install
+git clone https://github.com/ReliaAstra/Reliastra-backend.git
+cd Reliastra-backend
+pip install -r requirements.txt
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env — set DATABASE_URL, REDIS_URL, and SECRET_KEY at minimum
+
+# 3. Run database migrations
+alembic upgrade head
+
+# 4. Start the server
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+## Features & Core Tenets
 
 1. **API-First Only**: Every piece of data, every operation, and every query goes through versioned REST API endpoints (`/v1/*`). No direct database access; no GraphQL.
 2. **Modular Architecture**: The codebase is organized by domain modules (`app/modules/`). Each domain (`auth`, `users`, `organizations`, `dependencies`, `checks`, `incidents`, `evidence`, `vendors`, `notifications`, `dashboard`, `billing`, `api_keys`) is self-contained with its own explicit interface contract:
@@ -31,146 +48,121 @@ Reliastra is an **external dependency intelligence platform** that monitors thir
    - Renders structured incident metadata, per-region latency charts (embedded SVG), SLA degradation percentages, and cross-vendor correlations into pixel-perfect PDF evidence reports.
    - Automatically calculates cryptographic SHA-256 checksums and logs immutable events to the audit trail.
 
----
+## Production Deployment
 
-## 🛠️ Technology Stack
+### Required Environment Variables
 
-| Layer | Choice | Rationale |
-|---|---|---|
-| **API Framework** | FastAPI (Python 3.11+) | Auto-OpenAPI generation, async-native, Pydantic v2 validation |
-| **ORM / Models** | SQLAlchemy 2.0 (async) | Fully typed async ORM with Alembic migration support |
-| **Database** | PostgreSQL 15+ | JSONB support + native RANGE partitioning for high-volume time-series data |
-| **Cache / Queue** | Redis 7+ | Celery broker/backend, idempotency cache, rate limiting |
-| **Task Queue** | Celery + Celery Beat | Check scheduler (every 10s), evidence PDF generation, alert dispatch |
-| **Object Storage** | MinIO (S3-Compatible) | Storage for generated evidence PDF reports |
-| **Auth** | JWT + API Keys + OAuth 2.0 | Stateless, organization-scoped, RBAC-ready; Google & GitHub OAuth support |
-| **PDF Generation** | Playwright / HTML | High-fidelity HTML to PDF rendering with automatic local fallback |
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL with asyncpg driver | `postgresql+asyncpg://user:pass@host:5432/reliastra` |
+| `REDIS_URL` | Redis for rate limiting, Celery, idempotency | `redis://host:6379/0` |
+| `SECRET_KEY` | JWT signing key (min 32 chars) | Use `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
+| `ENVIRONMENT` | Set to `production` | `production` |
+| `CORS_ORIGINS` | JSON array of allowed frontend origins | `["https://yourdomain.com"]` |
 
----
+### Optional Environment Variables
 
-## 📁 Project Structure
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | JWT access token lifetime |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | JWT refresh token lifetime |
+| `GOOGLE_AUTH_ENABLED` | `false` | Enable Google OAuth |
+| `GOOGLE_CLIENT_ID` | _(empty)_ | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | _(empty)_ | Google OAuth client secret |
+| `GOOGLE_REDIRECT_URI` | _(empty)_ | Google OAuth redirect URI |
+| `GITHUB_AUTH_ENABLED` | `false` | Enable GitHub OAuth |
+| `GITHUB_CLIENT_ID` | _(empty)_ | GitHub OAuth client ID |
+| `GITHUB_CLIENT_SECRET` | _(empty)_ | GitHub OAuth client secret |
+| `GITHUB_REDIRECT_URI` | _(empty)_ | GitHub OAuth redirect URI |
+| `PAYSTACK_SECRET_KEY` | _(empty)_ | Paystack API secret key |
+| `PAYSTACK_PUBLIC_KEY` | _(empty)_ | Paystack public key for checkout |
+| `MINIO_ENDPOINT` | `localhost:9000` | S3-compatible storage for evidence PDFs |
+| `MINIO_ACCESS_KEY` | `minioadmin` | Storage access key |
+| `MINIO_SECRET_KEY` | `minioadmin` | Storage secret key |
+| `SMTP_HOST` | `localhost` | SMTP server for notifications |
+| `SMTP_PORT` | `1025` | SMTP port |
+| `SMTP_FROM` | `noreply@reliastra.com` | Sender email address |
 
-```
-reliastra/
-├── app/
-│   ├── __init__.py
-│   ├── main.py                 # FastAPI app factory, lifespan hooks, idempotency & CORS middleware
-│   ├── config.py               # Pydantic Settings & environment variable validation
-│   ├── dependencies.py         # FastAPI dependency injection (DB session, auth, org context, RBAC)
-│   ├── core/                   # Cross-cutting concerns
-│   │   ├── security.py         # Password hashing, JWT encode/decode, API key generation, Fernet encryption
-│   │   ├── permissions.py      # Role enum, hierarchy, and plan limit helpers
-│   │   ├── exceptions.py       # Standard error envelope & global exception handlers
-│   │   ├── pagination.py       # Standard cursor/offset pagination schemas
-│   │   ├── rate_limit.py       # Redis sliding window rate limiter
-│   │   └── audit_log.py        # Immutable audit log model and service
-│   ├── db/
-│   │   ├── session.py          # AsyncSession factory, engine, and get_db dependency
-│   │   ├── base.py             # DeclarativeBase, mixins (UUIDMixin, TimestampMixin, SoftDeleteMixin)
-│   │   └── migrations/         # Alembic migration scripts and env.py
-│   ├── modules/                # Self-contained domain modules
-│   │   ├── auth/               # Email auth, Google OAuth, GitHub OAuth, refresh, logout
-│   │   ├── users/              # Current user profile (/me)
-│   │   ├── organizations/      # Organizations & RBAC members management
-│   │   ├── dependencies/       # External endpoints monitoring configurations
-│   │   ├── checks/             # Check execution engine, time-series check results, quorum logic
-│   │   ├── incidents/          # Service degradation detection, temporal correlation, resolution
-│   │   ├── evidence/           # SLA report HTML/PDF generation & storage pipeline
-│   │   ├── vendors/            # Public vendor tracking (Stripe, Auth0, Cloudflare, OpenAI, Twilio)
-│   │   ├── notifications/      # Extensible alert routing (Email, Slack, PagerDuty, Webhook)
-│   │   ├── dashboard/          # Read-only aggregated analytics endpoints
-│   │   ├── billing/            # Stripe hooks stubbed for MVP & plan limits
-│   │   └── api_keys/           # Programmatic access key management
-│   └── infrastructure/
-│       ├── celery_app.py       # Celery configuration and Beat check schedule
-│       ├── redis_client.py     # Shared async Redis client
-│       ├── storage.py          # S3/MinIO storage abstraction with fallback
-│       └── email.py            # SMTP/SES email sending client
-├── templates/
-│   └── evidence/
-│       └── default.html        # Jinja2 HTML template for SLA evidence PDF reports
-├── tests/
-│   ├── conftest.py             # Pytest fixtures: embedded PostgreSQL, FakeRedis, async TestClient
-│   ├── unit/                   # Comprehensive service tests with mocked repositories
-│   ├── integration/            # Full API endpoint tests
-│   └── e2e/                    # Full E2E check execution, correlation, and evidence flow
-├── docker-compose.yml          # Bootstraps Postgres, Redis, MinIO, MailHog, API, Celery Worker & Beat
-├── Dockerfile                  # Application Docker image
-├── celery_worker.dockerfile    # Dedicated Celery worker Dockerfile
-├── alembic.ini                 # Alembic configuration
-└── pyproject.toml              # Poetry dependencies, pytest configuration
+### Deployment Checklist
+
+1. Set all required environment variables (DATABASE_URL, REDIS_URL, SECRET_KEY, ENVIRONMENT, CORS_ORIGINS)
+2. Ensure PostgreSQL 15+ and Redis 7+ are accessible from the container
+3. Run `alembic upgrade head` to create database tables
+4. Set OAuth variables to enable Google/GitHub sign-in
+5. Set `PAYSTACK_SECRET_KEY` and `PAYSTACK_PUBLIC_KEY` to enable billing
+6. Set `MINIO_*` variables to enable evidence PDF storage
+7. Verify health: `GET /health` should return `{"status": "ok", ...}`
+
+### Docker Compose (Local Development)
+
+```bash
+docker-compose up -d --build
 ```
 
----
+This starts PostgreSQL, Redis, MinIO, MailHog, the API server, and Celery workers. The API auto-runs migrations on startup.
 
-## 🐳 Docker Compose Up Instructions
+## API Documentation
 
-To boot up all Reliastra MVP backend services locally:
+- **Swagger UI**: `/docs`
+- **ReDoc UI**: `/redoc`
+- **OpenAPI JSON**: `/openapi.json`
+- **Frontend Integration Guide**: [`docs/FRONTEND_API_INTEGRATION_GUIDE.md`](./docs/FRONTEND_API_INTEGRATION_GUIDE.md)
 
-1. Ensure Docker and Docker Compose are installed.
-2. From the repository root, start the stack:
-   ```bash
-   docker-compose up -d --build
-   ```
-3. Docker Compose will launch:
-   - **PostgreSQL 15 (`postgres`)**: Port `5432` (persistent volume `postgres_data`)
-   - **Redis 7 (`redis`)**: Port `6379`
-   - **MinIO (`minio`)**: Ports `9000` (API) and `9001` (Web Console, default user/pass: `minioadmin`/`minioadmin`)
-   - **MailHog (`mailhog`)**: Ports `1025` (SMTP) and `8025` (Web UI for viewing email alerts)
-   - **Reliastra API (`api`)**: Port `8000` (auto-runs Alembic migrations and starts Uvicorn)
-   - **Celery Worker (`celery-worker`)**: Executes background checks, alerts, and evidence generation
-   - **Celery Beat (`celery-beat`)**: Runs check scheduler every 10 seconds
+## Architecture
 
-4. Verify service health:
-   ```bash
-   curl http://localhost:8000/health
-   # {"status": "ok", "service": "reliastra-backend"}
-   ```
+### Domain Modules
 
----
+The codebase follows a modular monolith pattern. Each module contains its own router, service, repository, models, and schemas:
 
-## 📖 API Documentation & Frontend Integration Guide
+| Module | Prefix | Auth | Description |
+|--------|--------|------|-------------|
+| Authentication | `/v1/auth` | Public | Register, login, refresh, logout, Google & GitHub OAuth |
+| Users | `/v1/users` | JWT/API Key | User profile management |
+| Organizations | `/v1/orgs` | JWT/API Key | Multi-tenant org and member management |
+| Dependencies | `/v1/orgs/{id}/dependencies` | JWT/API Key | External API monitoring targets |
+| Checks | `/v1/orgs/{id}/checks` | JWT/API Key | Check execution results and history |
+| Incidents | `/v1/orgs/{id}/incidents` | JWT/API Key | Incident detection and correlation |
+| Evidence | `/v1/orgs/{id}/evidence` | JWT/API Key | SLA evidence report generation |
+| Vendors | `/v1/public/vendors` | Public | Global vendor status tracking |
+| Notifications | `/v1/orgs/{id}/notifications` | JWT/API Key | Alert channel management |
+| Dashboard | `/v1/orgs/{id}/dashboard` | JWT/API Key | Aggregated analytics |
+| Billing | `/v1/orgs/{id}/billing` | JWT/API Key | Paystack payment integration |
+| API Keys | `/v1/orgs/{id}/api-keys` | JWT/API Key | Programmatic access keys |
+| Agencies | `/v1/orgs/{id}/agencies` | JWT/API Key | Agency hierarchy management |
+| AI Integration | `/v1/orgs/{id}/ai-providers` | JWT/API Key | Provider-agnostic AI configuration |
+| Verification | `/v1/verify/{id}` | Public | Evidence cryptographic verification |
 
-FastAPI automatically generates live interactive OpenAPI documentation:
+### Authentication
 
-- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **ReDoc UI**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
-- **OpenAPI JSON Schema**: [http://localhost:8000/openapi.json](http://localhost:8000/openapi.json) (Exported locally to `docs/openapi.json`)
-- **Frontend & Dashboard Integration Guide**: See [`docs/FRONTEND_API_INTEGRATION_GUIDE.md`](./docs/FRONTEND_API_INTEGRATION_GUIDE.md) for complete TypeScript interfaces, authentication workflows, RBAC matrix, and pre-built Axios interceptor patterns.
+Three authentication methods are supported for human users:
 
----
+- **Email/Password**: `POST /v1/auth/register` and `POST /v1/auth/login`
+- **Google OAuth**: `GET /v1/auth/google/url` → `POST /v1/auth/google`
+- **GitHub OAuth**: `GET /v1/auth/github/url` → `POST /v1/auth/github`
+- **JWT**: `Authorization: Bearer <token>` — 15min access, 7-day refresh
+- **API Keys**: `X-API-Key: rel_xxxxxxxx` — SHA-256 hashed, scope-enforced
 
-## 🧪 How to Run Tests
+### RBAC Hierarchy
 
-The test suite runs with **zero external dependencies required** by leveraging embedded PostgreSQL (`pgserver`) and `fakeredis` in `tests/conftest.py`.
+```
+Owner (40) > Admin (30) > Member (20) > Viewer (10)
+```
 
-### Using Poetry / Virtual Environment
+### Technology Stack
 
-1. Install dependencies:
-   ```bash
-   poetry install
-   # Or using pip in a virtual environment:
-   # pip install -r requirements.txt / pip install -e .
-   ```
-2. Run all unit, integration, and E2E tests:
-   ```bash
-   poetry run pytest -v
-   ```
-3. Run specific test suites:
-   ```bash
-   # Unit tests only (service layer with mocked repositories):
-   poetry run pytest tests/unit -v
+| Layer | Technology |
+|-------|-----------|
+| API Framework | FastAPI (Python 3.11+) |
+| ORM | SQLAlchemy 2.0 (async, asyncpg) |
+| Database | PostgreSQL 15+ |
+| Cache / Queue | Redis 7+ |
+| Task Queue | Celery + Beat |
+| Object Storage | MinIO (S3-compatible) |
+| Billing | Paystack |
+| Auth | JWT + SHA-256 API Keys + OAuth 2.0 (Google, GitHub) |
+| Encryption | Fernet (derived from SECRET_KEY) |
 
-   # Integration tests only (every API endpoint):
-   poetry run pytest tests/integration -v
-
-   # End-to-end check execution & correlation flow:
-   poetry run pytest tests/e2e -v
-   ```
-
----
-
-## 🔐 OAuth Configuration (Google & GitHub)
+## OAuth Configuration (Google & GitHub)
 
 OAuth providers are disabled by default. To enable, set the following environment variables:
 
@@ -214,34 +206,67 @@ If a user with the same email already exists (e.g., registered via email/passwor
 - A Google OAuth user can later sign in with GitHub if both use the same email.
 - The `auth_provider` field is updated to reflect the most recently used provider.
 
----
+## Running Tests
 
-## 🏛️ Architecture Decision Records (ADRs)
+```bash
+# Install test dependencies
+pip install -r requirements.txt
 
-### ADR-001: Why FastAPI + SQLAlchemy 2.0 Async?
-- **Decision**: Use FastAPI with SQLAlchemy 2.0 in fully asynchronous mode (`asyncpg`).
-- **Rationale**: FastAPI provides auto-generated OpenAPI documentation, native Pydantic v2 validation, and async endpoint execution. Using SQLAlchemy 2.0 async mode ensures the event loop is never blocked during I/O-bound database operations, which is critical for scaling high-frequency check execution and multi-tenant analytics.
+# Run all tests (zero external dependencies — uses embedded PostgreSQL + FakeRedis)
+pytest -v
 
-### ADR-002: Why Celery over Pure Asyncio for Checks?
-- **Decision**: Use Celery + Celery Beat backed by Redis for check scheduling and background task execution.
-- **Rationale**: Check execution requires reliable scheduling (Beat running every 10 seconds), automatic retries, distributed worker pooling, and task queue visibility. Implementing this on raw `asyncio` would require rebuilding a distributed task broker. Celery allows workers (`checks`, `evidence`, `notifications`) to scale independently from the stateless HTTP API tier.
+# Run specific suites
+pytest tests/unit -v        # Service layer with mocked repos
+pytest tests/integration -v # Full API endpoint tests
+pytest tests/e2e -v         # End-to-end check execution and evidence flow
+```
 
-### ADR-003: Why Partition `CheckResult` by Month?
-- **Decision**: Use PostgreSQL native range partitioning (`PARTITION BY RANGE (executed_at)`) for the `check_results` table.
-- **Rationale**: `CheckResult` is the highest-volume table in the system (potentially millions of rows per month). Partitioning by month allows PostgreSQL to drop old partitions efficiently without table locks, improves index density for recent dashboard queries, and enables seamless future migration to OLAP time-series engines (e.g., ClickHouse or TimescaleDB) without application changes.
+## Project Structure
 
-### ADR-004: Why Application-Layer Encryption for `Dependency.headers`?
-- **Decision**: Encrypt sensitive vendor API keys and headers in `Dependency.headers` at the application layer using symmetric Fernet encryption before storing them in the JSONB column.
-- **Rationale**: Vendor API credentials must never be stored plaintext. Deriving a deterministic Fernet key from `SECRET_KEY` protects credentials against database dump leaks without requiring PostgreSQL Transparent Data Encryption (TDE), which is difficult to manage across containerized and Kubernetes environments.
+```
+Reliastra-backend/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                 # FastAPI app factory, lifespan hooks, idempotency & CORS middleware
+│   ├── config.py               # Pydantic Settings & environment variable validation
+│   ├── dependencies.py         # FastAPI dependency injection (DB session, auth, org context, RBAC)
+│   ├── core/                   # Cross-cutting concerns
+│   │   ├── security.py         # Password hashing, JWT encode/decode, API key generation, Fernet encryption
+│   │   ├── permissions.py      # Role enum, hierarchy, and plan limit helpers
+│   │   ├── exceptions.py       # Standard error envelope & global exception handlers
+│   │   ├── pagination.py       # Standard cursor/offset pagination schemas
+│   │   ├── rate_limit.py       # Redis sliding window rate limiter
+│   │   └── audit_log.py        # Immutable audit log model and service
+│   ├── db/
+│   │   ├── session.py          # AsyncSession factory, engine, and get_db dependency
+│   │   ├── base.py             # DeclarativeBase, mixins (UUIDMixin, TimestampMixin, SoftDeleteMixin)
+│   │   └── migrations/         # Alembic migration scripts and env.py
+│   ├── modules/                # Self-contained domain modules
+│   │   ├── auth/               # Email auth, Google OAuth, GitHub OAuth, refresh, logout
+│   │   ├── users/              # Current user profile (/me)
+│   │   ├── organizations/      # Organizations & RBAC members management
+│   │   ├── dependencies/       # External endpoints monitoring configurations
+│   │   ├── checks/             # Check execution engine, time-series check results, quorum logic
+│   │   ├── incidents/          # Service degradation detection, temporal correlation, resolution
+│   │   ├── evidence/           # SLA report HTML/PDF generation & storage pipeline
+│   │   ├── vendors/            # Public vendor tracking (Stripe, Auth0, Cloudflare, OpenAI, Twilio)
+│   │   ├── notifications/      # Extensible alert routing (Email, Slack, PagerDuty, Webhook)
+│   │   ├── dashboard/          # Read-only aggregated analytics endpoints
+│   │   ├── billing/            # Stripe hooks stubbed for MVP & plan limits
+│   │   └── api_keys/           # Programmatic access key management
+│   └── infrastructure/
+│       ├── celery_app.py       # Celery configuration and Beat check schedule
+│       ├── redis_client.py     # Shared async Redis client
+│       ├── storage.py          # S3/MinIO storage abstraction with fallback
+│       └── email.py            # SMTP/SES email sending client
+├── templates/evidence/      # Jinja2 evidence report template
+├── tests/                   # Unit, integration, and E2E tests
+├── docs/                    # OpenAPI spec and frontend integration guide
+├── docker-compose.yml       # Local development stack
+├── .env.example             # Environment variable reference
+└── alembic.ini              # Database migration config
+```
 
-### ADR-005: Why Playwright over WeasyPrint for PDF Evidence Reports?
-- **Decision**: Use Playwright headless browser rendering for PDF evidence report generation, with an automatic `xhtml2pdf` fallback for offline or lightweight test sandboxes.
-- **Rationale**: Evidence reports must be pixel-perfect with embedded SVG latency charts and responsive tables. Playwright renders HTML and CSS exactly like a modern web browser, supporting flexbox and complex CSS features where WeasyPrint falls short. The automatic fallback ensures tests and lightweight containers remain resilient even if Chromium binaries are absent.
+## License
 
-### ADR-006: Why Authorization Code Flow for OAuth (not Implicit/PKCE)?
-- **Decision**: Implement both Google and GitHub OAuth using the server-side authorization code flow, where the backend exchanges the code for tokens and the frontend never handles provider access tokens directly.
-- **Rationale**: The authorization code flow keeps OAuth client secrets server-side (never exposed to the browser), eliminates token leakage risk on the frontend, and allows the backend to perform account linking and user creation atomically within a single database transaction. This is more secure than the implicit flow (deprecated by OAuth 2.1) and simpler than PKCE for server-rendered API backends. The backend acts as a trusted intermediary, exchanging the short-lived authorization code for provider tokens, fetching user profiles, and returning only Reliastra JWTs to the frontend.
-
-### ADR-007: Why Email-Based Account Linking Across OAuth Providers?
-- **Decision**: When a user authenticates via Google or GitHub and an existing user with the same email already exists, automatically link the OAuth identity to the existing account instead of creating a duplicate.
-- **Rationale**: Users expect to use the same account across sign-in methods. Without email-based linking, a user who signs up with email and later tries Google SSO would get a confusing "account already exists" error. The linking approach reduces friction and matches the behavior of major platforms (GitHub, GitLab, Notion). The trade-off is that an attacker who controls an unverified email on a provider could potentially link to another user's account — this is mitigated by requiring verified emails on Google and prioritizing verified emails on GitHub.
+Proprietary — All rights reserved.

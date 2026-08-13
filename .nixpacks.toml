@@ -1,5 +1,5 @@
 # .nixpacks.toml
-# Custom Nixpacks configuration for Reliastra-backend
+# Nixpacks configuration for Reliastra-backend (Python FastAPI)
 
 [phases.setup]
 nixPkgs = ["python312", "gcc"]
@@ -7,15 +7,11 @@ nixLibs = ["zlib", "stdenv.cc.cc.lib"]
 
 [phases.install]
 dependsOn = ["setup"]
-# Copy the entire project directory first
 onlyIncludeFiles = []
-# Set up the virtual environment and install dependencies
 cmds = [
-    "cp -r /build/. /app",
-    "python -m venv --copies /opt/venv",
-    ". /opt/venv/bin/activate",
-    "pip install --upgrade build setuptools",
-    "pip install ."
+    "pip install --no-cache-dir -r requirements.txt",
+    "pip install --no-cache-dir playwright",
+    "playwright install --with-deps chromium || true"
 ]
 
 [phases.build]
@@ -27,13 +23,10 @@ cmds = [
 ]
 
 [start]
-# Override the start command to run uvicorn directly
-cmd = "sh -c '. /opt/venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port $PORT'"
+cmd = "sh -c '. /opt/venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'"
 
-# Define NIXPACKS_PATH explicitly to avoid the warning
 [variables]
 NIXPACKS_PATH = "/opt/venv/bin:$PATH"
 
-# Set the Python version
 [build]
 pythonVersion = "3.12"

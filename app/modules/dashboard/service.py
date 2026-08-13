@@ -6,8 +6,12 @@ from app.modules.dashboard.schemas import (
     DashboardSummaryResponse,
     DependencyHealthResponse,
 )
-from app.modules.incidents.schemas import IncidentDetailResponse
-from app.modules.incidents.service import incident_service
+from app.modules.incidents.repository import IncidentRepository
+from app.modules.incidents.schemas import (
+    IncidentCorrelationResponse,
+    IncidentDetailResponse,
+    IncidentResponse,
+)
 from app.modules.vendors.schemas import VendorDetailResponse
 from app.modules.vendors.service import vendor_service
 
@@ -52,15 +56,19 @@ class DashboardService:
     async def get_incident_timeline(
         self, session: AsyncSession, org_id: uuid.UUID
     ) -> list[IncidentDetailResponse]:
-        incidents = await incident_service.list_incidents(
+        # Batched query: fetch incidents + correlations in 2 queries instead of N+1
+        rows = await IncidentRepository.list_with_correlations_for_org(
             session, org_id, limit=20
         )
         detailed_list: list[IncidentDetailResponse] = []
-        for inc in incidents:
-            detail = await incident_service.get_incident_detail(
-                session, org_id, inc.id
-            )
-            detailed_list.append(detail)
+        for row in rows:
+            inc = row["incident"]
+            correlations = row["correlations"]
+            data = IncidentResponse.model_validate(inc).model_dump()
+            data["correlations"] = [
+                IncidentCorrelationResponse.model_validate(c) for c in correlations
+            ]
+            detailed_list.append(IncidentDetailResponse.model_validate(data))
         return detailed_list
 
     async def get_vendor_status(

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, ForeignKey, DateTime
+from sqlalchemy import Boolean, String, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, UUIDMixin, TimestampMixin
 
@@ -15,11 +15,14 @@ class Organization(UUIDMixin, TimestampMixin, Base):
     plan: Mapped[str] = mapped_column(
         String(50), default="free", nullable=False
     )
-    stripe_customer_id: Mapped[str | None] = mapped_column(
-        String(100), nullable=True
+    has_agency_mode: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
     )
-    stripe_subscription_id: Mapped[str | None] = mapped_column(
-        String(100), nullable=True
+    is_founding_customer: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+    founding_discount_pct: Mapped[int] = mapped_column(
+        default=0, nullable=False
     )
 
     members: Mapped[list["OrganizationMember"]] = relationship(

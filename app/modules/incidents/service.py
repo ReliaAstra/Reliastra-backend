@@ -2,9 +2,9 @@ import abc
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ResourceNotFoundException
+from app.modules.evidence.schemas import EvidenceReportResponse
 from app.modules.incidents.constants import (
     DEFAULT_CORRELATION_CONFIDENCE,
     TEMPORAL_WINDOW_SECONDS,
@@ -140,6 +140,14 @@ class IncidentService:
         if not incident or (org_id and incident.org_id != org_id):
             raise ResourceNotFoundException("Incident not found")
 
+        # Resolution is idempotent. This prevents duplicate attribution and
+        # evidence tasks when recovery checks arrive concurrently.
+        if (
+            incident.status == IncidentStatus.RESOLVED.value
+            and incident.resolved_at is not None
+        ):
+            return incident
+
         updated = await self.repository.update(
             session=session,
             incident=incident,
@@ -147,15 +155,48 @@ class IncidentService:
             resolved_at=datetime.now(timezone.utc),
         )
 
-        correlations = await self.repository.get_correlations(session, incident.id)
-        if correlations:
-            try:
-                from app.modules.evidence.tasks import generate_evidence_report
+        # Attribution is deterministic and is persisted before immutable
+        # evidence generation is dispatched.
+        try:
+            from app.modules.attribution.repository import AttributionRepository
+            from app.modules.attribution.service import attribution_engine
+            from app.modules.observations.repository import ObservationRepository
 
-                generate_evidence_report.delay(str(incident.id))
-                logger.info("Dispatched evidence report task for incident %s", incident.id)
-            except Exception as exc:
-                logger.warning("Could not dispatch evidence task: %s", exc)
+            existing = await AttributionRepository.get_by_incident(
+                session, incident.id
+            )
+            if not existing:
+                observations = await ObservationRepository.list_for_source(
+                    session,
+                    incident.dependency_id,
+                    source_type="customer_check",
+                    limit=100,
+                    since=incident.started_at,
+                    until=updated.resolved_at,
+                )
+                async with session.begin_nested():
+                    result = await attribution_engine.compute_attribution(
+                        session, updated, observations
+                    )
+                    await AttributionRepository.create(session, result)
+        except Exception as exc:
+            logger.warning(
+                "Attribution engine failed for incident %s: %s",
+                incident.id,
+                exc,
+            )
+
+        # Evidence is generated for every resolved incident, not only incidents
+        # that happened to have a temporal correlation.
+        try:
+            from app.modules.evidence.tasks import generate_evidence_report
+
+            generate_evidence_report.delay(str(incident.id))
+            logger.info(
+                "Dispatched evidence report task for incident %s", incident.id
+            )
+        except Exception as exc:
+            logger.warning("Could not dispatch evidence task: %s", exc)
 
         return updated
 
@@ -200,10 +241,9 @@ class IncidentService:
             raise ResourceNotFoundException("Incident not found")
 
         update_kwargs = {}
-        if request.status is not None:
+        resolving = request.status == IncidentStatus.RESOLVED
+        if request.status is not None and not resolving:
             update_kwargs["status"] = request.status.value
-            if request.status == IncidentStatus.RESOLVED and not incident.resolved_at:
-                update_kwargs["resolved_at"] = datetime.now(timezone.utc)
         if request.severity is not None:
             update_kwargs["severity"] = request.severity.value
         if request.root_cause is not None:
@@ -211,7 +251,15 @@ class IncidentService:
         if request.description is not None:
             update_kwargs["description"] = request.description
 
-        updated = await self.repository.update(session, incident, **update_kwargs)
+        updated = (
+            await self.repository.update(session, incident, **update_kwargs)
+            if update_kwargs
+            else incident
+        )
+        if resolving:
+            updated = await self.resolve_incident(
+                session, incident.id, org_id=org_id
+            )
         return IncidentResponse.model_validate(updated)
 
     async def manually_correlate(
@@ -240,22 +288,22 @@ class IncidentService:
         session: AsyncSession,
         org_id: uuid.UUID,
         inc_id: uuid.UUID,
-    ) -> dict[str, Any]:
+    ) -> EvidenceReportResponse:
         incident = await self.repository.get_by_id(session, inc_id)
         if not incident or incident.org_id != org_id:
             raise ResourceNotFoundException("Incident not found")
 
         from app.modules.evidence.repository import EvidenceRepository
-        from app.modules.evidence.schemas import EvidenceReportResponse
+        from app.modules.evidence.schemas import EvidenceReportResponse as Err
 
         report = await EvidenceRepository.get_by_incident(session, inc_id)
         if report:
-            return EvidenceReportResponse.model_validate(report).model_dump()
+            return Err.model_validate(report)
 
         from app.modules.evidence.service import evidence_service
 
         report = await evidence_service.generate_for_incident(session, inc_id)
-        return EvidenceReportResponse.model_validate(report).model_dump()
+        return Err.model_validate(report)
 
 
 incident_service = IncidentService()

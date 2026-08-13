@@ -2,10 +2,20 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from typing import Any
+import logging
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+_KNOWN_INSECURE_SECRETS = {
+    "reliastra-super-secret-key-that-is-at-least-32-characters-long-for-security",
+    "reliastra-dev-only-change-in-production-key",
+    "changeme",
+    "secret",
+    "your-secret-key-here",
+}
 
 
 class Settings(BaseSettings):
@@ -77,6 +87,38 @@ class Settings(BaseSettings):
         default=True,
         description="Whether to allow cookies/credentials in CORS requests",
     )
+    PAYSTACK_SECRET_KEY: str = Field(
+        default="",
+        description="Paystack secret key used for API calls and webhook signing",
+    )
+    PAYSTACK_PUBLIC_KEY: str = Field(
+        default="",
+        description="Paystack public key for payment initialization",
+    )
+    PAYSTACK_BASE_URL: str = Field(
+        default="https://api.paystack.co",
+        description="Paystack API base URL",
+    )
+    SMTP_USE_TLS: bool = Field(
+        default=False,
+        description="Whether to negotiate SMTP TLS when supported",
+    )
+    ENVIRONMENT: str = Field(
+        default="development",
+        description="Current environment (development, staging, production)",
+    )
+
+    @model_validator(mode="after")
+    def _reject_insecure_defaults_in_production(self) -> type[Settings]:
+        if self.ENVIRONMENT == "production":
+            if self.SECRET_KEY in _KNOWN_INSECURE_SECRETS:
+                raise ValueError(
+                    "SECRET_KEY must be changed from the default value in production. "
+                    "Set a cryptographically random SECRET_KEY environment variable."
+                )
+            if self.MINIO_SECRET_KEY == "minioadmin":
+                logger.warning("MINIO_SECRET_KEY is set to the default 'minioadmin' in production")
+        return self
 
     # Google OAuth settings
     GOOGLE_CLIENT_ID: str | None = Field(

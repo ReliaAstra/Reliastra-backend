@@ -7,7 +7,6 @@ from app.core.exceptions import (
     ResourceNotFoundException,
 )
 from app.core.permissions import Role
-from app.modules.organizations.models import Organization, OrganizationMember
 from app.modules.organizations.repository import OrganizationRepository
 from app.modules.organizations.schemas import (
     OrganizationCreateRequest,
@@ -62,6 +61,14 @@ class OrganizationService:
             org_id=org.id,
             user_id=user_id,
             role=Role.OWNER.value,
+        )
+        from app.modules.agencies.repository import AgencyRepository
+
+        await AgencyRepository.create_application(
+            session,
+            org_id=org.id,
+            name="Default",
+            description="Default application",
         )
         return OrganizationResponse.model_validate(org)
 
@@ -146,6 +153,16 @@ class OrganizationService:
         member = await self.org_repository.get_member_by_id(session, member_id)
         if not member or member.org_id != org_id:
             raise ResourceNotFoundException("Organization member not found")
+
+        # Prevent removing the last owner of the organization
+        if member.role == Role.OWNER.value:
+            members = await self.org_repository.list_members(session, org_id)
+            owners = [m for m in members if m.role == Role.OWNER.value]
+            if len(owners) <= 1:
+                raise ForbiddenException(
+                    "Cannot remove the last owner of the organization. "
+                    "Transfer ownership to another member first."
+                )
 
         await self.org_repository.remove_member(session, member)
 

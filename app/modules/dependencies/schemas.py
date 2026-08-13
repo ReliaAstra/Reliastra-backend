@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Any
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.modules.dependencies.constants import (
     DEFAULT_EXPECTED_STATUS_CODES,
     DEFAULT_REGIONS,
@@ -11,29 +11,67 @@ from app.modules.dependencies.constants import (
 
 
 class DependencyCreateRequest(BaseModel):
-    name: str
+    name: str = Field(max_length=150, min_length=1)
+    application_id: uuid.UUID | None = None
     endpoint_url: str
     method: HttpMethod = HttpMethod.GET
     headers: dict[str, Any] | None = None
     expected_status_codes: list[int] = DEFAULT_EXPECTED_STATUS_CODES
-    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
-    check_interval_seconds: int = 300
-    regions: list[str] = DEFAULT_REGIONS
-    alert_threshold_ms: int | None = None
+    timeout_seconds: int = Field(default=DEFAULT_TIMEOUT_SECONDS, ge=1, le=300)
+    check_interval_seconds: int = Field(default=300, ge=10, le=86400)
+    regions: list[str] = Field(default=DEFAULT_REGIONS, min_length=1)
+    alert_threshold_ms: int | None = Field(default=None, ge=1)
     is_active: bool = True
+
+    @field_validator("endpoint_url")
+    @classmethod
+    def validate_endpoint_url(cls, v: str) -> str:
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("endpoint_url must start with http:// or https://")
+        return v
+
+    @field_validator("headers")
+    @classmethod
+    def validate_headers(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        if v is not None:
+            # Authorization values are encrypted at rest by DependencyService.
+            forbidden = {"cookie", "host"}
+            lower_keys = {k.lower() for k in v.keys()}
+            if forbidden & lower_keys:
+                raise ValueError(f"Headers cannot contain: {', '.join(sorted(forbidden))}")
+        return v
 
 
 class DependencyUpdateRequest(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, max_length=150, min_length=1)
+    application_id: uuid.UUID | None = None
     endpoint_url: str | None = None
     method: HttpMethod | None = None
     headers: dict[str, Any] | None = None
     expected_status_codes: list[int] | None = None
-    timeout_seconds: int | None = None
-    check_interval_seconds: int | None = None
+    timeout_seconds: int | None = Field(default=None, ge=1, le=300)
+    check_interval_seconds: int | None = Field(default=None, ge=10, le=86400)
     regions: list[str] | None = None
-    alert_threshold_ms: int | None = None
+    alert_threshold_ms: int | None = Field(default=None, ge=1)
     is_active: bool | None = None
+
+    @field_validator("endpoint_url")
+    @classmethod
+    def validate_endpoint_url(cls, v: str | None) -> str | None:
+        if v is not None and not v.startswith(("http://", "https://")):
+            raise ValueError("endpoint_url must start with http:// or https://")
+        return v
+
+    @field_validator("headers")
+    @classmethod
+    def validate_headers(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        if v is not None:
+            # Authorization values are encrypted at rest by DependencyService.
+            forbidden = {"cookie", "host"}
+            lower_keys = {k.lower() for k in v.keys()}
+            if forbidden & lower_keys:
+                raise ValueError(f"Headers cannot contain: {', '.join(sorted(forbidden))}")
+        return v
 
 
 class DependencyResponse(BaseModel):
@@ -41,6 +79,7 @@ class DependencyResponse(BaseModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
+    application_id: uuid.UUID | None = None
     name: str
     endpoint_url: str
     method: str
@@ -70,6 +109,7 @@ class DependencyInternalDTO(BaseModel):
 
     id: uuid.UUID
     org_id: uuid.UUID
+    application_id: uuid.UUID | None = None
     name: str
     endpoint_url: str
     method: str

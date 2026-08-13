@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.rate_limit import ip_limiter, enforce_rate_limit
 from app.db.session import get_db
 from app.modules.auth.schemas import (
     GitHubAuthRequest,
@@ -25,7 +26,6 @@ from app.modules.auth.github_service import (
     github_auth_service,
 )
 from app.modules.users.repository import UserRepository
-from app.modules.users.models import User
 
 router = APIRouter(prefix="/v1/auth", tags=["Authentication"])
 
@@ -47,38 +47,45 @@ def get_github_auth_service() -> GitHubAuthService:
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(
-    request: RegisterRequest,
+    request: Request,
+    body: RegisterRequest,
     db: AsyncSession = Depends(get_db),
     service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
-    return await service.register(db, request)
+    await enforce_rate_limit(request, ip_limiter)
+    return await service.register(db, body)
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
-    request: LoginRequest,
+    request: Request,
+    body: LoginRequest,
     db: AsyncSession = Depends(get_db),
     service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
-    return await service.login(db, request)
+    await enforce_rate_limit(request, ip_limiter)
+    return await service.login(db, body)
 
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
-    request: RefreshRequest,
+    request: Request,
+    body: RefreshRequest,
     db: AsyncSession = Depends(get_db),
     service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
-    return await service.refresh(db, request.refresh_token)
+    await enforce_rate_limit(request, ip_limiter)
+    return await service.refresh(db, body.refresh_token)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
-    request: LogoutRequest,
+    request: Request,
+    body: LogoutRequest,
     db: AsyncSession = Depends(get_db),
     service: AuthService = Depends(get_auth_service),
 ) -> None:
-    await service.logout(db, request.refresh_token)
+    await service.logout(db, body.refresh_token)
 
 
 # ── Google OAuth ──────────────────────────────────────────

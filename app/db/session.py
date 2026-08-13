@@ -21,6 +21,9 @@ def get_engine() -> AsyncEngine:
             settings.DATABASE_URL,
             echo=False,
             pool_pre_ping=True,
+            pool_size=10,
+            max_overflow=20,
+            pool_timeout=30,
             future=True,
         )
     return _engine

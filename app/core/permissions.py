@@ -43,25 +43,55 @@ class Plan(str, Enum):
     AGENCY = "agency"
 
 
+# Pricing page check intervals (seconds)
 PLAN_CHECK_INTERVALS: dict[str, int] = {
-    Plan.FREE.value: 300,
-    Plan.STANDARD.value: 60,
-    Plan.PROFESSIONAL.value: 30,
-    Plan.AGENCY.value: 30,
+    Plan.FREE.value: 60,          # 1-minute
+    Plan.STANDARD.value: 15,       # 15-second
+    Plan.PROFESSIONAL.value: 5,   # 5-second
+    Plan.AGENCY.value: 5,         # 5-second
 }
 
 
+# Pricing page vendor (dependency) limits
 PLAN_DEPENDENCY_LIMITS: dict[str, int] = {
     Plan.FREE.value: 5,
     Plan.STANDARD.value: 25,
-    Plan.PROFESSIONAL.value: 100,
-    Plan.AGENCY.value: 500,
+    Plan.PROFESSIONAL.value: 10_000,  # Effectively unlimited; 10k safety cap
+    Plan.AGENCY.value: 10_000,       # Effectively unlimited; 10k safety cap
 }
 
 
+# Monthly prices in USD (used for Paystack amount calculation in kobo)
+PLAN_PRICES_USD: dict[str, int] = {
+    Plan.STANDARD.value: 49,
+    Plan.PROFESSIONAL.value: 99,
+    Plan.AGENCY.value: 0,  # Custom pricing — not self-serve
+}
+
+
+# Founding customer discount: 40% off standard and professional plans for lifetime
+FOUNDING_DISCOUNT_PCT: int = 40
+FOUNDING_MAX_SPOTS: int = 25
+
+
 def get_min_check_interval(plan: str) -> int:
-    return PLAN_CHECK_INTERVALS.get(plan.lower(), 300)
+    return PLAN_CHECK_INTERVALS.get(plan.lower(), 60)
 
 
 def get_dependency_limit(plan: str) -> int:
     return PLAN_DEPENDENCY_LIMITS.get(plan.lower(), 5)
+
+
+def get_plan_price_usd(plan: str) -> int:
+    return PLAN_PRICES_USD.get(plan.lower(), 0)
+
+
+def get_discounted_price_usd(plan: str) -> int:
+    """Calculate the founding-customer discounted price.
+    Returns 0 for free/agency plans or if the plan has no base price.
+    """
+    base = PLAN_PRICES_USD.get(plan.lower(), 0)
+    if base <= 0:
+        return 0
+    discount = base * FOUNDING_DISCOUNT_PCT // 100
+    return base - discount
