@@ -76,6 +76,10 @@ class Settings(BaseSettings):
         default=False,
         description="Whether to use SSL when connecting to MinIO/S3",
     )
+    MINIO_REGION: str = Field(
+        default="",
+        description="S3 region (e.g. 'eu-west-3' for Supabase, 'us-east-1' for AWS). Leave empty for local MinIO.",
+    )
     SMTP_HOST: str = Field(
         default="localhost",
         description="SMTP server host",
@@ -128,6 +132,11 @@ class Settings(BaseSettings):
         existing_params["sslmode"] = [self.DATABASE_SSL_MODE]
         new_query = urlencode(existing_params, doseq=True)
         return urlunparse(parsed._replace(query=new_query))
+
+    @property
+    def minio_region_or_none(self) -> str | None:
+        """Return MINIO_REGION as None when empty so the Minio client auto-detects."""
+        return self.MINIO_REGION if self.MINIO_REGION else None
 
     @model_validator(mode="after")
     def _reject_insecure_defaults_in_production(self) -> type[Settings]:
