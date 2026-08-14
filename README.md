@@ -79,9 +79,12 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 | `GITHUB_REDIRECT_URI` | _(empty)_ | GitHub OAuth redirect URI |
 | `PAYSTACK_SECRET_KEY` | _(empty)_ | Paystack API secret key |
 | `PAYSTACK_PUBLIC_KEY` | _(empty)_ | Paystack public key for checkout |
-| `MINIO_ENDPOINT` | `localhost:9000` | S3-compatible storage for evidence PDFs |
+| `MINIO_ENDPOINT` | `localhost:9000` | S3-compatible storage endpoint (MinIO, Supabase, AWS S3, R2) |
 | `MINIO_ACCESS_KEY` | `minioadmin` | Storage access key |
 | `MINIO_SECRET_KEY` | `minioadmin` | Storage secret key |
+| `MINIO_BUCKET` | `reliastra-evidence` | Storage bucket name |
+| `MINIO_USE_SSL` | `false` | Enable SSL for storage connection |
+| `MINIO_REGION` | _(empty)_ | S3 region (e.g. `eu-west-3` for Supabase, `us-east-1` for AWS) |
 | `SMTP_HOST` | `localhost` | SMTP server for notifications |
 | `SMTP_PORT` | `1025` | SMTP port |
 | `SMTP_FROM` | `noreply@reliastra.com` | Sender email address |
@@ -95,7 +98,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 3. Run `alembic upgrade head` to create database tables
 4. Set OAuth variables to enable Google/GitHub sign-in
 5. Set `PAYSTACK_SECRET_KEY` and `PAYSTACK_PUBLIC_KEY` to enable billing
-6. Set `MINIO_*` variables to enable evidence PDF storage
+6. Set `MINIO_*` variables to enable evidence PDF storage (supports Supabase Storage S3, AWS S3, Cloudflare R2, or local MinIO)
 7. Verify health: `GET /health` should return `{"status": "ok", ...}`
 
 ### Docker Compose (Local Development)
@@ -164,7 +167,7 @@ Owner (40) > Admin (30) > Member (20) > Viewer (10)
 | Database | PostgreSQL 15+ |
 | Cache / Queue | Redis 7+ |
 | Task Queue | Celery + Beat |
-| Object Storage | MinIO (S3-compatible) |
+| Object Storage | S3-compatible (MinIO, Supabase, AWS, R2) via boto3 + minio |
 | Billing | Paystack |
 | Auth | JWT + SHA-256 API Keys + OAuth 2.0 (Google, GitHub) |
 | Encryption | Fernet (derived from SECRET_KEY) |
@@ -264,7 +267,7 @@ Reliastra-backend/
 │   └── infrastructure/
 │       ├── celery_app.py       # Celery configuration and Beat check schedule
 │       ├── redis_client.py     # Shared async Redis client
-│       ├── storage.py          # S3/MinIO storage abstraction with fallback
+│       ├── storage.py          # Dual-backend S3 storage (boto3 for Supabase/AWS, minio for local)
 │       └── email.py            # SMTP email sending client (verification & password reset emails)
 ├── templates/evidence/      # Jinja2 evidence report template
 ├── tests/                   # Unit, integration, and E2E tests

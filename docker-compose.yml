@@ -79,6 +79,7 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: reliastra-evidence
       MINIO_USE_SSL: "false"
+      MINIO_REGION: ""
       PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
       PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
       SMTP_HOST: mailhog
@@ -112,6 +113,7 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: reliastra-evidence
       MINIO_USE_SSL: "false"
+      MINIO_REGION: ""
       PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
       PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
       SMTP_HOST: mailhog
@@ -141,6 +143,7 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: reliastra-evidence
       MINIO_USE_SSL: "false"
+      MINIO_REGION: ""
       PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
       PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
       SMTP_HOST: mailhog
