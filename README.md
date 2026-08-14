@@ -56,7 +56,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL with asyncpg driver | `postgresql+asyncpg://user:pass@host:5432/reliastra` |
+| `DATABASE_URL` | PostgreSQL with asyncpg driver (works with Supabase, Neon, RDS, etc.) | `postgresql+asyncpg://user:pass@host:5432/reliastra` |
+| `DATABASE_SSL_MODE` | SSL mode for external databases (`require`, `verify-full`) | `require` |
 | `REDIS_URL` | Redis for rate limiting, Celery, idempotency | `redis://host:6379/0` |
 | `SECRET_KEY` | JWT signing key (min 32 chars) | Use `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
 | `ENVIRONMENT` | Set to `production` | `production` |

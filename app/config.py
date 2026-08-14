@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import logging
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -28,7 +29,14 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/reliastra",
-        description="Database connection URL with asyncpg driver",
+        description="Database connection URL with asyncpg driver.
+        Accepts both internal and external PostgreSQL URLs (e.g. Supabase, Neon, RDS).
+        For SSL databases, append ?sslmode=require or set DATABASE_SSL_MODE=require.",
+    )
+    DATABASE_SSL_MODE: str = Field(
+        default="",
+        description="PostgreSQL SSL mode (e.g. 'require', 'verify-full'). Appended to DATABASE_URL if set.
+        Supabase and most managed Postgres services require 'require'.", 
     )
     REDIS_URL: str = Field(
         default="redis://localhost:6379/0",
@@ -107,6 +115,18 @@ class Settings(BaseSettings):
         default="development",
         description="Current environment (development, staging, production)",
     )
+
+    @property
+    def database_url_with_ssl(self) -> str:
+        """Return DATABASE_URL with SSL parameters applied if configured."""
+        url = self.DATABASE_URL
+        if not self.DATABASE_SSL_MODE:
+            return url
+        parsed = urlparse(url)
+        existing_params = parse_qs(parsed.query, keep_blank_values=True)
+        existing_params["sslmode"] = [self.DATABASE_SSL_MODE]
+        new_query = urlencode(existing_params, doseq=True)
+        return urlunparse(parsed._replace(query=new_query))
 
     @model_validator(mode="after")
     def _reject_insecure_defaults_in_production(self) -> type[Settings]:
