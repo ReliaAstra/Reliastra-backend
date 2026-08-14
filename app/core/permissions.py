@@ -68,6 +68,9 @@ PLAN_PRICES_USD: dict[str, int] = {
     Plan.AGENCY.value: 0,  # Custom pricing — not self-serve
 }
 
+# Backward-compatible alias
+PLAN_AMOUNTS = PLAN_PRICES_USD
+
 
 # Founding customer discount: 40% off standard and professional plans for lifetime
 FOUNDING_DISCOUNT_PCT: int = 40
