@@ -29,14 +29,15 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/reliastra",
-        description="Database connection URL with asyncpg driver.
-        Accepts both internal and external PostgreSQL URLs (e.g. Supabase, Neon, RDS).
-        For SSL databases, append ?sslmode=require or set DATABASE_SSL_MODE=require.",
+        description="Database connection URL with asyncpg driver. "
+                    "Accepts both internal and external PostgreSQL URLs (e.g. Supabase, Neon, RDS). "
+                    "For SSL databases, set DATABASE_SSL_MODE=require.",
     )
     DATABASE_SSL_MODE: str = Field(
         default="",
-        description="PostgreSQL SSL mode (e.g. 'require', 'verify-full'). Appended to DATABASE_URL if set.
-        Supabase and most managed Postgres services require 'require'.", 
+        description="PostgreSQL SSL mode (e.g. 'require', 'verify-full'). "
+                    "Appended to DATABASE_URL if set. "
+                    "Supabase and most managed Postgres services require 'require'.",
     )
     REDIS_URL: str = Field(
         default="redis://localhost:6379/0",
