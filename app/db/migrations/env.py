@@ -1,4 +1,5 @@
 import asyncio
+import ssl as _ssl
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -14,7 +15,8 @@ if config.config_file_name is not None:
 import_all_models()
 target_metadata = Base.metadata
 
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Use the SSL-aware database URL for migrations
+config.set_main_option("sqlalchemy.url", settings.database_url_with_ssl)
 
 
 def run_migrations_offline() -> None:
