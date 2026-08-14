@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy import pool
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,15 @@ def _strip_sslmode_from_url(url: str) -> str:
     parsed = urlparse(url)
     qs = parse_qs(parsed.query, keep_blank_values=True)
     qs.pop("sslmode", None)
-    return urlunparse(parsed._replace(query=urlencode(qs, doseq=True) if qs else ""))
+    new_query = urlencode(qs, doseq=True) if qs else ""
+    # Preserve the original URL format: urlunparse may collapse "///" to "/"
+    # for SQLite URLs which breaks parsing. Reconstruct carefully.
+    if new_query:
+        return urlunparse(parsed._replace(query=new_query))
+    # No query params — return the original URL unchanged (preserves ///)
+    if not parsed.query:
+        return url
+    return urlunparse(parsed._replace(query=""))
 
 
 def _build_connect_args() -> dict:
@@ -36,10 +45,16 @@ def _build_connect_args() -> dict:
     ``sslmode`` from the connection URL.  We detect the desired mode from
     the ``DATABASE_SSL_MODE`` setting (or from the raw URL query string as
     a fallback) and translate it into an appropriate Python SSL context.
+
+    Only applies to PostgreSQL backends; SQLite and others return no args.
     """
+    url = settings.DATABASE_URL
+    if not url.startswith("postgresql"):
+        return {}
+
     ssl_mode = settings.DATABASE_SSL_MODE
     if not ssl_mode:
-        parsed = urlparse(settings.DATABASE_URL)
+        parsed = urlparse(url)
         qs = parse_qs(parsed.query, keep_blank_values=True)
         if "sslmode" in qs:
             ssl_mode = qs["sslmode"][0]
@@ -83,27 +98,48 @@ def get_engine() -> AsyncEngine:
         clean_url = _strip_sslmode_from_url(raw_url)
         connect_args = _build_connect_args()
 
-        # PgBouncer/Supabase pooler needs prepared-statement workaround
-        if _needs_pooler_compat(clean_url):
-            (connect_args or {}).update({"prepare_statement_cache_size": 0})
-            if not connect_args:
-                connect_args = {"prepare_statement_cache_size": 0}
+        # PgBouncer/Supabase pooler needs prepared-statement workaround.
+        # asyncpg >= 0.30 removed prepare_statement_cache_size from connect()
+        # and SQLAlchemy 2.0.36+ handles this via the pooler_compat flag or
+        # server-side settings.  We set it via server_settings instead.
+        pooler_compat = _needs_pooler_compat(clean_url)
+        if pooler_compat:
+            if connect_args:
+                connect_args["server_settings"] = {
+                    "prepare_statement_cache_size": "0",
+                }
+            else:
+                connect_args = {
+                    "server_settings": {"prepare_statement_cache_size": "0"},
+                }
+
+        # Determine engine kwargs based on backend
+        is_sqlite = clean_url.startswith("sqlite")
+        engine_kwargs: dict = dict(
+            echo=False,
+            future=True,
+        )
+        if is_sqlite:
+            # SQLite: no connection pooling, no connect_args needed
+            engine_kwargs["poolclass"] = pool.StaticPool
+        else:
+            # PostgreSQL: full connection pool
+            engine_kwargs.update(
+                pool_pre_ping=True,
+                pool_size=10,
+                max_overflow=20,
+                pool_timeout=30,
+            )
+            if connect_args:
+                engine_kwargs["connect_args"] = connect_args
 
         logger.info(
-            "Creating async engine — pool_size=10, max_overflow=20, ssl=%s, pooler_compat=%s",
-            bool(connect_args and connect_args.get("ssl")),
-            _needs_pooler_compat(clean_url),
+            "Creating async engine — backend=%s, ssl=%s, pooler_compat=%s",
+            "sqlite" if is_sqlite else "postgresql",
+            bool(connect_args and connect_args.get("ssl")) if connect_args else False,
+            pooler_compat,
         )
-        _engine = create_async_engine(
-            clean_url,
-            echo=False,
-            pool_pre_ping=True,
-            pool_size=10,
-            max_overflow=20,
-            pool_timeout=30,
-            future=True,
-            connect_args=connect_args if connect_args else None,
-        )
+        _engine = create_async_engine(clean_url, **engine_kwargs)
     return _engine
 
 

@@ -1,7 +1,7 @@
 import asyncio
 import ssl as _ssl
 from logging.config import fileConfig
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -16,12 +16,15 @@ if config.config_file_name is not None:
 import_all_models()
 target_metadata = Base.metadata
 
-# Use the SSL-aware database URL for migrations
-db_url = settings.database_url_with_ssl
 
+def _build_ssl_connect_args(db_url: str) -> dict:
+    """Build asyncpg-compatible SSL connect args from DATABASE_SSL_MODE or URL query.
 
-def _build_ssl_connect_args() -> dict:
-    """Build asyncpg-compatible SSL connect args from DATABASE_SSL_MODE or URL query."""
+    Only returns args for PostgreSQL URLs; all other drivers return an empty dict.
+    """
+    if not db_url.startswith("postgresql"):
+        return {}
+
     ssl_mode = settings.DATABASE_SSL_MODE
     if not ssl_mode:
         parsed = urlparse(db_url)
@@ -47,11 +50,14 @@ def _build_ssl_connect_args() -> dict:
     return {"ssl": ctx}
 
 
-# Set URL without sslmode in query (asyncpg doesn't accept sslmode kwarg)
+# Use the SSL-aware database URL for migrations (only appends sslmode for PostgreSQL)
+db_url = settings.database_url_with_ssl
+connect_args_for_ssl = _build_ssl_connect_args(db_url)
+
+# Strip sslmode from URL query string (asyncpg doesn't accept it as a URL param)
 parsed = urlparse(db_url)
 qs = parse_qs(parsed.query, keep_blank_values=True)
 qs.pop("sslmode", None)
-from urllib.parse import urlencode, urlunparse
 clean_url = urlunparse(parsed._replace(query=urlencode(qs, doseq=True) if qs else ""))
 config.set_main_option("sqlalchemy.url", clean_url)
 
@@ -77,11 +83,10 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    connect_args = _build_ssl_connect_args()
     engine = create_async_engine(
         clean_url,
         poolclass=pool.NullPool,
-        connect_args=connect_args if connect_args else None,
+        connect_args=connect_args_for_ssl if connect_args_for_ssl else None,
     )
 
     async with engine.connect() as connection:

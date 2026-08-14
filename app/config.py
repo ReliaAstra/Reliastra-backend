@@ -123,9 +123,13 @@ class Settings(BaseSettings):
 
     @property
     def database_url_with_ssl(self) -> str:
-        """Return DATABASE_URL with SSL parameters applied if configured."""
+        """Return DATABASE_URL with SSL parameters applied if configured.
+
+        Only PostgreSQL URLs get sslmode appended; SQLite and other drivers
+        are returned unchanged.
+        """
         url = self.DATABASE_URL
-        if not self.DATABASE_SSL_MODE:
+        if not self.DATABASE_SSL_MODE or not url.startswith("postgresql"):
             return url
         parsed = urlparse(url)
         existing_params = parse_qs(parsed.query, keep_blank_values=True)
