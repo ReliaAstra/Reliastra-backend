@@ -16,13 +16,14 @@ from app.core.exceptions import (
 )
 from app.core.permissions import (
     FOUNDING_DISCOUNT_PCT,
+    FOUNDING_ELIGIBLE_PLANS,
     FOUNDING_MAX_SPOTS,
-    PLAN_AMOUNTS,
     Plan,
     get_dependency_limit,
     get_discounted_price_usd,
     get_min_check_interval,
     get_plan_price_usd,
+    is_paid_plan,
 )
 from app.modules.billing.repository import BillingRepository
 from app.modules.billing.schemas import (
@@ -95,12 +96,13 @@ class PaystackClient:
 
 paystack_client = PaystackClient()
 
-# Amounts are in kobo (1 USD = 100 kobo).  Prices match the pricing page:
-#   Standard:   $49/mo  ->  4,900 kobo
-#   Professional: $99/mo  ->  9,900 kobo
-# Agency plans use custom pricing and are not self-serve.
-# Founding customers receive 40% off (applied at initialization).
+# Amounts in kobo (1 USD = 100 kobo).  All self-serve paid plans:
+#   Starter:     $19/mo  ->  1,900 kobo
+#   Standard:    $49/mo  ->  4,900 kobo
+#   Professional: $99/mo ->  9,900 kobo
+# Agency ($199) and Free ($0) are not self-serve.
 PLAN_AMOUNTS: dict[str, int] = {
+    Plan.STARTER.value: 1900,
     Plan.STANDARD.value: 4900,
     Plan.PROFESSIONAL.value: 9900,
     Plan.AGENCY.value: 0,
@@ -130,9 +132,9 @@ def _normalized_plan(data: dict[str, Any]) -> str:
             candidate = plan_data.get("name") or plan_data.get("plan_code")
         elif isinstance(plan_data, str):
             candidate = plan_data
-    candidate = str(candidate or Plan.STANDARD.value).strip().lower()
+    candidate = str(candidate or Plan.STARTER.value).strip().lower()
     valid_plans = {plan.value for plan in Plan}
-    return candidate if candidate in valid_plans else Plan.STANDARD.value
+    return candidate if candidate in valid_plans else Plan.STARTER.value
 
 
 class BillingService:
@@ -183,18 +185,24 @@ class BillingService:
             raise ResourceNotFoundException("Organization not found")
 
         plan = request.plan.lower()
-        if plan not in PLAN_AMOUNTS:
-            raise ValidationException(f"Invalid paid plan: {plan}")
-        if plan == Plan.AGENCY.value:
+
+        # Validate plan
+        if not is_paid_plan(plan):
             raise ValidationException(
-                "Agency plans require custom pricing. Please contact sales."
+                f"Invalid paid plan: '{plan}'. Must be one of: starter, standard, professional."
+            )
+        if plan not in PLAN_AMOUNTS:
+            raise ValidationException(
+                f"Plan '{plan}' is not available for self-serve checkout. "
+                f"Please contact sales for agency plans."
             )
 
         base_amount = PLAN_AMOUNTS[plan]
         is_founding = getattr(org, "is_founding_customer", False)
         discount_pct = 0
 
-        if is_founding and plan in (Plan.STANDARD.value, Plan.PROFESSIONAL.value):
+        # Apply founding discount to ALL eligible paid plans
+        if is_founding and plan in FOUNDING_ELIGIBLE_PLANS:
             discount_pct = FOUNDING_DISCOUNT_PCT
             discounted_kobo = base_amount - (base_amount * discount_pct // 100)
             logger.info(

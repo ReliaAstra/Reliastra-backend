@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.exceptions import (
+    ForbiddenException,
     ResourceNotFoundException,
     UnauthorizedException,
     ValidationException,
@@ -15,11 +16,13 @@ from app.core.exceptions import (
 from app.core.permissions import (
     FOUNDING_DISCOUNT_PCT,
     FOUNDING_MAX_SPOTS,
-    PLAN_AMOUNTS,
     PLAN_DEPENDENCY_LIMITS,
+    PLAN_FEATURES,
     PLAN_PRICES_USD,
+    PLAN_DESCRIPTIONS,
+    PLAN_RETENTION_DAYS,
+    PLAN_TAGS,
     Plan,
-    get_dependency_limit,
     get_discounted_price_usd,
     get_min_check_interval,
     get_plan_price_usd,
@@ -47,23 +50,72 @@ def get_bill_service() -> BillingService:
 # ── Public Endpoints (no auth required) ──────────────────────────────────────────
 
 
+class PricingPlanResponse(BaseModel):
+    plan: str
+    display_name: str
+    description: str
+    tag: str | None = None
+    price_usd: int
+    max_dependencies: int
+    min_check_interval_seconds: int
+    data_retention_days: int
+    features: dict
+
+
+class PricingPlansResponse(BaseModel):
+    plans: list[PricingPlanResponse]
+
+
+@router.get("/public/pricing", response_model=PricingPlansResponse)
+async def get_pricing_plans() -> PricingPlansResponse:
+    """Public endpoint returning all plan details for the pricing page.
+
+    Does NOT include founding discount pricing — the founding program is private.
+    """
+    plans = []
+    for plan_enum in Plan:
+        p = plan_enum.value
+        plans.append(PricingPlanResponse(
+            plan=p,
+            display_name=p.capitalize(),
+            description=PLAN_DESCRIPTIONS.get(p, ""),
+            tag=PLAN_TAGS.get(p),
+            price_usd=PLAN_PRICES_USD.get(p, 0),
+            max_dependencies=PLAN_DEPENDENCY_LIMITS.get(p, 0),
+            min_check_interval_seconds=get_min_check_interval(p),
+            data_retention_days=PLAN_RETENTION_DAYS.get(p, 1),
+            features=PLAN_FEATURES.get(p, {}),
+        ))
+    return PricingPlansResponse(plans=plans)
+
+
+# ── Founding Program (PRIVATE — auth required) ──────────────────────────────────
+
+
 class FoundingSpotsResponse(BaseModel):
     total_spots: int
     spots_taken: int
     spots_remaining: int
     founding_discount_pct: int
-    standard_price_usd: int
-    professional_price_usd: int
-    founding_standard_price_usd: int
-    founding_professional_price_usd: int
+    eligible_plans: list[str]
+    plan_discounts: dict[str, dict]
 
 
-@router.get("/public/founding-spots", response_model=FoundingSpotsResponse)
+@router.get(
+    "/orgs/{org_id}/billing/founding-spots",
+    response_model=FoundingSpotsResponse,
+)
 async def get_founding_spots(
+    org_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    current_org: Organization = Depends(get_current_org),
 ) -> FoundingSpotsResponse:
-    """Public endpoint for the landing page showing founding customer spots remaining.
-    Returns pricing, discount information, and how many founding spots are left.
+    """PRIVATE endpoint: founding customer program status.
+
+    Requires authentication. Returns founding spots remaining and
+    the discounted prices for all eligible paid tiers.
+
+    The founding program is invite-only and not advertised publicly.
     """
     try:
         result = await db.execute(
@@ -75,44 +127,113 @@ async def get_founding_spots(
     except Exception:
         spots_taken = 0
 
+    # Calculate discounts for all eligible paid plans
+    plan_discounts = {}
+    for plan_value in {Plan.STARTER.value, Plan.STANDARD.value,
+                       Plan.PROFESSIONAL.value, Plan.AGENCY.value}:
+        base = PLAN_PRICES_USD.get(plan_value, 0)
+        if base > 0:
+            discounted = get_discounted_price_usd(plan_value)
+            plan_discounts[plan_value] = {
+                "base_price_usd": base,
+                "discounted_price_usd": discounted,
+                "savings_usd": base - discounted,
+            }
+
     return FoundingSpotsResponse(
         total_spots=FOUNDING_MAX_SPOTS,
         spots_taken=spots_taken,
         spots_remaining=max(0, FOUNDING_MAX_SPOTS - spots_taken),
         founding_discount_pct=FOUNDING_DISCOUNT_PCT,
-        standard_price_usd=PLAN_PRICES_USD.get(Plan.STANDARD.value, 0),
-        professional_price_usd=PLAN_PRICES_USD.get(Plan.PROFESSIONAL.value, 0),
-        founding_standard_price_usd=get_discounted_price_usd(Plan.STANDARD.value),
-        founding_professional_price_usd=get_discounted_price_usd(Plan.PROFESSIONAL.value),
+        eligible_plans=[Plan.STARTER.value, Plan.STANDARD.value,
+                       Plan.PROFESSIONAL.value, Plan.AGENCY.value],
+        plan_discounts=plan_discounts,
     )
 
 
-class PricingPlansResponse(BaseModel):
-    plans: list[dict]
+class ClaimFoundingSpotRequest(BaseModel):
+    """Request body for claiming a founding customer spot."""
+    email: str | None = None
 
 
-@router.get("/public/pricing", response_model=PricingPlansResponse)
-async def get_pricing_plans() -> PricingPlansResponse:
-    """Public endpoint returning all plan details for the pricing page."""
-    plans = []
-    for plan_enum in Plan:
-        p = plan_enum.value
-        base_price = PLAN_PRICES_USD.get(p, 0)
-        plans.append({
-            "plan": p,
-            "max_dependencies": PLAN_DEPENDENCY_LIMITS.get(p, 0),
-            "min_check_interval_seconds": {
-                k: v for k, v in {
-                    Plan.FREE.value: 60,
-                    Plan.STANDARD.value: 15,
-                    Plan.PROFESSIONAL.value: 5,
-                    Plan.AGENCY.value: 5,
-                }.items() if k == p
-            }.get(p, 60),
-            "price_usd": base_price,
-            "founding_price_usd": get_discounted_price_usd(p) if base_price > 0 else 0,
-        })
-    return PricingPlansResponse(plans=plans)
+class ClaimFoundingSpotResponse(BaseModel):
+    success: bool
+    message: str
+    is_founding_customer: bool
+    founding_discount_pct: int
+
+
+@router.post(
+    "/orgs/{org_id}/billing/founding-spot/claim",
+    response_model=ClaimFoundingSpotResponse,
+    dependencies=[Depends(require_admin)],
+)
+async def claim_founding_spot(
+    org_id: uuid.UUID,
+    body: ClaimFoundingSpotRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_org: Organization = Depends(get_current_org),
+) -> ClaimFoundingSpotResponse:
+    """PRIVATE endpoint: claim a founding customer spot for an organization.
+
+    Only org owners/admins can claim. Enforces the 25-spot hard cap.
+    Once all 25 spots are taken, no more organizations can join.
+
+    The founding discount (40% off any paid tier) is applied automatically
+    at payment initialization for founding organizations.
+    """
+    # Check if org is already a founding customer
+    if current_org.is_founding_customer:
+        return ClaimFoundingSpotResponse(
+            success=False,
+            message="This organization is already a founding customer. The 40% discount is already applied.",
+            is_founding_customer=True,
+            founding_discount_pct=FOUNDING_DISCOUNT_PCT,
+        )
+
+    # Check spots remaining
+    try:
+        result = await db.execute(
+            select(func.count()).select_from(Organization).where(
+                Organization.is_founding_customer.is_(True)
+            )
+        )
+        spots_taken = result.scalar() or 0
+    except Exception:
+        spots_taken = 0
+
+    if spots_taken >= FOUNDING_MAX_SPOTS:
+        raise ValidationException(
+            f"All {FOUNDING_MAX_SPOTS} founding customer spots have been claimed. "
+            f"The founding program is now closed.",
+            details={
+                "code": "FOUNDING_PROGRAM_FULL",
+                "total_spots": FOUNDING_MAX_SPOTS,
+                "spots_taken": spots_taken,
+            },
+        )
+
+    # Claim the spot
+    from app.modules.organizations.repository import OrganizationRepository
+
+    await OrganizationRepository.update(
+        db,
+        current_org,
+        is_founding_customer=True,
+        founding_discount_pct=FOUNDING_DISCOUNT_PCT,
+    )
+
+    spots_remaining = FOUNDING_MAX_SPOTS - spots_taken - 1
+
+    return ClaimFoundingSpotResponse(
+        success=True,
+        message=(
+            f"Founding customer spot claimed! Your organization now has a lifetime "
+            f"40% discount on all paid tiers. {spots_remaining} founding spots remaining."
+        ),
+        is_founding_customer=True,
+        founding_discount_pct=FOUNDING_DISCOUNT_PCT,
+    )
 
 
 # ── Authenticated Endpoints ──────────────────────────────────────────────────────
