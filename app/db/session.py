@@ -16,6 +16,22 @@ _engine: AsyncEngine | None = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
 
 
+def _ensure_asyncpg_driver(url: str) -> str:
+    """Ensure a PostgreSQL URL uses the asyncpg driver.
+
+    ``create_async_engine`` requires the ``postgresql+asyncpg://`` scheme.
+    If the caller (or environment variable) omits the driver prefix
+    (e.g. ``postgresql://``), SQLAlchemy falls back to ``psycopg2`` which
+    is not installed and causes a ``ModuleNotFoundError`` at startup.
+
+    This is a common pitfall on PaaS platforms (Railway, Render, ZevCloud)
+    where the dashboard may auto-generate a bare ``postgresql://`` URL.
+    """
+    if url.startswith("postgresql://") and not url.startswith("postgresql+"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
+
 def _strip_sslmode_from_url(url: str) -> str:
     """Remove sslmode from URL query string.
 
@@ -95,6 +111,7 @@ def get_engine() -> AsyncEngine:
     if _engine is None:
         # Build clean URL (no sslmode query param) and SSL connect_args separately
         raw_url = settings.database_url_with_ssl
+        raw_url = _ensure_asyncpg_driver(raw_url)
         clean_url = _strip_sslmode_from_url(raw_url)
         connect_args = _build_connect_args()
 

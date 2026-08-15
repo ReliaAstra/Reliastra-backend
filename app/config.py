@@ -126,9 +126,14 @@ class Settings(BaseSettings):
         """Return DATABASE_URL with SSL parameters applied if configured.
 
         Only PostgreSQL URLs get sslmode appended; SQLite and other drivers
-        are returned unchanged.
+        are returned unchanged.  Also normalises bare ``postgresql://`` URLs
+        to ``postgresql+asyncpg://`` so that ``create_async_engine`` picks
+        the correct driver even when the environment variable omits it.
         """
         url = self.DATABASE_URL
+        # Normalise bare postgresql:// → postgresql+asyncpg://
+        if url.startswith("postgresql://") and not url.startswith("postgresql+"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
         if not self.DATABASE_SSL_MODE or not url.startswith("postgresql"):
             return url
         parsed = urlparse(url)
