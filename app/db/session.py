@@ -54,13 +54,17 @@ def _strip_sslmode_from_url(url: str) -> str:
     return urlunparse(parsed._replace(query=""))
 
 
-def _build_connect_args() -> dict:
-    """Build asyncpg ``connect_args`` with a proper ``ssl`` key.
+def _build_connect_args(pooler_compat: bool = False) -> dict:
+    """Build asyncpg ``connect_args`` with SSL and pooler compatibility.
 
     asyncpg expects an ``ssl.SSLContext`` object — it does **not** read
     ``sslmode`` from the connection URL.  We detect the desired mode from
     the ``DATABASE_SSL_MODE`` setting (or from the raw URL query string as
     a fallback) and translate it into an appropriate Python SSL context.
+
+    When *pooler_compat* is True (PgBouncer/Supabase pooler), we also set
+    ``statement_cache_size=0`` to prevent asyncpg from using named prepared
+    statements, which PgBouncer in transaction mode does not support.
 
     Only applies to PostgreSQL backends; SQLite and others return no args.
     """
@@ -75,25 +79,29 @@ def _build_connect_args() -> dict:
         if "sslmode" in qs:
             ssl_mode = qs["sslmode"][0]
 
-    if not ssl_mode:
-        return {}
+    args: dict = {}
 
-    import ssl as _ssl
+    if ssl_mode:
+        import ssl as _ssl
+        ctx = _ssl.create_default_context()
+        if ssl_mode == "require":
+            ctx.check_hostname = False
+            ctx.verify_mode = _ssl.CERT_NONE
+        elif ssl_mode == "verify-ca":
+            ctx.check_hostname = False
+            ctx.verify_mode = _ssl.CERT_REQUIRED
+        elif ssl_mode == "verify-full":
+            ctx.check_hostname = True
+            ctx.verify_mode = _ssl.CERT_REQUIRED
+        else:
+            ctx.check_hostname = False
+            ctx.verify_mode = _ssl.CERT_NONE
+        args["ssl"] = ctx
 
-    ctx = _ssl.create_default_context()
-    if ssl_mode == "require":
-        ctx.check_hostname = False
-        ctx.verify_mode = _ssl.CERT_NONE
-    elif ssl_mode == "verify-ca":
-        ctx.check_hostname = False
-        ctx.verify_mode = _ssl.CERT_REQUIRED
-    elif ssl_mode == "verify-full":
-        ctx.check_hostname = True
-        ctx.verify_mode = _ssl.CERT_REQUIRED
-    else:
-        ctx.check_hostname = False
-        ctx.verify_mode = _ssl.CERT_NONE
-    return {"ssl": ctx}
+    if pooler_compat:
+        args["statement_cache_size"] = 0
+
+    return args
 
 
 def _needs_pooler_compat(url: str) -> bool:
@@ -113,22 +121,12 @@ def get_engine() -> AsyncEngine:
         raw_url = settings.database_url_with_ssl
         raw_url = _ensure_asyncpg_driver(raw_url)
         clean_url = _strip_sslmode_from_url(raw_url)
-        connect_args = _build_connect_args()
 
         # PgBouncer/Supabase pooler needs prepared-statement workaround.
-        # asyncpg >= 0.30 removed prepare_statement_cache_size from connect()
-        # and SQLAlchemy 2.0.36+ handles this via the pooler_compat flag or
-        # server-side settings.  We set it via server_settings instead.
+        # asyncpg's statement_cache_size=0 prevents named prepared statements
+        # which PgBouncer in transaction mode does not support.
         pooler_compat = _needs_pooler_compat(clean_url)
-        if pooler_compat:
-            if connect_args:
-                connect_args["server_settings"] = {
-                    "prepare_statement_cache_size": "0",
-                }
-            else:
-                connect_args = {
-                    "server_settings": {"prepare_statement_cache_size": "0"},
-                }
+        connect_args = _build_connect_args(pooler_compat=pooler_compat)
 
         # Determine engine kwargs based on backend
         is_sqlite = clean_url.startswith("sqlite")

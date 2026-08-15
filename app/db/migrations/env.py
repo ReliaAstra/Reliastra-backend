@@ -17,10 +17,11 @@ import_all_models()
 target_metadata = Base.metadata
 
 
-def _build_ssl_connect_args(db_url: str) -> dict:
+def _build_ssl_connect_args(db_url: str, pooler_compat: bool = False) -> dict:
     """Build asyncpg-compatible SSL connect args from DATABASE_SSL_MODE or URL query.
 
     Only returns args for PostgreSQL URLs; all other drivers return an empty dict.
+    When *pooler_compat* is True, also disables statement caching for PgBouncer.
     """
     if not db_url.startswith("postgresql"):
         return {}
@@ -31,28 +32,32 @@ def _build_ssl_connect_args(db_url: str) -> dict:
         qs = parse_qs(parsed.query, keep_blank_values=True)
         if "sslmode" in qs:
             ssl_mode = qs["sslmode"][0]
-    if not ssl_mode:
-        return {}
 
-    ctx = _ssl.create_default_context()
-    if ssl_mode == "require":
-        ctx.check_hostname = False
-        ctx.verify_mode = _ssl.CERT_NONE
-    elif ssl_mode == "verify-ca":
-        ctx.check_hostname = False
-        ctx.verify_mode = _ssl.CERT_REQUIRED
-    elif ssl_mode == "verify-full":
-        ctx.check_hostname = True
-        ctx.verify_mode = _ssl.CERT_REQUIRED
-    else:
-        ctx.check_hostname = False
-        ctx.verify_mode = _ssl.CERT_NONE
-    return {"ssl": ctx}
+    args: dict = {}
+    if ssl_mode:
+        ctx = _ssl.create_default_context()
+        if ssl_mode == "require":
+            ctx.check_hostname = False
+            ctx.verify_mode = _ssl.CERT_NONE
+        elif ssl_mode == "verify-ca":
+            ctx.check_hostname = False
+            ctx.verify_mode = _ssl.CERT_REQUIRED
+        elif ssl_mode == "verify-full":
+            ctx.check_hostname = True
+            ctx.verify_mode = _ssl.CERT_REQUIRED
+        else:
+            ctx.check_hostname = False
+            ctx.verify_mode = _ssl.CERT_NONE
+        args["ssl"] = ctx
+
+    if pooler_compat:
+        args["statement_cache_size"] = 0
+
+    return args
 
 
 # Use the SSL-aware database URL for migrations (only appends sslmode for PostgreSQL)
 db_url = settings.database_url_with_ssl
-connect_args_for_ssl = _build_ssl_connect_args(db_url)
 
 # Strip sslmode from URL query string (asyncpg doesn't accept it as a URL param)
 parsed = urlparse(db_url)
@@ -82,11 +87,19 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 
+def _needs_pooler_compat(url: str) -> bool:
+    """True when the URL targets a PgBouncer / Supabase pooler."""
+    return "pooler.supabase" in url or "pgbouncer" in url
+
+
 async def run_async_migrations() -> None:
+    pooler_compat = _needs_pooler_compat(clean_url)
+    connect_args = _build_ssl_connect_args(clean_url, pooler_compat=pooler_compat)
+
     engine = create_async_engine(
         clean_url,
         poolclass=pool.NullPool,
-        connect_args=connect_args_for_ssl if connect_args_for_ssl else None,
+        connect_args=connect_args if connect_args else None,
     )
 
     async with engine.connect() as connection:
