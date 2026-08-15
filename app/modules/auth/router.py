@@ -109,9 +109,17 @@ async def logout(
 async def get_google_auth_url(
     service: GoogleAuthService = Depends(get_google_auth_service),
 ) -> GoogleAuthUrlResponse:
-    """Return the Google OAuth authorization URL for the frontend to redirect to."""
+    """
+    Return the Google OAuth authorization URL for the frontend to redirect to.
+
+    Generates a CSRF state token, stores it in Redis, and returns it
+    with the URL. The frontend must include the state in the callback request.
+    """
     import secrets
+
     state_token = secrets.token_urlsafe(32)
+    # Store state in Redis for CSRF validation
+    await service._store_state(state_token)
     url = service.get_authorization_url(state_token)
     return GoogleAuthUrlResponse(authorization_url=url, state=state_token)
 
@@ -124,27 +132,30 @@ async def google_auth_callback(
 ) -> GoogleAuthResponse:
     """
     Exchange Google authorization code for JWT tokens.
-    The frontend sends the code it received from Google's redirect.
-    This handles both signup and signin in one endpoint.
-    """
-    import uuid as uuid_mod
 
-    tokens = await service.authenticate_with_code(db, request.code)
+    The frontend sends the code (and optionally state) it received from
+    Google's redirect. This handles both signup and signin in one endpoint.
+
+    State validation provides CSRF protection when provided.
+    """
+    tokens, is_new_user = await service.authenticate_with_code(
+        db, request.code, state=request.state
+    )
 
     # Decode the token to get user_id and fetch full user details
+    import uuid as uuid_mod
     from app.core.security import decode_token
+
     payload = decode_token(tokens.access_token)
     user_id = uuid_mod.UUID(payload["sub"])
     user = await UserRepository.get_by_id(db, user_id)
 
-    # is_new_user is True if the user was just created by this Google flow
-    is_new = getattr(user, "auth_provider", None) == "google"
     return GoogleAuthResponse(
         access_token=tokens.access_token,
         refresh_token=tokens.refresh_token,
         token_type=tokens.token_type,
         expires_in=tokens.expires_in,
-        is_new_user=is_new,
+        is_new_user=is_new_user,
         user_id=user.id,
         email=user.email,
         full_name=user.full_name,
@@ -158,9 +169,17 @@ async def google_auth_callback(
 async def get_github_auth_url(
     service: GitHubAuthService = Depends(get_github_auth_service),
 ) -> GitHubAuthUrlResponse:
-    """Return the GitHub OAuth authorization URL for the frontend to redirect to."""
+    """
+    Return the GitHub OAuth authorization URL for the frontend to redirect to.
+
+    Generates a CSRF state token, stores it in Redis, and returns it
+    with the URL. The frontend must include the state in the callback request.
+    """
     import secrets
+
     state_token = secrets.token_urlsafe(32)
+    # Store state in Redis for CSRF validation
+    await service._store_state(state_token)
     url = service.get_authorization_url(state_token)
     return GitHubAuthUrlResponse(authorization_url=url, state=state_token)
 
@@ -173,26 +192,30 @@ async def github_auth_callback(
 ) -> GitHubAuthResponse:
     """
     Exchange GitHub authorization code for JWT tokens.
-    The frontend sends the code it received from GitHub's redirect.
-    This handles both signup and signin in one endpoint.
-    """
-    import uuid as uuid_mod
 
-    tokens = await service.authenticate_with_code(db, request.code)
+    The frontend sends the code (and optionally state) it received from
+    GitHub's redirect. This handles both signup and signin in one endpoint.
+
+    State validation provides CSRF protection when provided.
+    """
+    tokens, is_new_user = await service.authenticate_with_code(
+        db, request.code, state=request.state
+    )
 
     # Decode the token to get user_id and fetch full user details
+    import uuid as uuid_mod
     from app.core.security import decode_token
+
     payload = decode_token(tokens.access_token)
     user_id = uuid_mod.UUID(payload["sub"])
     user = await UserRepository.get_by_id(db, user_id)
 
-    is_new = getattr(user, "auth_provider", None) == "github"
     return GitHubAuthResponse(
         access_token=tokens.access_token,
         refresh_token=tokens.refresh_token,
         token_type=tokens.token_type,
         expires_in=tokens.expires_in,
-        is_new_user=is_new,
+        is_new_user=is_new_user,
         user_id=user.id,
         email=user.email,
         full_name=user.full_name,

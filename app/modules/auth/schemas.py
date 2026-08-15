@@ -45,6 +45,7 @@ class GoogleAuthUrlResponse(BaseModel):
 
 class GoogleAuthRequest(BaseModel):
     code: str
+    state: str | None = None
 
 
 class GitHubAuthUrlResponse(BaseModel):
@@ -54,10 +55,12 @@ class GitHubAuthUrlResponse(BaseModel):
 
 class GitHubAuthRequest(BaseModel):
     code: str
+    state: str | None = None
 
 
 class OAuthAuthResponse(TokenResponse):
     """Shared response for both Google and GitHub OAuth."""
+
     is_new_user: bool = False
     user_id: uuid.UUID
     email: str
