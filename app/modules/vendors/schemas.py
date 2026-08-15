@@ -66,3 +66,41 @@ class VendorIncidentResponse(BaseModel):
 class VendorIncidentsResponse(BaseModel):
     vendor_name: str
     incidents: list[VendorIncidentResponse]
+
+
+# ---------------------------------------------------------------------------
+# Timeline endpoint schemas
+# ---------------------------------------------------------------------------
+
+
+class TimelineBucket(BaseModel):
+    """A single aggregated time bucket in the vendor timeline."""
+
+    timestamp: datetime
+    avg_latency_ms: float
+    status_code: int | None
+    is_up: bool
+    observation_count: int
+    incident_id: uuid.UUID | None = None
+
+
+class TimelineCurrent(BaseModel):
+    """The most recent observation for a vendor, independent of the window."""
+
+    timestamp: datetime | None = None
+    latency_ms: float | None = None
+    status_code: int | None = None
+    is_up: bool | None = None
+
+
+class VendorTimelineResponse(BaseModel):
+    """Full response for GET /v1/public/vendors/{vendor_name}/timeline."""
+
+    vendor_name: str
+    window: str
+    resolution: str
+    region: str
+    from_: datetime = Field(alias="from")
+    to: datetime
+    current: TimelineCurrent
+    points: list[TimelineBucket] = Field(default_factory=list)

@@ -543,6 +543,148 @@ Returns uptime and latency metrics for charting.
 ]
 ```
 
+### 7.6 Vendor Timeline (`GET /v1/public/vendors/{vendor_name}/timeline`)
+
+Returns aggregated time-series data for the **Reliastra Public Reliability Graph**. This is the primary data source for rendering latency, availability, and incident markers on the frontend timeline visualization.
+
+**Public endpoint** — no authentication required. Subject to public vendor rate limits.
+
+#### Query Parameters
+
+| Parameter   | Type   | Default | Description                                                         |
+|-------------|--------|---------|---------------------------------------------------------------------|
+| `window`    | string | `24h`   | Time window. Supported: `1h`, `6h`, `24h`, `7d`, `30d`, `90d`.    |
+| `resolution`| string | `auto`  | Bucket resolution. Supported: `auto`, `1m`, `5m`, `15m`, `1h`, `6h`. |
+| `region`    | string | `us-east-1` | Probe region filter. Currently `us-east-1`. Schema supports future multi-region. |
+
+#### Auto-Resolution Defaults
+
+| Window | Auto Resolution |
+|--------|----------------|
+| `1h`   | `1m`           |
+| `6h`   | `1m`           |
+| `24h`  | `5m`           |
+| `7d`   | `15m`          |
+| `30d`  | `1h`           |
+| `90d`  | `6h`           |
+
+#### Response Schema (200 OK)
+
+```json
+{
+  "vendor_name": "stripe",
+  "window": "24h",
+  "resolution": "5m",
+  "region": "us-east-1",
+  "from": "2026-08-15T17:00:00Z",
+  "to": "2026-08-16T17:00:00Z",
+  "current": {
+    "timestamp": "2026-08-16T16:59:55Z",
+    "latency_ms": 184.0,
+    "status_code": 200,
+    "is_up": true
+  },
+  "points": [
+    {
+      "timestamp": "2026-08-16T16:55:00Z",
+      "avg_latency_ms": 182.5,
+      "status_code": 200,
+      "is_up": true,
+      "observation_count": 5,
+      "incident_id": null
+    },
+    {
+      "timestamp": "2026-08-16T14:30:00Z",
+      "avg_latency_ms": 3500.0,
+      "status_code": 503,
+      "is_up": false,
+      "observation_count": 12,
+      "incident_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    }
+  ]
+}
+```
+
+#### Field Reference
+
+| Field              | Type               | Description                                                    |
+|--------------------|--------------------|----------------------------------------------------------------|
+| `vendor_name`      | string             | Vendor slug identifier.                                        |
+| `window`           | string             | Requested time window (e.g. `24h`).                            |
+| `resolution`       | string             | Resolved bucket resolution (human-readable when `auto`).       |
+| `region`           | string             | Probe region used for observations.                            |
+| `from`             | ISO 8601 datetime  | Window start time (UTC).                                       |
+| `to`               | ISO 8601 datetime  | Window end time (UTC).                                         |
+| `current`          | object             | Most recent observation, independent of the window.            |
+| `current.timestamp`| ISO 8601 datetime  | Time of the latest observation (`null` if none).              |
+| `current.latency_ms`| float \| null     | Latency of the latest observation (`null` if none).           |
+| `current.status_code`| int \| null       | HTTP status code (`null` if no observation).                   |
+| `current.is_up`    | bool \| null       | `true` if the latest observation has a valid status code and no errors. |
+| `points`           | array              | Aggregated time buckets, ordered chronologically.              |
+| `points[].timestamp`| ISO 8601 datetime  | Bucket start time (UTC).                                       |
+| `points[].avg_latency_ms`| float         | Average latency across observations in this bucket.           |
+| `points[].status_code`| int \| null       | Representative status code for the bucket.                    |
+| `points[].is_up`    | bool              | `true` if ALL observations in the bucket are healthy.         |
+| `points[].observation_count`| int          | Number of raw observations in this bucket.                      |
+| `points[].incident_id`| UUID \| null     | Incident ID if this bucket overlaps an active incident.        |
+
+#### Frontend Rendering Guide
+
+The `points` array is designed for direct rendering into three visual layers:
+
+1. **Latency Graph** — Plot `points[].avg_latency_ms` on the Y-axis against `points[].timestamp` on the X-axis. Use `observation_count` to indicate data density (thicker line or opacity for higher counts).
+
+2. **Availability Graph** — Plot `points[].is_up` as a binary state (1/0) or as a colored background band. Green for `is_up: true`, red for `is_up: false`.
+
+3. **Incident Markers** — For any point where `incident_id` is not `null`, render a visible marker (e.g., vertical line, shaded region, or icon) on the timeline. Cross-reference with the `/incidents` endpoint for incident details.
+
+#### Polling Recommendation
+
+- **Poll interval**: 15–30 seconds for the `1h` or `6h` window.
+- **Recommended default**: `GET /v1/public/vendors/stripe/timeline?window=1h&resolution=1m`
+- **Use `current` for live display**: Show "Observed X seconds ago" by computing `Date.now() - new Date(current.timestamp)`.
+- **Do not use WebSocket/SSE** for this endpoint in the current version. Polling is sufficient and simpler.
+- The response is cached server-side with shorter TTLs for recent windows. Do not poll faster than every 10 seconds.
+
+#### Error Responses
+
+| Status | Code                  | When                                |
+|--------|-----------------------|-------------------------------------|
+| 404    | `RESOURCE_NOT_FOUND`  | Vendor not found or not public.     |
+| 422    | `VALIDATION_ERROR`    | Invalid `window` or `resolution`.   |
+| 429    | `RATE_LIMIT_EXCEEDED` | Public vendor rate limit exceeded.  |
+
+#### TypeScript Types
+
+```typescript
+interface TimelineBucket {
+  timestamp: string;
+  avg_latency_ms: number;
+  status_code: number | null;
+  is_up: boolean;
+  observation_count: number;
+  incident_id: string | null;
+}
+
+interface TimelineCurrent {
+  timestamp: string | null;
+  latency_ms: number | null;
+  status_code: number | null;
+  is_up: boolean | null;
+}
+
+interface VendorTimelineResponse {
+  vendor_name: string;
+  window: string;
+  resolution: string;
+  region: string;
+  from: string;
+  to: string;
+  current: TimelineCurrent;
+  points: TimelineBucket[];
+}
+```
+
 ---
 
 ## 8. Notification Alert Channels (`GET | POST /v1/orgs/{org_id}/notifications`)

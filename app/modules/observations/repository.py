@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import case, delete, func, select
+from sqlalchemy import case, delete, func, Integer, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.observations.models import Observation
@@ -257,3 +257,108 @@ class ObservationRepository:
             )
         )
         return int(result.scalar() or 0)
+
+    # ------------------------------------------------------------------
+    # Timeline aggregation (server-side PostgreSQL time-bucket query)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _bucket_expr(resolution_seconds: int):
+        """Return a PostgreSQL ``date_bin`` expression for the given
+        resolution, using epoch-based bucket alignment.
+        """
+        interval = text(f"'{resolution_seconds} seconds'::interval")
+        origin = text("'2000-01-01T00:00:00Z'::timestamptz")
+        return func.date_bin(interval, Observation.timestamp, origin)
+
+    @staticmethod
+    async def get_timeline_buckets(
+        session: AsyncSession,
+        endpoint_urls: list[str],
+        since: datetime,
+        until: datetime,
+        resolution_seconds: int,
+        region: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Aggregate observations into time-buckets using PostgreSQL
+        ``date_bin``.  All heavy lifting (GROUP BY, AVG, COUNT) happens
+        inside PostgreSQL — no Python-side aggregation of raw rows.
+
+        Returns a list of dicts, one per bucket, ordered chronologically.
+        """
+        if not endpoint_urls:
+            return []
+
+        bucket = ObservationRepository._bucket_expr(resolution_seconds)
+
+        # Determine "up" for each observation: has a valid status code
+        # and no error type.
+        is_up_col = case(
+            (
+                (Observation.status_code.is_not(None))
+                & (Observation.error_type.is_(None)),
+                1,
+            ),
+            else_=0,
+        ).cast(Integer)
+
+        conditions = [
+            Observation.endpoint_url.in_(endpoint_urls),
+            Observation.source_type == "customer_check",
+            Observation.timestamp >= since,
+            Observation.timestamp < until,
+        ]
+        if region is not None:
+            conditions.append(Observation.region == region)
+
+        query = (
+            select(
+                bucket.label("bucket_start"),
+                func.avg(Observation.latency_ms).label("avg_latency_ms"),
+                func.min(Observation.status_code).label("rep_status_code"),
+                # If all obs in the bucket are "up" → 1, else 0
+                func.min(is_up_col).label("all_up"),
+                func.count(Observation.id).label("obs_count"),
+            )
+            .where(*conditions)
+            .group_by(bucket)
+            .order_by(bucket)
+        )
+
+        rows = (await session.execute(query)).all()
+
+        return [
+            {
+                "bucket_start": row.bucket_start,
+                "avg_latency_ms": round(float(row.avg_latency_ms or 0), 2),
+                "rep_status_code": int(row.rep_status_code)
+                if row.rep_status_code is not None
+                else None,
+                "is_up": bool(row.all_up) if row.all_up is not None else True,
+                "obs_count": int(row.obs_count),
+            }
+            for row in rows
+        ]
+
+    @staticmethod
+    async def get_latest_observation(
+        session: AsyncSession,
+        endpoint_urls: list[str],
+        region: str | None = None,
+    ) -> Observation | None:
+        """Return the single newest observation matching the criteria."""
+        if not endpoint_urls:
+            return None
+        conditions = [
+            Observation.endpoint_url.in_(endpoint_urls),
+            Observation.source_type == "customer_check",
+        ]
+        if region is not None:
+            conditions.append(Observation.region == region)
+        result = await session.execute(
+            select(Observation)
+            .where(*conditions)
+            .order_by(Observation.timestamp.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()

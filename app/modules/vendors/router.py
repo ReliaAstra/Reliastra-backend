@@ -9,6 +9,7 @@ from app.modules.vendors.schemas import (
     VendorIncidentsResponse,
     VendorMetricsResponse,
     VendorResponse,
+    VendorTimelineResponse,
 )
 from app.modules.vendors.service import VendorService, vendor_service
 
@@ -65,6 +66,22 @@ async def get_vendor_metrics(
 ) -> VendorMetricsResponse:
     await _rate_limit(request)
     return await service.get_vendor_metrics(db, vendor_name, window)
+
+
+@router.get("/{vendor_name}/timeline", response_model=VendorTimelineResponse)
+async def get_vendor_timeline(
+    request: Request,
+    vendor_name: str,
+    window: str = Query(default="24h"),
+    resolution: str = Query(default="auto"),
+    region: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    service: VendorService = Depends(get_vnd_service),
+) -> VendorTimelineResponse:
+    await _rate_limit(request)
+    return await service.get_vendor_timeline(
+        db, vendor_name, window, resolution, region
+    )
 
 
 @router.get("/{vendor_name}/incidents", response_model=VendorIncidentsResponse)

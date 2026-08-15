@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
+import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import TSTZRANGE
 
 from app.modules.dependencies.models import Dependency
 from app.modules.incidents.models import Incident
@@ -109,3 +111,40 @@ class VendorRepository:
             .limit(limit)
         )
         return list(result.all())
+
+    @staticmethod
+    async def get_incidents_in_window(
+        session: AsyncSession,
+        endpoint_urls: list[str],
+        window_start: datetime,
+        window_end: datetime,
+    ) -> list[tuple[uuid.UUID, datetime, datetime | None]]:
+        """Return incidents whose active period overlaps the given window.
+
+        Each row is ``(incident_id, started_at, resolved_at)`` for the
+        timeline service to match buckets with incidents efficiently.
+        """
+        if not endpoint_urls:
+            return []
+        now = datetime.now(timezone.utc)
+        # Use range-overlap:  incident period [started_at, coalesce(resolved_at, now))
+        # overlaps with requested [window_start, window_end)
+        incident_range = TSTZRANGE(
+            Incident.started_at, func.coalesce(Incident.resolved_at, now)
+        )
+        query_range = TSTZRANGE(window_start, window_end)
+
+        result = await session.execute(
+            select(
+                Incident.id,
+                Incident.started_at,
+                Incident.resolved_at,
+            )
+            .join(Dependency, Incident.dependency_id == Dependency.id)
+            .where(
+                Dependency.endpoint_url.in_(endpoint_urls),
+                incident_range.overlaps(query_range),
+            )
+            .order_by(Incident.started_at.asc())
+        )
+        return [(row.id, row.started_at, row.resolved_at) for row in result.all()]
