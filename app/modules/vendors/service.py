@@ -239,7 +239,53 @@ class VendorService:
         4. Fetch overlapping incidents.
         5. Build current observation snapshot.
         6. Assemble response and cache it.
+
+        This method is wrapped in a top-level safety net so that it
+        NEVER raises an unhandled exception — it will always return a
+        valid ``VendorTimelineResponse`` (possibly empty) to prevent
+        public-facing 500 errors.
         """
+        try:
+            return await self._get_vendor_timeline_impl(
+                session, vendor_name, window, resolution, region
+            )
+        except (ResourceNotFoundException, ValidationException):
+            # Re-raise expected business errors (404, 422).
+            raise
+        except Exception:
+            logger.exception(
+                "Unexpected error building timeline for vendor=%s window=%s",
+                vendor_name,
+                window,
+            )
+            # Return a valid empty response instead of 500.
+            now = datetime.now(timezone.utc)
+            window_hours = _WINDOW_HOURS.get(window, 24)
+            since = now - timedelta(hours=window_hours)
+            resolved_region = region or _DEFAULT_REGION
+            return VendorTimelineResponse(
+                vendor_name=vendor_name,
+                window=window,
+                resolution=resolution if resolution != "auto" else self._auto_label(window),
+                region=resolved_region,
+                from_=since,
+                to=now,
+                current=TimelineCurrent(
+                    timestamp=None, latency_ms=None,
+                    status_code=None, is_up=None,
+                ),
+                points=[],
+            )
+
+    async def _get_vendor_timeline_impl(
+        self,
+        session: AsyncSession,
+        vendor_name: str,
+        window: str = "24h",
+        resolution: str = "auto",
+        region: str | None = None,
+    ) -> VendorTimelineResponse:
+        """Internal implementation — may raise on unexpected errors."""
         # --- 1. Validate ------------------------------------------------
         if window not in _WINDOW_HOURS:
             raise ValidationException(
