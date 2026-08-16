@@ -26,12 +26,21 @@ from app.modules.checks.router import router as checks_router
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.dependencies.router import router as dependencies_router
 from app.modules.evidence.router import router as evidence_router
+from app.modules.evidence_gate.router import router as evidence_gate_router
 from app.modules.incidents.router import router as incidents_router
 from app.modules.notifications.router import router as notifications_router
 from app.modules.organizations.router import router as organizations_router
 from app.modules.users.router import router as users_router
 from app.modules.vendors.router import router as vendors_router
+from app.modules.timeline_share.router import router as timeline_share_router
 from app.modules.verification.router import router as verification_router
+from app.modules.referrals.router import referrals_router
+from app.modules.webhooks.router import webhooks_router as webhooks_router
+from app.modules.badges.router import router as badges_router
+from app.modules.vendor_submissions.router import submission_router, submission_admin_router
+from app.modules.growth.router import growth_router
+from app.modules.feed.router import feed_router
+from app.modules.status_pages.router import status_router, status_page_router
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +172,9 @@ def create_app() -> FastAPI:
     app.include_router(checks_router)
     app.include_router(incidents_router)
     app.include_router(evidence_router)
+    app.include_router(evidence_gate_router)
     app.include_router(vendors_router)
+    app.include_router(timeline_share_router)
     app.include_router(notifications_router)
     app.include_router(dashboard_router)
     app.include_router(billing_router)
@@ -171,6 +182,15 @@ def create_app() -> FastAPI:
     app.include_router(agencies_router)
     app.include_router(ai_providers_router)
     app.include_router(verification_router)
+    app.include_router(referrals_router)
+    app.include_router(webhooks_router)
+    app.include_router(badges_router)
+    app.include_router(submission_router)
+    app.include_router(submission_admin_router)
+    app.include_router(growth_router)
+    app.include_router(feed_router)
+    app.include_router(status_router)
+    app.include_router(status_page_router)
 
     @app.get("/health", tags=["Health"])
     async def health_check(response: Response) -> dict[str, Any]:

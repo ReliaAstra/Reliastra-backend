@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.rate_limit import enforce_rate_limit, public_vendor_limiter
+from app.core.rate_limit import SlidingWindowRateLimiter, enforce_rate_limit, public_vendor_limiter
 from app.db.session import get_db
 from app.modules.vendors.schemas import (
+    VendorDeveloperResponse,
     VendorDetailResponse,
     VendorHistoryResponse,
     VendorIncidentsResponse,
@@ -14,6 +15,10 @@ from app.modules.vendors.schemas import (
 from app.modules.vendors.service import VendorService, vendor_service
 
 router = APIRouter(prefix="/v1/public/vendors", tags=["Public Vendors"])
+
+developer_limiter = SlidingWindowRateLimiter(
+    limit=30, window_seconds=60, key_prefix="rl_developer"
+)
 
 
 def get_vnd_service() -> VendorService:
@@ -94,3 +99,14 @@ async def get_vendor_incidents(
 ) -> VendorIncidentsResponse:
     await _rate_limit(request)
     return await service.get_vendor_incidents(db, vendor_name, limit)
+
+
+@router.get("/{vendor_name}/developer", response_model=VendorDeveloperResponse)
+async def get_vendor_developer_info(
+    request: Request,
+    vendor_name: str,
+    db: AsyncSession = Depends(get_db),
+    service: VendorService = Depends(get_vnd_service),
+) -> VendorDeveloperResponse:
+    await enforce_rate_limit(request, developer_limiter)
+    return await service.get_developer_info(db, vendor_name)

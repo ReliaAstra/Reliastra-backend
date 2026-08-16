@@ -109,3 +109,28 @@ class VendorTimelineResponse(BaseModel):
     to: datetime
     current: TimelineCurrent
     points: list[TimelineBucket] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Developer API schema
+# ---------------------------------------------------------------------------
+
+
+class VendorDeveloperResponse(BaseModel):
+    """Comprehensive vendor data aggregated in a single developer API call."""
+
+    vendor: VendorDetailResponse
+    current_status: TimelineCurrent
+    metrics_24h: VendorMetricsResponse
+    recent_incidents: list[VendorIncidentResponse]
+    uptime_7d: float
+    uptime_30d: float
+    avg_latency_24h: float
+    p95_latency_24h: float | None = None
+    endpoints: list[VendorEndpointResponse]
+    api_docs_url: str = "https://docs.reliastra.com/public-api"
+    powered_by: dict = {
+        "name": "Reliastra",
+        "url": "https://reliastra.com",
+        "message": "Monitor YOUR vendors at reliastra.com",
+    }

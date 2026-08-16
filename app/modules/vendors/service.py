@@ -12,6 +12,7 @@ from app.modules.vendors.repository import VendorRepository
 from app.modules.vendors.schemas import (
     TimelineBucket,
     TimelineCurrent,
+    VendorDeveloperResponse,
     VendorDetailResponse,
     VendorEndpointResponse,
     VendorHistoryResponse,
@@ -216,6 +217,79 @@ class VendorService:
             )
         return VendorIncidentsResponse(
             vendor_name=vendor.vendor_name, incidents=incidents
+        )
+
+    # ------------------------------------------------------------------
+    # Developer API
+    # ------------------------------------------------------------------
+
+    async def get_developer_info(
+        self,
+        session: AsyncSession,
+        vendor_name: str,
+    ) -> VendorDeveloperResponse:
+        """Aggregate all vendor data in one call for the developer API."""
+        vendor, endpoints, urls = await self._vendor_and_urls(
+            session, vendor_name
+        )
+
+        # Vendor detail (includes endpoints)
+        vendor_detail = await self.get_vendor_detail(session, vendor_name)
+
+        # Current status (latest observation)
+        latest = await ObservationRepository.get_latest_observation(session, urls)
+        current_status = TimelineCurrent(
+            timestamp=latest.timestamp if latest else None,
+            latency_ms=round(latest.latency_ms, 2) if latest else None,
+            status_code=latest.status_code if latest else None,
+            is_up=(
+                bool(latest.status_code is not None and latest.error_type is None)
+                if latest
+                else None
+            ),
+        )
+
+        # 24h metrics
+        metrics_24h = await self.get_vendor_metrics(session, vendor_name, window="24h")
+
+        # Extract uptime from metrics
+        uptime_7d_stats = await ObservationRepository.get_endpoint_stats(
+            session, urls, _WINDOW_HOURS["7d"]
+        )
+        uptime_30d_stats = await ObservationRepository.get_endpoint_stats(
+            session, urls, _WINDOW_HOURS["30d"]
+        )
+        uptime_7d = uptime_7d_stats["uptime_percentage"]
+        uptime_30d = uptime_30d_stats["uptime_percentage"]
+
+        # Latency stats from 24h window
+        stats_24h = await ObservationRepository.get_endpoint_stats(
+            session, urls, _WINDOW_HOURS["24h"]
+        )
+        avg_latency_24h = round(stats_24h["avg_latency_ms"], 2)
+        p95_latency_24h = stats_24h["p95_latency_ms"]
+
+        # Recent incidents (last 10)
+        incidents_response = await self.get_vendor_incidents(
+            session, vendor_name, limit=10
+        )
+        recent_incidents = incidents_response.incidents
+
+        # Endpoint list
+        endpoint_list = [
+            VendorEndpointResponse.model_validate(e) for e in endpoints
+        ]
+
+        return VendorDeveloperResponse(
+            vendor=vendor_detail,
+            current_status=current_status,
+            metrics_24h=metrics_24h,
+            recent_incidents=recent_incidents,
+            uptime_7d=round(uptime_7d, 2),
+            uptime_30d=round(uptime_30d, 2),
+            avg_latency_24h=avg_latency_24h,
+            p95_latency_24h=round(p95_latency_24h, 2) if p95_latency_24h is not None else None,
+            endpoints=endpoint_list,
         )
 
     # ------------------------------------------------------------------

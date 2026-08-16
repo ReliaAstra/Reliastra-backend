@@ -62,3 +62,10 @@ def import_all_models() -> None:
     import app.modules.attribution.models  # noqa: F401
     import app.modules.ai_integration.models  # noqa: F401
     import app.modules.dashboard.models  # noqa: F401
+    import app.modules.referrals.models  # noqa: F401
+    import app.modules.evidence_gate.models  # noqa: F401
+    import app.modules.webhooks.models  # noqa: F401
+    import app.modules.badges.models  # noqa: F401
+    import app.modules.timeline_share.models  # noqa: F401
+    import app.modules.vendor_submissions.models  # noqa: F401
+    import app.modules.status_pages.models  # noqa: F401

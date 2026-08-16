@@ -87,6 +87,17 @@ class AuthService:
             description="Default application",
         )
 
+        # Process referral if ref_code provided
+        if request.ref_code:
+            from app.modules.referrals.service import referral_service
+            await referral_service.process_referral_on_register(
+                session=session,
+                ref_code=request.ref_code,
+                new_user_id=user.id,
+                new_user_email=request.email,
+                new_user_org_id=org.id,
+            )
+
         tokens = self._generate_token_pair(user.id)
         expires_at = datetime.now(timezone.utc) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS
