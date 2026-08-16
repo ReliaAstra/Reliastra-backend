@@ -100,8 +100,6 @@ class CheckService:
         return [CheckResultResponse.model_validate(r) for r in results]
 
     async def schedule_due_checks(self, session: AsyncSession) -> int:
-        from app.modules.checks.tasks import execute_check
-
         due_deps = await self.dep_repository.get_due_dependencies(session)
         dispatched_count = 0
         now = datetime.now(timezone.utc)
@@ -115,12 +113,12 @@ class CheckService:
             regions = dep.regions or ["us-east", "eu-west"]
             for reg in regions:
                 try:
-                    execute_check.delay(str(dep.id), reg)
+                    await self.execute_check(session, dep.id, reg)
                     dispatched_count += 1
                 except Exception as exc:
-                    logger.warning("Failed to dispatch execute_check for dep %s: %s", dep.id, exc)
+                    logger.warning("Failed to execute check for dep %s: %s", dep.id, exc)
 
-        logger.info("Scheduled %s checks across %s dependencies", dispatched_count, len(due_deps))
+        logger.info("Executed %s checks across %s dependencies", dispatched_count, len(due_deps))
         return dispatched_count
 
     async def execute_check(

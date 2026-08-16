@@ -455,8 +455,4 @@ class TimelineShareService:
         return png_bytes
 
 
-# Ensure matplotlib Agg backend is loaded before any rendering
-import matplotlib
-matplotlib.use("Agg")
-
 timeline_share_service = TimelineShareService()

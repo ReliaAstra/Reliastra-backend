@@ -17,6 +17,7 @@ from app.infrastructure.redis_client import (
     safe_redis_ping,
     safe_redis_setex,
 )
+from app.infrastructure.scheduler import start_scheduler, stop_scheduler
 from app.modules.agencies.router import router as agencies_router
 from app.modules.ai_integration.router import router as ai_providers_router
 from app.modules.api_keys.router import router as api_keys_router
@@ -125,8 +126,10 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Reliastra backend starting up...")
     get_engine()
+    start_scheduler()
     yield
     logger.info("Reliastra backend shutting down...")
+    stop_scheduler()
     await close_redis()
 
 

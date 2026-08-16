@@ -189,14 +189,14 @@ class IncidentService:
         # Evidence is generated for every resolved incident, not only incidents
         # that happened to have a temporal correlation.
         try:
-            from app.modules.evidence.tasks import generate_evidence_report
+            from app.modules.evidence.service import evidence_service
 
-            generate_evidence_report.delay(str(incident.id))
+            await evidence_service.generate_for_incident(session, incident.id)
             logger.info(
-                "Dispatched evidence report task for incident %s", incident.id
+                "Generated evidence report for incident %s", incident.id
             )
         except Exception as exc:
-            logger.warning("Could not dispatch evidence task: %s", exc)
+            logger.warning("Could not generate evidence report: %s", exc)
 
         return updated
 
