@@ -14,7 +14,11 @@ from app.core.exceptions import (
     ValidationException,
 )
 from app.core.security import get_password_hash
-from app.infrastructure.redis_client import get_redis
+from app.infrastructure.redis_client import (
+    safe_redis_delete,
+    safe_redis_exists,
+    safe_redis_set,
+)
 from app.modules.auth.constants import TOKEN_TYPE_BEARER
 from app.modules.auth.repository import AuthRepository
 from app.modules.auth.schemas import TokenResponse
@@ -74,26 +78,17 @@ class GitHubAuthService:
 
     async def _store_state(self, state_token: str) -> None:
         """Store the OAuth state token in Redis for CSRF validation."""
-        try:
-            redis = get_redis()
-            await redis.set(f"{_OAUTH_STATE_PREFIX}{state_token}", "1", ex=_OAUTH_STATE_TTL_SECONDS)
-        except Exception as exc:
-            logger.warning("Failed to store OAuth state in Redis (CSRF protection degraded): %s", exc)
+        await safe_redis_set(f"{_OAUTH_STATE_PREFIX}{state_token}", "1", ex=_OAUTH_STATE_TTL_SECONDS)
 
     async def _validate_state(self, state_token: str) -> bool:
         """Validate the OAuth state token against Redis. Returns True if valid."""
-        try:
-            redis = get_redis()
-            key = f"{_OAUTH_STATE_PREFIX}{state_token}"
-            exists = await redis.exists(key)
-            if exists:
-                # Delete on use (one-time token)
-                await redis.delete(key)
-                return True
-            return False
-        except Exception as exc:
-            logger.warning("Failed to validate OAuth state via Redis: %s", exc)
+        key = f"{_OAUTH_STATE_PREFIX}{state_token}"
+        exists = await safe_redis_exists(key)
+        if exists:
+            # Delete on use (one-time token)
+            await safe_redis_delete(key)
             return True
+        return False
 
     def get_authorization_url(self, state_token: str) -> str:
         """Build the GitHub OAuth authorization URL."""

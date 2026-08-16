@@ -11,7 +11,12 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from app.config import settings
 from app.core.exceptions import setup_exception_handlers
 from app.db.session import get_engine
-from app.infrastructure.redis_client import close_redis, get_redis
+from app.infrastructure.redis_client import (
+    close_redis,
+    safe_redis_get,
+    safe_redis_ping,
+    safe_redis_setex,
+)
 from app.modules.agencies.router import router as agencies_router
 from app.modules.ai_integration.router import router as ai_providers_router
 from app.modules.api_keys.router import router as api_keys_router
@@ -60,9 +65,8 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         try:
-            redis = get_redis()
             cache_key = f"idempotency:{idempotency_key}"
-            cached_resp = await redis.get(cache_key)
+            cached_resp = await safe_redis_get(cache_key)
             if cached_resp:
                 data = json.loads(cached_resp)
                 return Response(
@@ -84,7 +88,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     if k.lower() not in self._HOP_BY_HOP
                 }
 
-                await redis.setex(
+                await safe_redis_setex(
                     cache_key,
                     86400,  # 24 hours TTL
                     json.dumps(
@@ -189,15 +193,10 @@ def create_app() -> FastAPI:
             overall_status = "degraded"
 
         # Redis connectivity check
-        try:
-            redis = get_redis()
-            await redis.ping()
+        if await safe_redis_ping():
             checks["redis"] = "ok"
-        except Exception as exc:
-            msg = str(exc)
-            if "Connect call failed" in msg or "Error 111" in msg:
-                msg = "connection refused"
-            checks["redis"] = f"unavailable: {msg}"
+        else:
+            checks["redis"] = "unavailable: connection refused"
             overall_status = "degraded"
 
         response.status_code = 200 if overall_status == "ok" else 503

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import time
 import logging
 from fastapi import Request
 from app.core.exceptions import RateLimitExceededException
 
 logger = logging.getLogger(__name__)
+
+# Hard ceiling on any single Redis pipeline call (seconds).
+_RATE_LIMIT_REDIS_TIMEOUT = 2.0
 
 
 class SlidingWindowRateLimiter:
@@ -22,10 +26,8 @@ class SlidingWindowRateLimiter:
     async def is_redis_available(self) -> bool:
         """Check if Redis is reachable without raising."""
         try:
-            from app.infrastructure.redis_client import get_redis
-            redis = get_redis()
-            await redis.ping()
-            return True
+            from app.infrastructure.redis_client import safe_redis_ping
+            return await safe_redis_ping()
         except Exception:
             return False
 
@@ -38,6 +40,7 @@ class SlidingWindowRateLimiter:
         to prevent Redis outages from blocking all public and auth endpoints.
         """
         try:
+            import asyncio
             from app.infrastructure.redis_client import get_redis
             redis = get_redis()
             now = time.time()
@@ -49,7 +52,9 @@ class SlidingWindowRateLimiter:
             pipeline.zcard(key)
             pipeline.zadd(key, {f"{now}:{time.time_ns()}": now})
             pipeline.expire(key, self.window_seconds * 2)
-            results = await pipeline.execute()
+            results = await asyncio.wait_for(
+                pipeline.execute(), timeout=_RATE_LIMIT_REDIS_TIMEOUT
+            )
 
             current_count = results[1]
             if current_count >= self.limit:

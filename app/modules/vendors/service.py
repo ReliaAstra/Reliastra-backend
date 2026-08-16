@@ -395,28 +395,30 @@ class VendorService:
 
     @staticmethod
     async def _get_cache(key: str) -> VendorTimelineResponse | None:
+        """Fetch cached timeline from Redis. Returns None on any failure."""
         try:
-            from app.infrastructure.redis_client import get_redis
-            redis = get_redis()
-            raw = await redis.get(key)
+            from app.infrastructure.redis_client import safe_redis_get
+
+            raw = await safe_redis_get(key)
             if raw is None:
                 return None
             data = json.loads(raw)
             return VendorTimelineResponse.model_validate(data)
         except Exception:
-            logger.debug("Timeline cache miss (Redis unavailable)", exc_info=True)
+            logger.debug("Timeline cache miss (parse error)", exc_info=True)
             return None
 
     @staticmethod
     async def _set_cache(
         key: str, response: VendorTimelineResponse, ttl: int
     ) -> None:
+        """Cache timeline response in Redis. Silent failure."""
         try:
-            from app.infrastructure.redis_client import get_redis
-            redis = get_redis()
-            await redis.set(key, response.model_dump_json(mode="json"), ex=ttl)
+            from app.infrastructure.redis_client import safe_redis_set
+
+            await safe_redis_set(key, response.model_dump_json(mode="json"), ex=ttl)
         except Exception:
-            logger.debug("Timeline cache set failed (Redis unavailable)", exc_info=True)
+            logger.debug("Timeline cache set failed", exc_info=True)
 
 
 vendor_service = VendorService()
