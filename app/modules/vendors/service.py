@@ -462,7 +462,7 @@ class VendorService:
         try:
             from app.infrastructure.redis_client import safe_redis_set
 
-            await safe_redis_set(key, response.model_dump_json(mode="json"), ex=ttl)
+            await safe_redis_set(key, response.model_dump_json(by_alias=True), ex=ttl)
         except Exception:
             logger.debug("Timeline cache set failed", exc_info=True)
 

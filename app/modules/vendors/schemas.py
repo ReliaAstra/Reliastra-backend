@@ -96,11 +96,16 @@ class TimelineCurrent(BaseModel):
 class VendorTimelineResponse(BaseModel):
     """Full response for GET /v1/public/vendors/{vendor_name}/timeline."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     vendor_name: str
     window: str
     resolution: str
     region: str
-    from_: datetime = Field(alias="from")
+    from_: datetime = Field(
+        alias="from",
+        serialization_alias="from",
+    )
     to: datetime
     current: TimelineCurrent
     points: list[TimelineBucket] = Field(default_factory=list)
