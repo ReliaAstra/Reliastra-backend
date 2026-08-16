@@ -3,7 +3,6 @@ import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.dialects.postgresql import TSTZRANGE
 
 from app.modules.dependencies.models import Dependency
 from app.modules.incidents.models import Incident
@@ -123,16 +122,19 @@ class VendorRepository:
 
         Each row is ``(incident_id, started_at, resolved_at)`` for the
         timeline service to match buckets with incidents efficiently.
+
+        Uses PostgreSQL ``tstzrange`` constructor + ``&&`` overlap operator.
         """
         if not endpoint_urls:
             return []
         now = datetime.now(timezone.utc)
-        # Use range-overlap:  incident period [started_at, coalesce(resolved_at, now))
-        # overlaps with requested [window_start, window_end)
-        incident_range = TSTZRANGE(
+
+        # Build range overlap: tstzrange(start, end) && tstzrange(start, end)
+        # The && operator returns true when two ranges overlap.
+        incident_range = func.tstzrange(
             Incident.started_at, func.coalesce(Incident.resolved_at, now)
         )
-        query_range = TSTZRANGE(window_start, window_end)
+        query_range = func.tstzrange(window_start, window_end)
 
         result = await session.execute(
             select(
@@ -143,7 +145,7 @@ class VendorRepository:
             .join(Dependency, Incident.dependency_id == Dependency.id)
             .where(
                 Dependency.endpoint_url.in_(endpoint_urls),
-                incident_range.overlaps(query_range),
+                incident_range.op("&&")(query_range),
             )
             .order_by(Incident.started_at.asc())
         )
