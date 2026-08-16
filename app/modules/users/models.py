@@ -1,6 +1,7 @@
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, UUIDMixin, TimestampMixin
+from datetime import datetime, timezone
 
 
 class User(UUIDMixin, TimestampMixin, Base):
@@ -29,3 +30,20 @@ class User(UUIDMixin, TimestampMixin, Base):
     auth_provider: Mapped[str | None] = mapped_column(
         String(50), nullable=True
     )  # "google", "github", "email", None
+    # Admin panel fields
+    is_system_admin: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+    admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )  # "organic", "evidence_gate", "referral", "badge", etc.
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_activity_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    login_count: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )

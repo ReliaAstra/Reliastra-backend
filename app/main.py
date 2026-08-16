@@ -42,6 +42,8 @@ from app.modules.vendor_submissions.router import submission_router, submission_
 from app.modules.growth.router import growth_router
 from app.modules.feed.router import feed_router
 from app.modules.status_pages.router import status_router, status_page_router
+from app.modules.admin.router import admin_router, public_announcements_router
+from app.modules.admin.seed import seed_first_admin
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +129,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Reliastra backend starting up...")
     get_engine()
     start_scheduler()
+    await seed_first_admin()
     yield
     logger.info("Reliastra backend shutting down...")
     stop_scheduler()
@@ -194,6 +197,8 @@ def create_app() -> FastAPI:
     app.include_router(feed_router)
     app.include_router(status_router)
     app.include_router(status_page_router)
+    app.include_router(admin_router)
+    app.include_router(public_announcements_router)
 
     @app.get("/health", tags=["Health"])
     async def health_check(response: Response) -> dict[str, Any]:

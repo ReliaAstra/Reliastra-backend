@@ -209,6 +209,12 @@ class Settings(BaseSettings):
         description="Password reset token lifetime in minutes",
     )
 
+    # Admin panel bootstrap
+    FIRST_ADMIN_EMAIL: str | None = Field(
+        default=None,
+        description="Email of the first system admin to auto-promote on startup",
+    )
+
     @property
     def fernet_key(self) -> bytes:
         """Derive a 32-byte url-safe base64-encoded key from SECRET_KEY for Fernet encryption."""
