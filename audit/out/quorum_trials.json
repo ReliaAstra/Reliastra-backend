@@ -1,0 +1,146 @@
+{
+  "trials": 15,
+  "outcomes": {
+    "MISSED incident (0)": 2,
+    "correct (1 incident)": 13
+  },
+  "bricked": 0,
+  "correctness_rate": 0.8666666666666667,
+  "details": [
+    {
+      "trial": 0,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 0,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 1,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 2,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 3,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 4,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 5,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 0,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 6,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 7,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 8,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 9,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 10,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 11,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 12,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 13,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    },
+    {
+      "trial": 14,
+      "region_results": [
+        "ok",
+        "ok"
+      ],
+      "open_incidents": 1,
+      "followup_check": "ok"
+    }
+  ]
+}

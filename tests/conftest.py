@@ -40,7 +40,11 @@ def setup_test_db_server() -> Generator[str, None, None]:
 
     # Run Alembic migrations
     alembic_cfg = Config("alembic.ini")
-    alembic_cfg.set_main_option("sqlalchemy.url", pg_uri)
+    # ConfigParser treats '%' as interpolation syntax. The pgserver URI holds a
+    # percent-encoded unix socket path (host=%2Ftmp%2F...), so it must be
+    # escaped as '%%' before being handed to Alembic or every test errors with
+    # "invalid interpolation syntax".
+    alembic_cfg.set_main_option("sqlalchemy.url", pg_uri.replace("%", "%%"))
     command.upgrade(alembic_cfg, "head")
 
     yield pg_uri

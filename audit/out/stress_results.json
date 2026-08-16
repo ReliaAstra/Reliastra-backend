@@ -1,0 +1,221 @@
+[
+  {
+    "scenario": "C: HTTP connection churn",
+    "result": "FAIL",
+    "severity": "P1",
+    "detail": "app/modules/checks/service.py:175 opens `async with httpx.AsyncClient(...)` INSIDE execute_check, so every probe pays a fresh DNS lookup + TCP handshake + TLS handshake and the pool is discarded on exit. Measured 263ms per probe with a per-request client vs 223ms with a reused pooled client \u2014 39ms (15%) of every recorded latency_ms is connection setup, not vendor latency. This means the latency SLA numbers Reliastra sells are inflated by handshake cost, and socket churn scales linearly with probe volume (TIME_WAIT accumulation).",
+    "metrics": {
+      "new_client_per_check": true,
+      "global_pool_configured": false,
+      "http2_enabled": false,
+      "avg_ms_per_request_new_client": 262.9,
+      "avg_ms_per_request_pooled": 223.5,
+      "handshake_overhead_ms": 39.5,
+      "latency_inflation_pct": 15.0
+    }
+  },
+  {
+    "scenario": "D: Idempotency collision",
+    "result": "FAIL",
+    "severity": "P0",
+    "detail": "200 concurrent POST /v1/orgs with one Idempotency-Key produced 3 distinct org id(s) and 4 DB rows. CROSS-TENANT REPLAY: user B sending user A's key received HTTP 201 and A COPY OF USER A ORG \u2014 CONFIRMED TENANT DATA LEAK. The cache key is built as f'idempotency:{idempotency_key}' (app/main.py:76) with NO user/org in the key, and the cached value is the full response body. There is also no in-flight lock (no SETNX): the middleware does GET-then-call-then-SETEX, so concurrent requests all miss the cache and each executes the mutation.",
+    "metrics": {
+      "requests": 200,
+      "distinct_orgs_created": 3,
+      "db_rows_created": 4,
+      "cross_tenant_replay_status": 201,
+      "cross_tenant_leak_confirmed": true,
+      "cross_tenant_body": "{\"id\":\"065dc9f2-ec74-4cb6-995f-6b383a53e733\",\"name\":\"Idem Org 3\",\"slug\":\"idem-org-3\",\"plan\":\"free\",\"has_agency_mode\":false,\"created_at\":\"2026-08-16T23:31:10.650576Z\",\"updated_at\":\"2026-08-16T23:31:10.650580Z\"}",
+      "cache_key_is_user_scoped": false,
+      "in_flight_lock_present": false
+    }
+  },
+  {
+    "scenario": "E: Quorum race",
+    "result": "FAIL",
+    "severity": "P0",
+    "detail": "3 concurrent 2-region failure bursts against one dependency produced 4 check_results (2 quorum_confirmed) and 2 incident row(s), 2 still open. Correct behaviour is exactly 1 open incident. execute_check (service.py:205-233) does read-recent-results -> evaluate-in-Python -> write with NO row lock and NO unique constraint on (dependency_id, status='open'), so two regions committing inside the same 60s quorum window can both observe 'no open incident' and both insert (duplicate alerts / double-billed evidence), or both observe only their own failure and neither reach quorum (missed incident).",
+    "metrics": {
+      "check_results": 4,
+      "quorum_confirmed_results": 2,
+      "incidents_created": 2,
+      "incidents_open": 2,
+      "expected_incidents": 1,
+      "row_lock_used": false,
+      "unique_partial_index_on_open_incident": false
+    }
+  },
+  {
+    "scenario": "F: Partitioning",
+    "result": "FAIL",
+    "severity": "P1",
+    "detail": "check_results is RANGE (executed_at) but the ONLY partition that exists is ['check_results_default => DEFAULT']. The future-dated insert SUCCEEDED and landed in ERROR:  invalid input syntax for type uuid: \"2d98c4e4-8636-49ef-b173-59ee68064434\nINSERT 0 1\"\nLINE 1: ...leoid::regclass::text FROM check_results WHERE id='2d98c4e4-...\n                                                             ^. So partitioning is declared but non-functional: because a DEFAULT partition catches everything, there is no 'no partition found' error \u2014 instead 100% of rows accumulate in one physical table. That is worse than the expected failure: the platform gets none of the pruning, vacuum or O(1) drop-old-data benefits it was designed for, the team gets no signal that partition management is missing, and once rows are in DEFAULT you cannot ATTACH a covering monthly partition without moving them (ATTACH fails while overlapping rows sit in DEFAULT).",
+    "metrics": {
+      "partition_strategy": "RANGE (executed_at)",
+      "partitions": [
+        "check_results_default => DEFAULT"
+      ],
+      "monthly_partitions_present": false,
+      "future_insert_rejected": false,
+      "future_row_landed_in": "ERROR:  invalid input syntax for type uuid: \"2d98c4e4-8636-49ef-b173-59ee68064434\nINSERT 0 1\"\nLINE 1: ...leoid::regclass::text FROM check_results WHERE id='2d98c4e4-...\n                                                             ^",
+      "pg_partman_installed": false,
+      "rows_in_default_partition": "7"
+    }
+  },
+  {
+    "scenario": "G: Webhook security",
+    "result": "PASS",
+    "severity": "P2",
+    "detail": "No signature -> HTTP 401 ({\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"Missing Paystack webhook signature\",\"details\":{}}}); invalid signature -> HTTP 401 ({\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"Paystack webhook secret is not configured\",\"details\":{}}}). handle_webhook raises UnauthorizedException when the signature is missing and uses hmac.compare_digest for constant-time comparison (billing/service.py:332-345), so forged upgrade events are rejected. Residual risk: verification depends on PAYSTACK_SECRET_KEY being set \u2014 the deployment default is an empty string, and there is no replay protection (no event-id dedupe / timestamp window), so a captured valid webhook can be replayed indefinitely.",
+    "metrics": {
+      "no_signature_status": 401,
+      "invalid_signature_status": 401,
+      "unsigned_rejected": true,
+      "invalid_rejected": true,
+      "constant_time_compare": true,
+      "replay_protection": false,
+      "secret_configured_by_default": false
+    }
+  },
+  {
+    "scenario": "H: CORS",
+    "result": "PASS",
+    "severity": "P2",
+    "detail": "Preflight from https://evil.com -> HTTP 400, ACAO=None. Credentialed GET from evil origin -> HTTP 200, ACAO=None. Allowed origin -> ACAO='http://localhost:3000', allow-credentials='true'. Starlette's CORSMiddleware omits Access-Control-Allow-Origin for non-allowlisted origins, so the BROWSER blocks evil.com from reading the response even though the server still executes the request and returns 200. CORS is configured correctly (explicit CORS_ORIGINS list, not '*', with credentials enabled). Note CORS is not an authorization control: the request is still processed server-side, so it must never be relied on in place of CSRF protection for cookie-based flows.",
+    "metrics": {
+      "evil_origin_acao": null,
+      "evil_preflight_status": 400,
+      "evil_preflight_acao": null,
+      "allowed_origin_acao": "http://localhost:3000",
+      "allow_credentials": "true",
+      "wildcard_with_credentials": false
+    }
+  },
+  {
+    "scenario": "B: DB pool exhaustion",
+    "result": "PASS",
+    "severity": "P1",
+    "detail": "100 concurrent 90-day dashboard queries: 100/100 succeeded, p50=1645ms p95=2466ms max=2517ms, wall=2.8s. Pool is pool_size=10 + max_overflow=20 = 30 hard cap with pool_timeout=30s (app/db/session.py:139-142), so the 70 requests beyond the pool queue behind it. Requests are serialised rather than rejected, so latency degrades as a step function instead of shedding load; at >30s queueing the client sees a pool-timeout 500.",
+    "metrics": {
+      "succeeded": 100,
+      "failed": 0,
+      "error_codes": [],
+      "p50_ms": 1645,
+      "p95_ms": 2466,
+      "max_ms": 2517,
+      "wall_seconds": 2.8,
+      "peak_pg_connections_observed": 38,
+      "pool_size": 10,
+      "max_overflow": 20,
+      "pool_timeout_s": 30
+    }
+  },
+  {
+    "scenario": "A: Scheduler saturation",
+    "result": "FAIL",
+    "severity": "P1",
+    "detail": "Achieved 900 check_results vs 3000 theoretically due (30.0% of nominal throughput). The scheduler runs serially inside ONE APScheduler job with max_instances=1: every probe is awaited in-line in a single `for dep ... for region` loop sharing ONE AsyncSession, so cycle time grows linearly with dependency count and the 30s interval is missed. Probes are also emitted at the fixed 30s beat, not the configured 10s interval \u2014 sub-30s intervals are silently unhonoured.",
+    "metrics": {
+      "dependencies": 50,
+      "probes_per_cycle": 100,
+      "check_results_written_5min": 900,
+      "nominal_expected_5min": 3000,
+      "throughput_completion_pct": 30.0,
+      "measured_full_cycle_seconds": 35.1,
+      "worst_health_latency_ms": 81.7,
+      "peak_pg_connections": 18,
+      "samples": [
+        {
+          "t": 30,
+          "rows": 0,
+          "pg_conns": 18,
+          "pg_active": 1,
+          "pg_lock_waits": 0,
+          "health_ms": 51.8,
+          "health": 200
+        },
+        {
+          "t": 60,
+          "rows": 100,
+          "pg_conns": 18,
+          "pg_active": 1,
+          "pg_lock_waits": 0,
+          "health_ms": 71.5,
+          "health": 200
+        },
+        {
+          "t": 90,
+          "rows": 200,
+          "pg_conns": 18,
+          "pg_active": 1,
+          "pg_lock_waits": 0,
+          "health_ms": 44.3,
+          "health": 200
+        },
+        {
+          "t": 120,
+          "rows": 300,
+          "pg_conns": 18,
+          "pg_active": 1,
+          "pg_lock_waits": 0,
+          "health_ms": 33.0,
+          "health": 200
+        },
+        {
+          "t": 150,
+          "rows": 400,
+          "pg_conns": 18,
+          "pg_active": 1,
+          "pg_lock_waits": 0,
+          "health_ms": 43.7,
+          "health": 200
+        },
+        {
+          "t": 180,
+          "rows": 500,
+          "pg_conns": 18,
+          "pg_active": 1,
+          "pg_lock_waits": 0,
+          "health_ms": 35.8,
+          "health": 200
+        },
+        {
+          "t": 210,
+          "rows": 600,
+          "pg_conns": 18,
+          "pg_active": 1,
+          "pg_lock_waits": 0,
+          "health_ms": 67.1,
+          "health": 200
+        },
+        {
+          "t": 240,
+          "rows": 700,
+          "pg_conns": 18,
+          "pg_active": 1,
+          "pg_lock_waits": 0,
+          "health_ms": 39.3,
+          "health": 200
+        },
+        {
+          "t": 270,
+          "rows": 800,
+          "pg_conns": 18,
+          "pg_active": 1,
+          "pg_lock_waits": 0,
+          "health_ms": 81.7,
+          "health": 200
+        },
+        {
+          "t": 300,
+          "rows": 900,
+          "pg_conns": 18,
+          "pg_active": 1,
+          "pg_lock_waits": 0,
+          "health_ms": 32.6,
+          "health": 200
+        }
+      ]
+    }
+  }
+]

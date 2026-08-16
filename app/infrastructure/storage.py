@@ -138,15 +138,24 @@ class StorageClient:
                 if not self._minio_client.bucket_exists(self.bucket):
                     self._minio_client.make_bucket(self.bucket)
             return True
-        except self._boto3_client.exceptions.ClientError:
-            # 404 — bucket does not exist; create it
-            try:
-                self._boto3_client.create_bucket(Bucket=self.bucket)
-                return True
-            except Exception as exc:
-                logger.warning("S3 bucket creation failed, using local fallback: %s", exc)
-                return False
         except Exception as exc:
+            # Bucket missing (404) — attempt to create it. Only the boto3
+            # backend exposes ``exceptions.ClientError``; guarding on the
+            # backend prevents an AttributeError when boto3 is unavailable.
+            if self._backend == "boto3" and self._boto3_client is not None:
+                client_error = getattr(
+                    self._boto3_client.exceptions, "ClientError", ()
+                )
+                if isinstance(exc, client_error):
+                    try:
+                        self._boto3_client.create_bucket(Bucket=self.bucket)
+                        return True
+                    except Exception as create_exc:
+                        logger.warning(
+                            "S3 bucket creation failed, using local fallback: %s",
+                            create_exc,
+                        )
+                        return False
             logger.warning("S3 bucket check failed, using local fallback: %s", exc)
             return False
 
