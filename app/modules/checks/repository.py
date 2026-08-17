@@ -44,8 +44,14 @@ class CheckRepository:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
     ) -> list[CheckResult]:
-        query = select(CheckResult).where(
-            CheckResult.dependency_id == dependency_id
+        # FIX 37: exclude results of soft-deleted dependencies.
+        query = (
+            select(CheckResult)
+            .join(Dependency, CheckResult.dependency_id == Dependency.id)
+            .where(
+                CheckResult.dependency_id == dependency_id,
+                Dependency.is_deleted == False,  # noqa: E712
+            )
         )
         if start_time:
             query = query.where(CheckResult.executed_at >= start_time)
@@ -61,12 +67,15 @@ class CheckRepository:
         dependency_id: uuid.UUID,
         window_seconds: int = 120,
     ) -> list[CheckResult]:
+        # FIX 37: exclude results of soft-deleted dependencies.
         since = datetime.now(timezone.utc) - timedelta(seconds=window_seconds)
         query = (
             select(CheckResult)
+            .join(Dependency, CheckResult.dependency_id == Dependency.id)
             .where(
                 CheckResult.dependency_id == dependency_id,
                 CheckResult.executed_at >= since,
+                Dependency.is_deleted == False,  # noqa: E712
             )
             .order_by(CheckResult.executed_at.desc())
         )
@@ -79,9 +88,14 @@ class CheckRepository:
         org_id: uuid.UUID,
         limit: int = 50,
     ) -> list[CheckResult]:
+        # FIX 37: exclude results of soft-deleted dependencies.
         query = (
             select(CheckResult)
-            .where(CheckResult.org_id == org_id)
+            .join(Dependency, CheckResult.dependency_id == Dependency.id)
+            .where(
+                CheckResult.org_id == org_id,
+                Dependency.is_deleted == False,  # noqa: E712
+            )
             .order_by(CheckResult.executed_at.desc())
             .limit(limit)
         )
@@ -89,22 +103,7 @@ class CheckRepository:
         return list(result.scalars().all())
 
     @staticmethod
-    async def get_aggregated_stats(
-        session: AsyncSession,
-        dependency_id: uuid.UUID,
-        window_hours: int = 24,
-    ) -> dict[str, Any]:
-        since = datetime.now(timezone.utc) - timedelta(hours=window_hours)
-        query = select(
-            func.count(CheckResult.id).label("total_checks"),
-            func.avg(CheckResult.latency_ms).label("avg_latency"),
-            func.sum(func.cast(CheckResult.is_up, Integer)).label("total_up"),
-        ).where(
-            CheckResult.dependency_id == dependency_id,
-            CheckResult.executed_at >= since,
-        )
-        res = await session.execute(query)
-        row = res.one_or_none()
+    def _stats_from_row(row: Any) -> dict[str, Any]:
         if not row or not row.total_checks:
             return {
                 "uptime_percentage": 100.0,
@@ -125,6 +124,74 @@ class CheckRepository:
             "total_up": total_up,
             "total_down": total_down,
         }
+
+    @staticmethod
+    async def get_aggregated_stats(
+        session: AsyncSession,
+        dependency_id: uuid.UUID,
+        window_hours: int = 24,
+    ) -> dict[str, Any]:
+        since = datetime.now(timezone.utc) - timedelta(hours=window_hours)
+        query = (
+            select(
+                func.count(CheckResult.id).label("total_checks"),
+                func.avg(CheckResult.latency_ms).label("avg_latency"),
+                func.sum(func.cast(CheckResult.is_up, Integer)).label("total_up"),
+            )
+            .join(Dependency, CheckResult.dependency_id == Dependency.id)
+            .where(
+                CheckResult.dependency_id == dependency_id,
+                CheckResult.executed_at >= since,
+                Dependency.is_deleted == False,  # noqa: E712
+            )
+        )
+        res = await session.execute(query)
+        return CheckRepository._stats_from_row(res.one_or_none())
+
+    @staticmethod
+    async def get_aggregated_stats_bulk(
+        session: AsyncSession,
+        dependency_ids: list[uuid.UUID],
+        window_hours: int = 24,
+    ) -> dict[uuid.UUID, dict[str, Any]]:
+        """FIX 22: aggregated stats for many dependencies in ONE query."""
+        if not dependency_ids:
+            return {}
+        since = datetime.now(timezone.utc) - timedelta(hours=window_hours)
+        query = (
+            select(
+                CheckResult.dependency_id.label("dependency_id"),
+                func.count(CheckResult.id).label("total_checks"),
+                func.avg(CheckResult.latency_ms).label("avg_latency"),
+                func.sum(func.cast(CheckResult.is_up, Integer)).label("total_up"),
+            )
+            .join(Dependency, CheckResult.dependency_id == Dependency.id)
+            .where(
+                CheckResult.dependency_id.in_(dependency_ids),
+                CheckResult.executed_at >= since,
+                Dependency.is_deleted == False,  # noqa: E712
+            )
+            .group_by(CheckResult.dependency_id)
+        )
+        res = await session.execute(query)
+        stats_map: dict[uuid.UUID, dict[str, Any]] = {}
+        for row in res:
+            stats_map[uuid.UUID(str(row.dependency_id))] = (
+                CheckRepository._stats_from_row(row)
+            )
+        # Dependencies with no rows in the window are implicitly 100% up.
+        for dep_id in dependency_ids:
+            stats_map.setdefault(
+                dep_id,
+                {
+                    "uptime_percentage": 100.0,
+                    "avg_latency_ms": 0.0,
+                    "total_checks": 0,
+                    "total_up": 0,
+                    "total_down": 0,
+                },
+            )
+        return stats_map
 
     @staticmethod
     async def update_quorum(
@@ -155,6 +222,7 @@ class CheckRepository:
             Dependency, CheckResult.dependency_id == Dependency.id
         ).where(
             Dependency.endpoint_url == endpoint_url,
+            Dependency.is_deleted == False,  # noqa: E712
             CheckResult.executed_at >= since,
         )
         res = await session.execute(query)
@@ -191,6 +259,7 @@ class CheckRepository:
             Dependency, CheckResult.dependency_id == Dependency.id
         ).where(
             Dependency.endpoint_url == endpoint_url,
+            Dependency.is_deleted == False,  # noqa: E712
         ).order_by(CheckResult.executed_at.desc()).limit(limit)
         result = await session.execute(query)
         return list(result.scalars().all())

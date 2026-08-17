@@ -26,6 +26,11 @@ from app.db.session import get_db, set_test_engine
 from app.infrastructure.redis_client import set_test_redis
 from app.main import app
 
+# Tests run like docker-compose: the standalone scheduler owns the queue, so
+# the in-process (PaaS) scheduler must stay off — otherwise background ticks
+# would probe test dependencies with real HTTP calls mid-assertion.
+settings.RUN_IN_PROCESS_SCHEDULER = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,6 +63,7 @@ async def test_engine(setup_test_db_server: str) -> AsyncGenerator[AsyncEngine, 
     async with engine.begin() as conn:
         for table in [
             "audit_logs",
+            "observation_outbox",
             "refresh_tokens",
             "api_keys",
             "alert_configs",
@@ -85,6 +91,12 @@ async def mock_redis() -> AsyncGenerator[fakeredis.aioredis.FakeRedis, None]:
     set_test_redis(fake_redis)
     yield fake_redis
     await fake_redis.close()
+
+
+@pytest_asyncio.fixture(scope="function")
+async def fake_redis(mock_redis: fakeredis.aioredis.FakeRedis) -> AsyncGenerator[fakeredis.aioredis.FakeRedis, None]:
+    """Alias for the autouse fakeredis fixture (kept for explicit tests)."""
+    yield mock_redis
 
 
 @pytest_asyncio.fixture(scope="function")

@@ -15,6 +15,7 @@ from app.modules.vendors.schemas import (
     TimelineCurrent,
     VendorTimelineResponse,
 )
+from app.modules.observations.repository import ObservationRepository
 from app.modules.vendors.service import VendorService
 
 
@@ -209,8 +210,9 @@ async def test_timeline_service_full_flow():
     ):
         # Mock observation repository methods
         with patch.object(
-            VendorService.__module__ + ".ObservationRepository",
-            get_timeline_buckets=AsyncMock(return_value=[
+            ObservationRepository,
+            "get_timeline_buckets",
+            new=AsyncMock(return_value=[
                 {
                     "bucket_start": now - timedelta(minutes=10),
                     "avg_latency_ms": 120.5,
@@ -226,7 +228,10 @@ async def test_timeline_service_full_flow():
                     "obs_count": 8,
                 },
             ]),
-            get_latest_observation=AsyncMock(return_value=MagicMock(
+        ), patch.object(
+            ObservationRepository,
+            "get_latest_observation",
+            new=AsyncMock(return_value=MagicMock(
                 timestamp=now - timedelta(seconds=30),
                 latency_ms=95.0,
                 status_code=200,

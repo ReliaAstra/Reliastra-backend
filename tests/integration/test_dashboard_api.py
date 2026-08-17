@@ -21,12 +21,14 @@ async def test_dashboard_endpoints(async_client, auth_data):
     assert health_res.status_code == 200
     assert isinstance(health_res.json(), list)
 
-    # GET /v1/orgs/{org_id}/dashboard/incident-timeline
+    # GET /v1/orgs/{org_id}/dashboard/incident-timeline (FIX 17: paginated)
     timeline_res = await async_client.get(
         f"/v1/orgs/{org_id}/dashboard/incident-timeline", headers=headers
     )
     assert timeline_res.status_code == 200
-    assert isinstance(timeline_res.json(), list)
+    timeline_payload = timeline_res.json()
+    assert isinstance(timeline_payload, dict)
+    assert isinstance(timeline_payload["items"], list)
 
     # GET /v1/orgs/{org_id}/dashboard/vendor-status
     vendor_res = await async_client.get(

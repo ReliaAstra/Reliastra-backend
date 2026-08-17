@@ -31,12 +31,18 @@ class DashboardService:
     async def get_dependency_health(
         self, session: AsyncSession, org_id: uuid.UUID
     ) -> list[DependencyHealthResponse]:
+        # FIX 22: fetch all dependencies and their 24h stats with exactly TWO
+        # queries (dependency list + bulk aggregation) instead of one stats
+        # query per dependency.
         deps = await self.repository.list_active_dependencies(session, org_id)
+        if not deps:
+            return []
+        stats_map = await CheckRepository.get_aggregated_stats_bulk(
+            session, [d.id for d in deps], window_hours=24
+        )
         result: list[DependencyHealthResponse] = []
         for dep in deps:
-            stats = await CheckRepository.get_aggregated_stats(
-                session, dep.id, window_hours=24
-            )
+            stats = stats_map.get(dep.id, {})
             up_pct = stats.get("uptime_percentage", 100.0)
             status = "operational" if up_pct >= 99.0 else "degraded"
             if not dep.is_active:
@@ -54,11 +60,15 @@ class DashboardService:
         return result
 
     async def get_incident_timeline(
-        self, session: AsyncSession, org_id: uuid.UUID
+        self,
+        session: AsyncSession,
+        org_id: uuid.UUID,
+        limit: int = 20,
+        cursor: uuid.UUID | None = None,
     ) -> list[IncidentDetailResponse]:
         # Batched query: fetch incidents + correlations in 2 queries instead of N+1
         rows = await IncidentRepository.list_with_correlations_for_org(
-            session, org_id, limit=20
+            session, org_id, limit=limit, cursor=cursor
         )
         detailed_list: list[IncidentDetailResponse] = []
         for row in rows:
@@ -74,14 +84,9 @@ class DashboardService:
     async def get_vendor_status(
         self, session: AsyncSession, org_id: uuid.UUID
     ) -> list[VendorDetailResponse]:
-        vendors = await vendor_service.list_public_vendors(session)
-        result: list[VendorDetailResponse] = []
-        for v in vendors:
-            detail = await vendor_service.get_vendor_detail(
-                session, v.vendor_name
-            )
-            result.append(detail)
-        return result
+        # FIX 22: bulk vendor details — a single observation query across all
+        # vendor endpoints instead of per-vendor detail calls.
+        return await vendor_service.get_vendor_details_bulk(session)
 
 
 dashboard_service = DashboardService()

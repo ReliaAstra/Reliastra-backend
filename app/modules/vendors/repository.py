@@ -11,12 +11,32 @@ from app.modules.vendors.models import VendorEndpoint, VendorTracking
 
 class VendorRepository:
     @staticmethod
-    async def list_public(session: AsyncSession) -> list[VendorTracking]:
-        result = await session.execute(
+    async def list_public(
+        session: AsyncSession,
+        limit: int | None = None,
+        cursor: uuid.UUID | None = None,
+    ) -> list[VendorTracking]:
+        """List public vendors ordered by display_name with optional
+        cursor pagination (FIX 17). *cursor* is the vendor id of the last
+        item on the previous page."""
+        query = (
             select(VendorTracking)
             .where(VendorTracking.is_public.is_(True))
-            .order_by(VendorTracking.display_name.asc())
+            .order_by(VendorTracking.display_name.asc(), VendorTracking.id.asc())
         )
+        if cursor:
+            cursor_vendor = await session.get(VendorTracking, cursor)
+            if cursor_vendor is not None:
+                query = query.where(
+                    (VendorTracking.display_name > cursor_vendor.display_name)
+                    | (
+                        (VendorTracking.display_name == cursor_vendor.display_name)
+                        & (VendorTracking.id > cursor_vendor.id)
+                    )
+                )
+        if limit is not None:
+            query = query.limit(limit)
+        result = await session.execute(query)
         return list(result.scalars().all())
 
     @staticmethod

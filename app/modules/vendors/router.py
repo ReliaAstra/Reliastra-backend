@@ -1,6 +1,9 @@
+import uuid
+
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import CursorPagination
 from app.core.rate_limit import SlidingWindowRateLimiter, enforce_rate_limit, public_vendor_limiter
 from app.db.session import get_db
 from app.modules.vendors.schemas import (
@@ -29,14 +32,25 @@ async def _rate_limit(request: Request) -> None:
     await enforce_rate_limit(request, public_vendor_limiter)
 
 
-@router.get("", response_model=list[VendorResponse])
+@router.get("", response_model=CursorPagination[VendorResponse])
 async def list_public_vendors(
     request: Request,
     db: AsyncSession = Depends(get_db),
     service: VendorService = Depends(get_vnd_service),
-) -> list[VendorResponse]:
+    cursor: uuid.UUID | None = Query(
+        default=None, description="Vendor id of the last item on the previous page"
+    ),
+    limit: int = Query(default=50, ge=1, le=100),
+) -> CursorPagination[VendorResponse]:
+    """FIX 17: cursor-paginated vendor listing."""
     await _rate_limit(request)
-    return await service.list_public_vendors(db)
+    vendors = await service.list_public_vendors(db, limit=limit + 1, cursor=cursor)
+    has_more = len(vendors) > limit
+    items = vendors[:limit]
+    next_cursor = str(items[-1].id) if has_more and items else None
+    return CursorPagination(
+        items=items, next_cursor=next_cursor, has_more=has_more
+    )
 
 
 @router.get("/{vendor_name}", response_model=VendorDetailResponse)

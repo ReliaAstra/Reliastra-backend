@@ -45,8 +45,12 @@ class DependencyService:
         return headers
 
     def _to_response(self, dep: Dependency) -> DependencyResponse:
+        # FIX 23: never return decrypted headers to API consumers. Expose only
+        # the presence flag; the plaintext stays encrypted at rest and is
+        # decoded exclusively server-side (get_dependency_config_internal).
         response_dict = DependencyResponse.model_validate(dep).model_dump()
-        response_dict["headers"] = self._decode_headers(dep.headers)
+        response_dict["headers"] = None
+        response_dict["has_headers"] = bool(dep.headers)
         return DependencyResponse.model_validate(response_dict)
 
     async def list_dependencies(

@@ -141,7 +141,13 @@ async def test_refresh_success(mocker):
     user_id = uuid.uuid4()
     rt_str = create_refresh_token(str(user_id))
 
-    auth_repo.get_refresh_token = AsyncMock(return_value=MagicMock(is_revoked=False))
+    family = uuid.uuid4()
+    auth_repo.get_refresh_token = AsyncMock(
+        return_value=MagicMock(
+            is_revoked=False, token_family=family, token_sequence=1
+        )
+    )
+    auth_repo.get_latest_sequence = AsyncMock(return_value=1)
     auth_repo.create_refresh_token = AsyncMock()
     auth_repo.revoke_refresh_token = AsyncMock()
     user_repo.get_by_id = AsyncMock(return_value=MagicMock(id=user_id, is_active=True))
@@ -155,6 +161,43 @@ async def test_refresh_success(mocker):
     result = await service.refresh(session, rt_str)
 
     assert result.access_token is not None
+    # FIX 28: the rotated token belongs to the same family with sequence + 1.
+    args, kwargs = auth_repo.create_refresh_token.call_args
+    assert kwargs["token_family"] == family
+    assert kwargs["token_sequence"] == 2
+
+
+@pytest.mark.asyncio
+async def test_refresh_rejects_replayed_sequence(mocker):
+    auth_repo = MagicMock()
+    user_repo = MagicMock()
+    org_repo = MagicMock()
+
+    from app.core.security import create_refresh_token
+    user_id = uuid.uuid4()
+    rt_str = create_refresh_token(str(user_id))
+
+    family = uuid.uuid4()
+    auth_repo.get_refresh_token = AsyncMock(
+        return_value=MagicMock(
+            is_revoked=False, token_family=family, token_sequence=1
+        )
+    )
+    # The family has already advanced to sequence 2 → replay of sequence 1.
+    auth_repo.get_latest_sequence = AsyncMock(return_value=2)
+    auth_repo.revoke_family = AsyncMock()
+    user_repo.get_by_id = AsyncMock(return_value=MagicMock(id=user_id, is_active=True))
+
+    service = AuthService(
+        auth_repository=auth_repo,
+        user_repository=user_repo,
+        org_repository=org_repo,
+    )
+    session = AsyncMock()
+
+    with pytest.raises(UnauthorizedException):
+        await service.refresh(session, rt_str)
+    auth_repo.revoke_family.assert_awaited_once_with(session, family)
 
 
 @pytest.mark.asyncio

@@ -1,91 +1,59 @@
-import asyncio
 import logging
 import uuid
 from typing import Any
+
+from app.infrastructure.async_tasks import async_task_body
 from app.infrastructure.celery_app import celery_app
-from app.db.session import get_session_maker
 
 logger = logging.getLogger(__name__)
 
 
-def run_async(coro: Any) -> Any:
-    """Run an async coroutine in a sync context, using modern asyncio patterns.
-
-    Avoids the deprecated ``asyncio.get_event_loop()`` which raises DeprecationWarning
-    (and RuntimeError) in Python 3.10+ when no running loop exists.
-    """
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-
-    if loop and loop.is_running():
-        # If called inside an already-running loop (e.g. a test), create a new thread
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(asyncio.run, coro)
-            return future.result()
-    else:
-        return asyncio.run(coro)
-
-
-@celery_app.task(name="app.modules.checks.tasks.schedule_checks")
-def schedule_checks() -> int:
-    async def _run() -> int:
-        session_maker = get_session_maker()
-        async with session_maker() as session:
-            try:
-                from app.modules.checks.service import check_service
-                count = await check_service.schedule_due_checks(session)
-                await session.commit()
-                return count
-            except Exception as exc:
-                await session.rollback()
-                logger.exception("Error in schedule_checks task: %s", exc)
-                return 0
-
-    try:
-        return run_async(_run())
-    finally:
-        # Each task runs on a fresh asyncio loop; asyncpg connections are
-        # loop-bound, so the shared engine must not outlive the loop.
-        from app.db.session import reset_engine
-        reset_engine()
-
-
 @celery_app.task(name="app.modules.checks.tasks.execute_check")
-def execute_check(dependency_id: str, region: str) -> dict[str, Any] | None:
-    async def _run() -> dict[str, Any] | None:
-        session_maker = get_session_maker()
-        async with session_maker() as session:
-            try:
-                from app.modules.checks.service import check_service
-                result = await check_service.execute_check(
-                    session, uuid.UUID(dependency_id), region
-                )
-                await session.commit()
-                if not result:
-                    return None
-                return {
-                    "id": str(result.id),
-                    "dependency_id": str(result.dependency_id),
-                    "org_id": str(result.org_id),
-                    "region": result.region,
-                    "is_up": result.is_up,
-                    "latency_ms": result.latency_ms,
-                    "quorum_confirmed": result.quorum_confirmed,
-                }
-            except Exception as exc:
-                await session.rollback()
-                logger.exception(
-                    "Error in execute_check task for dep %s: %s",
-                    dependency_id,
-                    exc,
-                )
-                return None
+def execute_check(
+    dependency_id: str, region: str, request_id: str | None = None
+) -> dict[str, Any] | None:
+    async def _run(session) -> dict[str, Any] | None:
+        try:
+            from app.modules.checks.service import check_service
 
-    try:
-        return run_async(_run())
-    finally:
-        from app.db.session import reset_engine
-        reset_engine()
+            result = await check_service.execute_check(
+                session, uuid.UUID(dependency_id), region
+            )
+            if not result:
+                return None
+            return {
+                "id": str(result.id),
+                "dependency_id": str(result.dependency_id),
+                "org_id": str(result.org_id),
+                "region": result.region,
+                "is_up": result.is_up,
+                "latency_ms": result.latency_ms,
+                "quorum_confirmed": result.quorum_confirmed,
+            }
+        except Exception as exc:
+            logger.exception(
+                "Error in execute_check task for dep %s (request_id=%s): %s",
+                dependency_id,
+                request_id,
+                exc,
+            )
+            return None
+
+    return async_task_body(_run)
+
+
+@celery_app.task(name="app.modules.checks.tasks.ensure_check_result_partitions")
+def ensure_check_result_partitions(months_ahead: int = 12) -> int:
+    """Create monthly partitions for the next *months_ahead* months.
+
+    Scheduled monthly by Celery beat; also runs once in migration
+    ``0015_production_hardening``.
+    """
+
+    async def _run(session) -> int:
+        from app.modules.checks.partition_manager import ensure_partitions
+
+        names = await ensure_partitions(session, months_ahead)
+        return len(names)
+
+    return async_task_body(_run)

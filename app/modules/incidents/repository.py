@@ -141,18 +141,31 @@ class IncidentRepository:
         session: AsyncSession,
         org_id: uuid.UUID,
         limit: int = 20,
+        cursor: uuid.UUID | None = None,
     ) -> list[dict[str, Any]]:
         """Fetch incidents for an org with their correlations in a batched manner.
 
         Returns a list of dicts with 'incident' and 'correlations' keys
-        to avoid N+1 queries in the dashboard timeline.
+        to avoid N+1 queries in the dashboard timeline. Supports cursor
+        pagination (FIX 17): *cursor* is the incident id of the last item of
+        the previous page.
         """
         incidents_query = (
             select(Incident)
             .where(Incident.org_id == org_id)
-            .order_by(Incident.started_at.desc())
+            .order_by(Incident.started_at.desc(), Incident.id.desc())
             .limit(limit)
         )
+        if cursor:
+            cursor_incident = await session.get(Incident, cursor)
+            if cursor_incident is not None:
+                incidents_query = incidents_query.where(
+                    (Incident.started_at < cursor_incident.started_at)
+                    | (
+                        (Incident.started_at == cursor_incident.started_at)
+                        & (Incident.id < cursor_incident.id)
+                    )
+                )
         inc_result = await session.execute(incidents_query)
         incidents = list(inc_result.scalars().all())
 

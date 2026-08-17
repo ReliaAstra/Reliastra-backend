@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,8 @@ from app.modules.auth.schemas import (
 )
 from app.modules.organizations.repository import OrganizationRepository
 from app.modules.users.repository import UserRepository
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -147,12 +150,35 @@ class AuthService:
         if not user or not user.is_active:
             raise UnauthorizedException("User account not found or disabled")
 
+        # FIX 28: token family reuse detection. When a token is presented
+        # whose sequence is below the family's latest, it was already rotated
+        # (or is a stolen copy of one) — revoke the entire family.
+        family = stored_rt.token_family if stored_rt else uuid.uuid4()
+        sequence = stored_rt.token_sequence if stored_rt else 1
+        latest_sequence = await self.auth_repository.get_latest_sequence(
+            session, family
+        )
+        if latest_sequence > sequence:
+            await self.auth_repository.revoke_family(session, family)
+            logger.warning(
+                "Refresh token reuse detected for family %s — family revoked",
+                family,
+            )
+            raise UnauthorizedException(
+                "Refresh token reuse detected; session has been revoked"
+            )
+
         tokens = self._generate_token_pair(user.id)
         expires_at = datetime.now(timezone.utc) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS
         )
         await self.auth_repository.create_refresh_token(
-            session, user.id, tokens.refresh_token, expires_at
+            session,
+            user.id,
+            tokens.refresh_token,
+            expires_at,
+            token_family=family,
+            token_sequence=sequence + 1,
         )
         if stored_rt:
             await self.auth_repository.revoke_refresh_token(

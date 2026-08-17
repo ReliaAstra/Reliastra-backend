@@ -120,13 +120,19 @@ class Settings(BaseSettings):
         default="development",
         description="Current environment (development, staging, production)",
     )
+    TRUSTED_PROXY_HOPS: int = Field(
+        default=1,
+        description="Number of trusted reverse-proxy hops used when parsing "
+                    "X-Forwarded-For for rate limiting",
+    )
     RUN_IN_PROCESS_SCHEDULER: bool = Field(
         default=True,
         description=(
-            "Run the APScheduler inside the API process.  Required on "
-            "single-container PaaS where Celery Beat cannot run; MUST be "
-            "disabled when Celery Beat is running (docker-compose) to avoid "
-            "every dependency being scheduled and probed twice."
+            "Run the Redis ZSET check scheduler inside the API process.  "
+            "Required on single-container PaaS where no separate scheduler "
+            "process (or Celery Beat) can run; disabled in docker-compose "
+            "where the dedicated scheduler service owns the queue.  The ZSET "
+            "design makes multiple pollers safe (atomic claim per entry)."
         ),
     )
 

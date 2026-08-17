@@ -28,7 +28,7 @@ async def test_get_plan_details():
 
     assert res.plan == Plan.STANDARD.value
     assert res.subscription_status == "active"
-    assert res.min_check_interval_seconds == 60
+    assert res.min_check_interval_seconds == 15
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from collections.abc import AsyncGenerator
+from typing import Any
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -8,13 +9,44 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy import pool
+from sqlalchemy import event, pool
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 _engine: AsyncEngine | None = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
+
+_WRITE_FLAG = "_reliastra_writes"
+
+
+def _install_write_tracking() -> None:
+    """Track uncommitted writes per-session via SQLAlchemy events.
+
+    ``Session.new/dirty/deleted`` do NOT capture objects that were already
+    flushed (a flushed INSERT leaves ``new``), so request sessions that write
+    then flush would be mistaken for read-only. Every explicit flush and
+    every non-SELECT statement executed through a session sets a flag in
+    ``session.info``; ``get_db`` consults it to decide commit vs rollback.
+
+    Events are registered on the sync ``Session`` class — ``AsyncSession``
+    wraps a sync session and forwards these ORM events.
+    """
+
+    from sqlalchemy.orm import Session as _SyncSession
+
+    @event.listens_for(_SyncSession, "after_flush")
+    def _mark_flushed(session: Any, flush_context: Any) -> None:
+        session.info[_WRITE_FLAG] = True
+
+    @event.listens_for(_SyncSession, "do_orm_execute")
+    def _mark_dml(orm_execute_state: Any) -> None:
+        statement = orm_execute_state.statement
+        if not getattr(statement, "is_select", False):
+            orm_execute_state.session.info[_WRITE_FLAG] = True
+
+
+_install_write_tracking()
 
 
 def _ensure_asyncpg_driver(url: str) -> str:
@@ -115,47 +147,52 @@ def _needs_pooler_compat(url: str) -> bool:
     return "pooler.supabase" in url or "pgbouncer" in url
 
 
+def build_engine() -> AsyncEngine:
+    """Create a new async engine from the current settings (no caching)."""
+    # Build clean URL (no sslmode query param) and SSL connect_args separately
+    raw_url = settings.database_url_with_ssl
+    raw_url = _ensure_asyncpg_driver(raw_url)
+    clean_url = _strip_sslmode_from_url(raw_url)
+
+    # PgBouncer/Supabase pooler needs prepared-statement workaround.
+    # asyncpg's statement_cache_size=0 prevents named prepared statements
+    # which PgBouncer in transaction mode does not support.
+    pooler_compat = _needs_pooler_compat(clean_url)
+    connect_args = _build_connect_args(pooler_compat=pooler_compat)
+
+    # Determine engine kwargs based on backend
+    is_sqlite = clean_url.startswith("sqlite")
+    engine_kwargs: dict = dict(
+        echo=False,
+        future=True,
+    )
+    if is_sqlite:
+        # SQLite: no connection pooling, no connect_args needed
+        engine_kwargs["poolclass"] = pool.StaticPool
+    else:
+        # PostgreSQL: full connection pool
+        engine_kwargs.update(
+            pool_pre_ping=True,
+            pool_size=10,
+            max_overflow=20,
+            pool_timeout=30,
+        )
+        if connect_args:
+            engine_kwargs["connect_args"] = connect_args
+
+    logger.info(
+        "Creating async engine — backend=%s, ssl=%s, pooler_compat=%s",
+        "sqlite" if is_sqlite else "postgresql",
+        bool(connect_args and connect_args.get("ssl")) if connect_args else False,
+        pooler_compat,
+    )
+    return create_async_engine(clean_url, **engine_kwargs)
+
+
 def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
-        # Build clean URL (no sslmode query param) and SSL connect_args separately
-        raw_url = settings.database_url_with_ssl
-        raw_url = _ensure_asyncpg_driver(raw_url)
-        clean_url = _strip_sslmode_from_url(raw_url)
-
-        # PgBouncer/Supabase pooler needs prepared-statement workaround.
-        # asyncpg's statement_cache_size=0 prevents named prepared statements
-        # which PgBouncer in transaction mode does not support.
-        pooler_compat = _needs_pooler_compat(clean_url)
-        connect_args = _build_connect_args(pooler_compat=pooler_compat)
-
-        # Determine engine kwargs based on backend
-        is_sqlite = clean_url.startswith("sqlite")
-        engine_kwargs: dict = dict(
-            echo=False,
-            future=True,
-        )
-        if is_sqlite:
-            # SQLite: no connection pooling, no connect_args needed
-            engine_kwargs["poolclass"] = pool.StaticPool
-        else:
-            # PostgreSQL: full connection pool
-            engine_kwargs.update(
-                pool_pre_ping=True,
-                pool_size=10,
-                max_overflow=20,
-                pool_timeout=30,
-            )
-            if connect_args:
-                engine_kwargs["connect_args"] = connect_args
-
-        logger.info(
-            "Creating async engine — backend=%s, ssl=%s, pooler_compat=%s",
-            "sqlite" if is_sqlite else "postgresql",
-            bool(connect_args and connect_args.get("ssl")) if connect_args else False,
-            pooler_compat,
-        )
-        _engine = create_async_engine(clean_url, **engine_kwargs)
+        _engine = build_engine()
     return _engine
 
 
@@ -173,11 +210,29 @@ def get_session_maker() -> async_sessionmaker[AsyncSession]:
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI dependency yielding a request-scoped session.
+
+    FIX 38: a COMMIT is only issued when the session actually modified data
+    (ORM unit-of-work: new/deleted/dirty). Read-only GET requests instead end
+    their implicit transaction with a cheap ROLLBACK, which releases the
+    pooled connection without any write to the WAL or the commit
+    round-trip semantics on hot probe-heavy paths.
+    """
     session_maker = get_session_maker()
     async with session_maker() as session:
         try:
             yield session
-            await session.commit()
+            if session.is_active:
+                dirty = bool(
+                    session.info.get(_WRITE_FLAG)
+                    or session.new
+                    or session.deleted
+                    or session.dirty
+                )
+                if dirty:
+                    await session.commit()
+                else:
+                    await session.rollback()
         except Exception:
             await session.rollback()
             raise

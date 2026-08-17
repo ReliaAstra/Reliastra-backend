@@ -1,6 +1,7 @@
 import http.server
 import threading
 import uuid
+import httpx
 import pytest
 from app.modules.checks.service import check_service
 
@@ -32,8 +33,36 @@ def test_http_server():
 async def test_full_e2e_flow(async_client, db_session, test_http_server, mocker):
     # This test intentionally uses a loopback HTTP fixture. Bypass URL
     # validation only in the test; production SSRF protection remains enabled.
+    # FIX 26: the check service pins connections via a resolved target; the
+    # test supplies a pinned target for the loopback server and a real
+    # transport so requests actually reach the fixture.
+    from app.core.ssrf_protection import PinnedTarget
+
+    loopback_url = test_http_server
     mocker.patch(
-        "app.modules.checks.service.validate_outbound_url", return_value=None
+        "app.modules.checks.service.resolve_pinned_target",
+        return_value=PinnedTarget(
+            url=loopback_url,
+            hostname="127.0.0.1",
+            port=int(loopback_url.rsplit(":", 1)[1]),
+            ips=["127.0.0.1"],
+        ),
+    )
+    mocker.patch(
+        "app.modules.checks.service.pinned_transport_for",
+        return_value=httpx.AsyncHTTPTransport(),
+    )
+    # FIX 35: storage failures raise — stub uploads in the test harness.
+    mocker.patch(
+        "app.modules.evidence.service.storage_client.upload_bytes",
+        return_value="evidence/x.pdf",
+    )
+    mocker.patch(
+        "app.modules.evidence.service.storage_client.get_presigned_url",
+        return_value="http://storage.test/evidence/x.pdf",
+    )
+    mocker.patch(
+        "app.modules.evidence.tasks.generate_evidence_report.apply_async"
     )
     # Spy on notification sending
     send_email_spy = mocker.spy(email_client, "send_email")

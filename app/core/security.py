@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import json
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -25,18 +26,25 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
+def _base_token_payload(subject: str, expire: datetime, token_type: str) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    return {
+        "sub": subject,
+        "iat": now,
+        "nbf": now,
+        "exp": expire,
+        "type": token_type,
+        "jti": secrets.token_hex(16),
+    }
+
+
 def create_access_token(
     subject: str, additional_claims: dict[str, Any] | None = None
 ) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
-    to_encode = {
-        "sub": subject,
-        "exp": expire,
-        "type": "access",
-        "jti": secrets.token_hex(16),
-    }
+    to_encode = _base_token_payload(subject, expire, "access")
     if additional_claims:
         to_encode.update(additional_claims)
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
@@ -48,12 +56,7 @@ def create_refresh_token(
     expire = datetime.now(timezone.utc) + timedelta(
         days=settings.REFRESH_TOKEN_EXPIRE_DAYS
     )
-    to_encode = {
-        "sub": subject,
-        "exp": expire,
-        "type": "refresh",
-        "jti": secrets.token_hex(16),
-    }
+    to_encode = _base_token_payload(subject, expire, "refresh")
     if additional_claims:
         to_encode.update(additional_claims)
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
@@ -84,8 +87,34 @@ def generate_api_key() -> tuple[str, str, str]:
 
 
 def hash_api_key(key: str) -> str:
-    """Return SHA-256 hex digest of the API key."""
-    return hashlib.sha256(key.encode("utf-8")).hexdigest()
+    """Return a bcrypt hash of the API key.
+
+    bcrypt is GPU-brute-force resistant (unlike raw SHA-256), which matters
+    because API keys carry enough entropy to be valuable if the database
+    leaks. Keys are short (< 72 bytes), so bcrypt's input limit is a non-issue.
+    """
+    return bcrypt.hashpw(
+        key.encode("utf-8"), bcrypt.gensalt()
+    ).decode("utf-8")
+
+
+def verify_api_key(raw_key: str, stored_hash: str) -> bool:
+    """Verify *raw_key* against *stored_hash*.
+
+    Supports both hash formats so pre-existing rows keep working:
+
+    * ``$2b$...``  — bcrypt (all new keys)
+    * 64 hex chars — legacy SHA-256 (checked in constant time)
+    """
+    if stored_hash.startswith(("$2a$", "$2b$", "$2y$")):
+        try:
+            return bcrypt.checkpw(
+                raw_key.encode("utf-8"), stored_hash.encode("utf-8")
+            )
+        except (ValueError, TypeError):
+            return False
+    legacy_sha256 = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+    return hmac.compare_digest(legacy_sha256, stored_hash)
 
 
 def get_fernet() -> Fernet:
