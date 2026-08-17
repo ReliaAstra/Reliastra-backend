@@ -64,7 +64,10 @@ parsed = urlparse(db_url)
 qs = parse_qs(parsed.query, keep_blank_values=True)
 qs.pop("sslmode", None)
 clean_url = urlunparse(parsed._replace(query=urlencode(qs, doseq=True) if qs else ""))
-config.set_main_option("sqlalchemy.url", clean_url)
+# Alembic stores this in a ConfigParser, which treats '%' as interpolation
+# syntax. Percent-encoded URLs (e.g. a unix socket host=%2Ftmp%2F...) must be
+# escaped as '%%' or Alembic raises "invalid interpolation syntax".
+config.set_main_option("sqlalchemy.url", clean_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:
@@ -99,7 +102,7 @@ async def run_async_migrations() -> None:
     engine = create_async_engine(
         clean_url,
         poolclass=pool.NullPool,
-        connect_args=connect_args if connect_args else None,
+        connect_args=connect_args or {},
     )
 
     async with engine.connect() as connection:

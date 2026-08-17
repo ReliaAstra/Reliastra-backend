@@ -1,0 +1,471 @@
+[
+  {
+    "area": "Auth",
+    "test": "POST /v1/auth/register",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "201 {\"access_token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjOWUwYjhjMi00NDI0LTQ3YmItOTkzNi04MDRjM2U4Y2IwNjgiLCJleHAiOjE3ODY5MjM3MTQsInR5cGUiOiJhY2Nlc3MiLCJqdGkiOiIzNWUzNzEwMzRiNmE4OTU5ZTE5NWU2Mj"
+  },
+  {
+    "area": "Auth",
+    "test": "TokenResponse structure",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "keys=['access_token', 'expires_in', 'refresh_token', 'token_type']"
+  },
+  {
+    "area": "Auth",
+    "test": "POST /v1/auth/login",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200"
+  },
+  {
+    "area": "Auth",
+    "test": "POST /v1/auth/refresh",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200"
+  },
+  {
+    "area": "Auth",
+    "test": "refresh token rotated (new != old)",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "token reuse possible if equal"
+  },
+  {
+    "area": "Auth",
+    "test": "old refresh token revoked after rotation",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "replay returned 401"
+  },
+  {
+    "area": "Auth",
+    "test": "login rejects wrong password",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "401"
+  },
+  {
+    "area": "Org",
+    "test": "POST /v1/orgs",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "201 {\"id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"name\":\"Audit Org 048d9994\",\"slug\":\"audit-org-048d9994\",\"plan\":\"free\",\"has_agency_mode\":false,\"created_at\":\"2026-08-16T23:26:55.519644Z\",\"updated_at\":\"2026"
+  },
+  {
+    "area": "Org",
+    "test": "GET /v1/orgs",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200"
+  },
+  {
+    "area": "Org",
+    "test": "creator role == owner",
+    "status": "FAIL",
+    "severity": "P1",
+    "detail": "{\"id\": \"1b40c67a-f54a-4a75-8b33-4503145ba8a0\", \"name\": \"Audit Org 048d9994\", \"slug\": \"audit-org-048d9994\", \"plan\": \"professional\", \"has_agency_mode\": false, \"created_at\": \"2026-08-16T23:26:55.519644Z\""
+  },
+  {
+    "area": "RBAC",
+    "test": "POST /v1/orgs/{id}/members (invite viewer)",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "201 {\"id\":\"3ee0809d-2b13-49b1-9bc1-e13e1be7434e\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"user_id\":\"40594c5a-643f-43be-890d-82c832b6d908\",\"role\":\"viewer\",\"joined_at\":\"2026-08-16T23:26:55.859808Z\"}"
+  },
+  {
+    "area": "RBAC",
+    "test": "Viewer CANNOT POST dependencies (expect 403)",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "got 403 \u2014 privilege escalation if 2xx"
+  },
+  {
+    "area": "RBAC",
+    "test": "Viewer CAN read dependencies (read allowed)",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200"
+  },
+  {
+    "area": "RBAC",
+    "test": "PATCH member role -> admin",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 {\"id\":\"3ee0809d-2b13-49b1-9bc1-e13e1be7434e\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"user_id\":\"40594c5a-643f-43be-890d-82c832b6d908\",\"role\":\"admin\",\"jo"
+  },
+  {
+    "area": "RBAC",
+    "test": "Cross-tenant read blocked (expect 403/404)",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "got 403 \u2014 TENANT DATA LEAK if 200"
+  },
+  {
+    "area": "RBAC",
+    "test": "Cross-tenant dashboard blocked",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "got 403"
+  },
+  {
+    "area": "Dependencies",
+    "test": "POST dependency [healthy]",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "201 {\"id\":\"840b5620-1a63-46f4-8b96-ae35f82f6fe2\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"application_id\":\"23e8f198-00ed-43f9-8e90-426eaaa34e60\",\"name\":\"healthy-048d9994\",\"endpoint_url\":\"https://h"
+  },
+  {
+    "area": "Dependencies",
+    "test": "POST dependency [unhealthy-500]",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "201 {\"id\":\"05161dc2-5161-4fa5-8bef-dbf47b6c625f\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"application_id\":\"23e8f198-00ed-43f9-8e90-426eaaa34e60\",\"name\":\"unhealthy-500-048d9994\",\"endpoint_url\":\"htt"
+  },
+  {
+    "area": "Dependencies",
+    "test": "POST dependency [slow-delay15]",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "201 {\"id\":\"b67a5e4c-ded0-4bd0-8115-a3a8905ab16a\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"application_id\":\"23e8f198-00ed-43f9-8e90-426eaaa34e60\",\"name\":\"slow-delay15-048d9994\",\"endpoint_url\":\"http"
+  },
+  {
+    "area": "Dependencies",
+    "test": "POST dependency [redirect-chain]",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "201 {\"id\":\"81b36529-e636-4fef-80d8-7c201179a118\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"application_id\":\"23e8f198-00ed-43f9-8e90-426eaaa34e60\",\"name\":\"redirect-chain-048d9994\",\"endpoint_url\":\"ht"
+  },
+  {
+    "area": "Dependencies",
+    "test": "POST dependency [conn-refused]",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "201 {\"id\":\"ed177ac7-dfd3-4179-93b3-dd83d648c262\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"application_id\":\"23e8f198-00ed-43f9-8e90-426eaaa34e60\",\"name\":\"conn-refused-048d9994\",\"endpoint_url\":\"http"
+  },
+  {
+    "area": "Security",
+    "test": "SSRF: localhost dependency accepted at create time",
+    "status": "FAIL",
+    "severity": "P1",
+    "detail": "create-time SSRF validation absent; only enforced at probe time"
+  },
+  {
+    "area": "Dependencies",
+    "test": "GET dependencies list",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 count=5"
+  },
+  {
+    "area": "Checks",
+    "test": "Scheduler executed checks within 150s",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "results for healthy dep = 2"
+  },
+  {
+    "area": "Checks",
+    "test": "GET dependency results",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200"
+  },
+  {
+    "area": "Checks",
+    "test": "GET dependency history (aggregation)",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 {\"dependency_id\":\"840b5620-1a63-46f4-8b96-ae35f82f6fe2\",\"uptime_percentage\":0.0,\"avg_latency_ms\":31.94,\"total_checks\":2,\"total_up\":0,\"total_down\":2}"
+  },
+  {
+    "area": "Checks",
+    "test": "GET /checks/recent",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 n=10"
+  },
+  {
+    "area": "Checks",
+    "test": "Redirect chain NOT followed (302 recorded as down)",
+    "status": "FAIL",
+    "severity": "P1",
+    "detail": "status codes observed=[None, None]"
+  },
+  {
+    "area": "Checks",
+    "test": "Slow endpoint times out at timeout_seconds",
+    "status": "FAIL",
+    "severity": "P1",
+    "detail": "errors=['TLS/SSL connection has been closed (EOF) (_ssl.c:992)', 'TLS/SSL connection has been closed (EOF) (_ssl.c:992)']"
+  },
+  {
+    "area": "Incidents",
+    "test": "GET incidents",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 n=4"
+  },
+  {
+    "area": "Incidents",
+    "test": "500-status dependency produced an incident",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "incident count=4; quorum requires 2 regions failing within 60s window"
+  },
+  {
+    "area": "Incidents",
+    "test": "GET incident evidence",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 {\"id\":\"12b49bd2-0a06-4076-b56d-bc03102f944b\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"incident_id\":\"d754e00e-d176-40e6-92c3-e0f860479eea\",\"file_size_byt"
+  },
+  {
+    "area": "Incidents",
+    "test": "POST incident correlate",
+    "status": "FAIL",
+    "severity": "P2",
+    "detail": "422 {\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Request validation failed\",\"details\":{\"errors\":[{\"loc\":[\"body\",\"correlated_dependency_id\"],\"msg\":\"Field required\""
+  },
+  {
+    "area": "Incidents",
+    "test": "PATCH resolve incident",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 {\"id\":\"d754e00e-d176-40e6-92c3-e0f860479eea\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"dependency_id\":\"81b36529-e636-4fef-80d8-7c201179a118\",\"started_at\""
+  },
+  {
+    "area": "Dashboard",
+    "test": "GET summary",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 11ms {\"active_dependencies_count\":5,\"open_incidents_count\":3,\"overall_uptime_percentage\":0.0,\"alerts_today_count\":4}"
+  },
+  {
+    "area": "Dashboard",
+    "test": "GET latency?hours=1",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 8ms [{\"timestamp\":\"2026-08-16T23:27:20.842773Z\",\"region\":\"us-east\",\"latency_ms\":33.55550765991211,\"dependency_id\":\"840b5620-"
+  },
+  {
+    "area": "Dashboard",
+    "test": "GET sla-degradation",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 8ms {\"total_degradation_pct\":100.0,\"affected_services\":5,\"period\":\"7d\"}"
+  },
+  {
+    "area": "Dashboard",
+    "test": "GET dependency-health",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 11ms [{\"dependency_id\":\"ed177ac7-dfd3-4179-93b3-dd83d648c262\",\"name\":\"conn-refused-048d9994\",\"endpoint_url\":\"http://localhost"
+  },
+  {
+    "area": "Dashboard",
+    "test": "GET incident-timeline",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 10ms [{\"id\":\"d754e00e-d176-40e6-92c3-e0f860479eea\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"dependency_id\":\"81b36529-"
+  },
+  {
+    "area": "Dashboard",
+    "test": "GET vendor-status",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 25ms [{\"id\":\"85e29a1e-f13f-4baa-bf6c-576ed5f9f21c\",\"vendor_name\":\"auth0\",\"display_name\":\"Auth0\",\"category\":\"auth\",\"is_public\""
+  },
+  {
+    "area": "Dashboard",
+    "test": "latency?hours=2160 (90d max) accepted",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 6ms"
+  },
+  {
+    "area": "Dashboard",
+    "test": "latency rejects absurd range (expect 422)",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "got 422 \u2014 unbounded scan risk if 200"
+  },
+  {
+    "area": "PublicVendors",
+    "test": "GET /v1/public/vendors",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200"
+  },
+  {
+    "area": "PublicVendors",
+    "test": "vendor list is paginated",
+    "status": "FAIL",
+    "severity": "P1",
+    "detail": "returned list \u2014 unbounded list if array"
+  },
+  {
+    "area": "PublicVendors",
+    "test": "GET /public/vendors/stripe (detail)",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 {\"id\":\"7d5dd711-6d96-4351-98f3-91cad90057a9\",\"vendor_name\":\"stripe\",\"display_name\":\"Stripe\",\"category\":\"payments\",\"is_pu"
+  },
+  {
+    "area": "PublicVendors",
+    "test": "GET /public/vendors/stripe/history",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 {\"vendor_name\":\"stripe\",\"uptime_percentage_24h\":100.0,\"avg_latency_ms_24h\":0.0,\"recent_checks_count\":0}"
+  },
+  {
+    "area": "PublicVendors",
+    "test": "GET /public/vendors/stripe/metrics",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 {\"vendor_name\":\"stripe\",\"metrics\":{\"1h\":{\"window\":\"1h\",\"total_observations\":0,\"uptime_percentage\":100.0,\"avg_latency_ms\""
+  },
+  {
+    "area": "PublicVendors",
+    "test": "GET /public/vendors/stripe/incidents",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 {\"vendor_name\":\"stripe\",\"incidents\":[]}"
+  },
+  {
+    "area": "Notifications",
+    "test": "POST notification config",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "201 {\"id\":\"1822d852-490b-4f81-b842-69ecb0ad8f9d\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"channel_type\":\"slack\",\"is_active\":true,\"created_at\":\"2026-08-16T23:27:28.156313Z\",\"updated_at\":\"2026-08-16"
+  },
+  {
+    "area": "Notifications",
+    "test": "POST notifications/test",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 {\"success\":false,\"message\":\"Failed to send test alert\"}"
+  },
+  {
+    "area": "ApiKeys",
+    "test": "POST api-keys",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "201 {\"id\":\"4341c18e-bb94-41b0-a636-59ed7858a4ae\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"name\":\"audit-key\",\"prefix\":\"rel_97d5\",\"scopes\":[\"read:checks\",\"write:dependencies\",\"read:incidents\",\"read:"
+  },
+  {
+    "area": "ApiKeys",
+    "test": "full_key returned once on create",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "keys=['created_at', 'expires_at', 'full_key', 'id', 'last_used_at', 'name', 'org_id', 'prefix', 'scopes']"
+  },
+  {
+    "area": "ApiKeys",
+    "test": "list does NOT expose full_key",
+    "status": "PASS",
+    "severity": "-",
+    "detail": ""
+  },
+  {
+    "area": "ApiKeys",
+    "test": "ApiKey auth scheme works",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 [{\"id\":\"ed177ac7-dfd3-4179-93b3-dd83d648c262\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"application_id\":\"23e8f198-00ed-43f9-8e90-426eaaa34e60\",\"name\":\"co"
+  },
+  {
+    "area": "ApiKeys",
+    "test": "X-API-Key header accepted",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200"
+  },
+  {
+    "area": "ApiKeys",
+    "test": "DELETE api-key (revoke)",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "204"
+  },
+  {
+    "area": "ApiKeys",
+    "test": "revoked key rejected",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "got 401 \u2014 revocation broken if 200"
+  },
+  {
+    "area": "Billing",
+    "test": "GET billing/plan",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 {\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"plan\":\"professional\",\"max_dependencies\":100,\"min_check_interval_seconds\":5,\"subscription_status\":null,\"current_period_end\":null,\"is_founding_customer\""
+  },
+  {
+    "area": "Billing",
+    "test": "POST billing/initialize",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "422 {\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Paystack is not configured\",\"details\":{}}}"
+  },
+  {
+    "area": "Billing",
+    "test": "POST billing/verify (bad ref rejected)",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "422 {\"error\":{\"code\":\"VALIDATION_ERROR\",\"message\":\"Transaction verification failed: Paystack is not configured\",\"details\":{}}}"
+  },
+  {
+    "area": "Evidence",
+    "test": "GET evidence list",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 n=2"
+  },
+  {
+    "area": "Evidence",
+    "test": "GET evidence report",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200"
+  },
+  {
+    "area": "Evidence",
+    "test": "POST evidence regenerate",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "201 {\"id\":\"56f4a312-b9c5-43c5-8628-26437627d8b5\",\"org_id\":\"1b40c67a-f54a-4a75-8b33-4503145ba8a0\",\"incident_id\":\"d754e00e-d176-40e6-92c3-e0f860479eea\",\"file_size_byt"
+  },
+  {
+    "area": "Evidence",
+    "test": "GET /v1/verify/{id}",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "200 {\"found\":false,\"error\":\"Evidence not found\"}"
+  },
+  {
+    "area": "Evidence",
+    "test": "verify unknown id returns 404",
+    "status": "FAIL",
+    "severity": "P2",
+    "detail": "200"
+  },
+  {
+    "area": "Auth",
+    "test": "POST /v1/auth/logout returns 204",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "got 204"
+  },
+  {
+    "area": "Auth",
+    "test": "refresh token revoked after logout",
+    "status": "PASS",
+    "severity": "-",
+    "detail": "got 401 \u2014 session not terminated if 200"
+  }
+]
