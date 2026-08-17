@@ -174,7 +174,18 @@ class CheckService:
         # Reset timer for actual HTTP request
         start_time = time.time()
         try:
-            async with httpx.AsyncClient(timeout=timeout, verify=True) as client:
+            # follow_redirects=True: vendor endpoints routinely redirect
+            # (http->https, www->apex, CDN routing).  With httpx's default
+            # follow_redirects=False every such dependency was marked DOWN
+            # with "Unexpected status code: 301/302".  Cap redirects so a
+            # redirect loop is treated as a failed check instead of an
+            # unbounded request.
+            async with httpx.AsyncClient(
+                timeout=timeout,
+                verify=True,
+                follow_redirects=True,
+                max_redirects=5,
+            ) as client:
                 response = await client.request(
                     method=method,
                     url=url,
