@@ -297,3 +297,111 @@ async def test_schedule_due_checks_never_runs_http(db_session, monkeypatch):
     assert count == 2
     assert enqueued_members == [(str(dep.id), "us-east"), (str(dep.id), "eu-west")]
     service.execute_check.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_execute_check_follows_redirects_with_revalidation(mocker):
+    """PR #10 + FIX 26: 3xx redirects are followed (bounded), and every hop
+    is re-validated against the SSRF policy before connecting."""
+    from app.core.ssrf_protection import PinnedTarget
+
+    chk_repo = MagicMock()
+    dep_repo = MagicMock()
+    dep_id = uuid.uuid4()
+    org_id = uuid.uuid4()
+
+    fake_dto = _fake_dto(dep_id, org_id)
+    fake_result = _fake_result(dep_id, org_id)
+    chk_repo.create = AsyncMock(return_value=fake_result)
+    chk_repo.list_recent_for_dependency = AsyncMock(return_value=[fake_result])
+
+    service = CheckService(repository=chk_repo, dep_repository=dep_repo)
+    session = AsyncMock()
+
+    targets = iter([
+        PinnedTarget("https://example.com/api", "example.com", 443, ["93.184.216.34"]),
+        PinnedTarget("https://www.example.com/api", "www.example.com", 443, ["93.184.216.35"]),
+    ])
+
+    def fake_resolve(url):
+        return next(targets)
+
+    responses = iter([
+        httpx.Response(status_code=302, headers={"location": "https://www.example.com/api"}),
+        httpx.Response(status_code=200),
+    ])
+
+    class FakeTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request):
+            return next(responses)
+
+    with patch(
+        "app.modules.dependencies.service.dependency_service.get_dependency_config_internal",
+        new=AsyncMock(return_value=fake_dto),
+    ), patch(
+        "app.modules.checks.service.resolve_pinned_target",
+        side_effect=fake_resolve,
+    ), patch(
+        "app.modules.checks.service.pinned_transport_for",
+        return_value=FakeTransport(),
+    ), patch(
+        "app.modules.incidents.repository.IncidentRepository.get_open_for_dependency",
+        new=AsyncMock(return_value=None),
+    ):
+        res = await service.execute_check(session, dep_id, "us-east")
+
+    assert res.is_up is True
+    assert res.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_execute_check_blocks_redirect_to_private_target():
+    """A redirect hop to a blocked target fails the check without a request."""
+    from app.core.ssrf_protection import PinnedTarget
+
+    chk_repo = MagicMock()
+    dep_repo = MagicMock()
+    dep_id = uuid.uuid4()
+    org_id = uuid.uuid4()
+
+    fake_dto = _fake_dto(dep_id, org_id)
+    fake_result = _fake_result(dep_id, org_id)
+    fake_result.is_up = False
+    chk_repo.create = AsyncMock(return_value=fake_result)
+    chk_repo.list_recent_for_dependency = AsyncMock(return_value=[fake_result])
+
+    service = CheckService(repository=chk_repo, dep_repository=dep_repo)
+    session = AsyncMock()
+
+    first_target = PinnedTarget(
+        "https://example.com/api", "example.com", 443, ["93.184.216.34"]
+    )
+    resolve_calls = {"n": 0}
+
+    def fake_resolve(url):
+        if resolve_calls["n"] == 0:
+            resolve_calls["n"] += 1
+            return first_target
+        raise ValueError("URL safety check failed: private network")
+
+    class FakeTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request):
+            return httpx.Response(
+                status_code=302, headers={"location": "http://169.254.169.254/steal"}
+            )
+
+    with patch(
+        "app.modules.dependencies.service.dependency_service.get_dependency_config_internal",
+        new=AsyncMock(return_value=fake_dto),
+    ), patch(
+        "app.modules.checks.service.resolve_pinned_target",
+        side_effect=fake_resolve,
+    ), patch(
+        "app.modules.checks.service.pinned_transport_for",
+        return_value=FakeTransport(),
+    ):
+        res = await service.execute_check(session, dep_id, "us-east")
+
+    assert res.is_up is False
+    _, kwargs = chk_repo.create.call_args
+    assert "blocked" in kwargs["error_message"]

@@ -6,9 +6,19 @@
 
 All 40 fixes are implemented. Verification:
 
-* `pytest` — **191 passed, 0 failed** (unit + integration + e2e, embedded PostgreSQL via `pgserver`, fakeredis).
+* `pytest` — **194 passed, 0 failed** (unit + integration + e2e, embedded PostgreSQL via `pgserver`, fakeredis).
 * `docker-compose up --build` — compose file validated (YAML parse + service wiring); **Docker is not available in this execution sandbox**, so the runtime stack was validated instead by the full pytest suite (embedded Postgres) plus a standalone smoke run of the scheduler (`python -m app.infrastructure.scheduler` — starts, degrades gracefully with Redis/DB down, exits cleanly).
-* Migration `0012_production_hardening` applies cleanly from head `0011_plg_growth_features` (verified by the test suite, which runs `alembic upgrade head`).
+* Migrations apply cleanly: single head `0015_production_hardening` (chained after `0014_open_incident_unique` from the audit-fix branch), verified by the test suite which runs `alembic upgrade head`.
+
+## Merge reconciliation with main (PR #10 audit fixes)
+
+Main advanced while this branch was open. The merge resolves the overlaps as follows:
+
+* **`RUN_IN_PROCESS_SCHEDULER`** (new on main): honored. When enabled (default for single-container PaaS), the API lifespan now starts the **Redis ZSET scheduler in consume-inline mode** — due checks execute in-process, each in its own short transaction. The old APScheduler duplicate of Celery Beat is gone (FIX 14). Atomic ZSET claims make the in-process poller safe even if a standalone scheduler or Celery Beat also runs. docker-compose sets it to `false` and uses the dedicated `scheduler` service.
+* **Idempotency principal** (main's `_idempotency_principal`): adopted — JWT `sub` → `user:{sub}`, API key → `key:{sha256[:32]}`, anonymous → `ip:{ip}`. Combined with this branch's FIX 40 (cache 404/409/422, never 5xx).
+* **Redirect following** (main's `follow_redirects` fix): kept the behavior but implemented it safely — redirects are followed manually with a 5-hop cap and **every hop is re-validated against the SSRF policy and pinned to a freshly validated IP** (blind `follow_redirects=True` would have bypassed FIX 26's pinning on cross-host redirects).
+* **Migrations**: main added `0012_user_admin_fields` / `0013_missing_model_tables` / `0014_open_incident_unique`. This branch's migration was renumbered to `0015_production_hardening` (chained after `0014`) and the user-column additions were dropped (now covered by main's 0012).
+* **`schedule_checks` / `reset_engine`** (main's task changes): superseded by this branch's ZSET scheduler and loop-affine async task bridge (`async_task_body`); the task module keeps the new design.
 
 Every fix below lists: file path + line numbers, what changed (before/after essence), and the test case proving it.
 
@@ -57,7 +67,7 @@ Every fix below lists: file path + line numbers, what changed (before/after esse
 
 ## FIX 5 — Automated partition management for check_results
 
-**Files:** `app/modules/checks/partition_manager.py` (new), `app/modules/checks/tasks.py` L48-68, `app/db/migrations/versions/0012_production_hardening.py` L76-88, `app/infrastructure/celery_app.py` L50-53
+**Files:** `app/modules/checks/partition_manager.py` (new), `app/modules/checks/tasks.py` L48-68, `app/db/migrations/versions/0015_production_hardening.py` L76-88, `app/infrastructure/celery_app.py` L50-53
 
 **Before:** `PARTITION BY RANGE (executed_at)` declared; only a DEFAULT partition existed.
 **After:** migration 0012 creates the next 12 monthly partitions (`check_results_YYYY_MM`); `ensure_partitions()` + Celery task `ensure_check_result_partitions` (beat, monthly on day 1 @ 02:00) keep creating future partitions.
@@ -231,7 +241,7 @@ Every fix below lists: file path + line numbers, what changed (before/after esse
 
 ## FIX 24 — Index on dependencies.next_check_at
 
-**File:** migration `0012_production_hardening.py` L81-86
+**File:** migration `0015_production_hardening.py` L81-86
 
 **Before:** `get_due_dependencies` scanned the table (plain index).
 **After:** `CREATE INDEX idx_dependencies_next_check_at_due ON dependencies (next_check_at) WHERE is_active = TRUE AND is_deleted = FALSE`.
@@ -386,22 +396,23 @@ Every fix below lists: file path + line numbers, what changed (before/after esse
 
 ## Bonus: baseline drift repaired (required for the stack to boot)
 
-`app/db/migrations/versions/0012_production_hardening.py` L66-80 — the `User` model declared `is_system_admin`, `admin_note`, `source`, `last_login_at`, `last_activity_at`, `login_count` but no migration ever created them, breaking the admin seed and every user query. 0012 adds them (with `server_default` + backfill where needed). Downgrade path included.
+Resolved by main's `0012_user_admin_fields` (which adds `is_system_admin`, `admin_note`, `source`, `last_login_at`, `last_activity_at`, `login_count` to `users` — the model declared them but no migration existed, breaking the admin seed and every user query). This branch's migration chains after it; no duplicate work.
 
 ## Test suite summary
 
 | Scope | Result |
 |---|---|
-| `tests/unit` (161 tests) | ✅ 161 passed |
+| `tests/unit` (164 tests) | ✅ 164 passed |
 | `tests/integration` | ✅ passed |
 | `tests/e2e` | ✅ passed |
-| Total | **191 passed, 0 failed** |
+| Total | **194 passed, 0 failed** |
 
 Verification commands:
 
 ```bash
-python -m pytest -q                      # 191 passed
+python -m pytest -q                      # 194 passed
 python -m app.infrastructure.scheduler   # smoke: starts, degrades gracefully, exits cleanly
+alembic heads                            # 0015_production_hardening (single head)
 ```
 
-`docker-compose up --build`: the compose file was extended with a `scheduler` service and validated; Docker is unavailable in this sandbox so the stack boot is validated by the pytest suite (embedded Postgres + migrations) and the standalone scheduler smoke run.
+`docker-compose up --build`: the compose file was extended with a `scheduler` service and `RUN_IN_PROCESS_SCHEDULER=false` on the API; validated via YAML parse + service wiring. Docker is unavailable in this sandbox so the stack boot is validated by the pytest suite (embedded Postgres + migrations) and the standalone scheduler smoke run.

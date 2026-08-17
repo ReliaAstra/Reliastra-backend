@@ -26,6 +26,11 @@ from app.db.session import get_db, set_test_engine
 from app.infrastructure.redis_client import set_test_redis
 from app.main import app
 
+# Tests run like docker-compose: the standalone scheduler owns the queue, so
+# the in-process (PaaS) scheduler must stay off — otherwise background ticks
+# would probe test dependencies with real HTTP calls mid-assertion.
+settings.RUN_IN_PROCESS_SCHEDULER = False
+
 logger = logging.getLogger(__name__)
 
 

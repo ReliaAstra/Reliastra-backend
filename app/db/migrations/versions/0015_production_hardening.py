@@ -2,20 +2,22 @@
 
 Production-hardening fixes from the platform reliability review:
 
-1. ``users.is_system_admin`` column — the model declared it but no
-   migration ever added it (boot drift that broke the admin seed path).
-2. ``check_results`` monthly partitions for the next 12 months
+1. ``check_results`` monthly partitions for the next 12 months
    (FIX 5) — the parent table is PARTITION BY RANGE (executed_at) and only
    a DEFAULT partition existed.
-3. Partial index on ``dependencies.next_check_at`` (FIX 24) — the
+2. Partial index on ``dependencies.next_check_at`` (FIX 24) — the
    ``get_due_dependencies`` scan only reads active, non-deleted rows.
-4. ``observation_outbox`` table (FIX 9) — transactional outbox for the
+3. ``observation_outbox`` table (FIX 9) — transactional outbox for the
    observation dual-write.
-5. Refresh-token family columns ``token_family`` / ``token_sequence``
+4. Refresh-token family columns ``token_family`` / ``token_sequence``
    (FIX 28) — rotation + replay detection.
 
-Revision ID: 0012_production_hardening
-Revises: 0011_plg_growth_features
+NOTE: users admin/growth columns are handled by main's
+``0012_user_admin_fields``; this migration chains after
+``0014_open_incident_unique`` to avoid a migration branch collision.
+
+Revision ID: 0015_production_hardening
+Revises: 0014_open_incident_unique
 Create Date: 2026-08-17 00:00:00.000000
 
 """
@@ -27,8 +29,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = "0012_production_hardening"
-down_revision: Union[str, None] = "0011_plg_growth_features"
+revision: str = "0015_production_hardening"
+down_revision: Union[str, None] = "0014_open_incident_unique"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -53,34 +55,7 @@ def _partition_months(count: int = 12) -> list[tuple[str, datetime, datetime]]:
 
 
 def upgrade() -> None:
-    # 1. users admin/growth columns (model/migration drift fix — the User
-    #    model declares these but no earlier migration ever created them)
-    op.add_column(
-        "users",
-        sa.Column(
-            "is_system_admin",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.text("false"),
-        ),
-    )
-    op.add_column("users", sa.Column("admin_note", sa.Text(), nullable=True))
-    op.add_column("users", sa.Column("source", sa.String(50), nullable=True))
-    op.add_column(
-        "users", sa.Column("last_login_at", sa.DateTime(timezone=True), nullable=True)
-    )
-    op.add_column(
-        "users",
-        sa.Column("last_activity_at", sa.DateTime(timezone=True), nullable=True),
-    )
-    op.add_column(
-        "users",
-        sa.Column(
-            "login_count", sa.Integer(), nullable=False, server_default=sa.text("0")
-        ),
-    )
-
-    # 2. Monthly check_results partitions (FIX 5)
+    # 1. Monthly check_results partitions (FIX 5)
     for name, start, end in _partition_months(12):
         op.execute(
             f"CREATE TABLE IF NOT EXISTS {name} "
@@ -88,14 +63,14 @@ def upgrade() -> None:
             f"FOR VALUES FROM ('{start.isoformat()}') TO ('{end.isoformat()}')"
         )
 
-    # 3. Partial index for due-dependency scans (FIX 24)
+    # 2. Partial index for due-dependency scans (FIX 24)
     op.execute(
-        "CREATE INDEX idx_dependencies_next_check_at_due "
+        "CREATE INDEX IF NOT EXISTS idx_dependencies_next_check_at_due "
         "ON dependencies (next_check_at) "
         "WHERE is_active = TRUE AND is_deleted = FALSE"
     )
 
-    # 4. observation_outbox (FIX 9)
+    # 3. observation_outbox (FIX 9)
     op.create_table(
         "observation_outbox",
         sa.Column(
@@ -119,7 +94,7 @@ def upgrade() -> None:
         ["created_at"],
     )
 
-    # 5. Refresh token family (FIX 28)
+    # 4. Refresh token family (FIX 28)
     op.add_column(
         "refresh_tokens",
         sa.Column(
@@ -168,10 +143,3 @@ def downgrade() -> None:
 
     for name, _start, _end in _partition_months(12):
         op.execute(f"DROP TABLE IF EXISTS {name}")
-
-    op.drop_column("users", "login_count")
-    op.drop_column("users", "last_activity_at")
-    op.drop_column("users", "last_login_at")
-    op.drop_column("users", "source")
-    op.drop_column("users", "admin_note")
-    op.drop_column("users", "is_system_admin")

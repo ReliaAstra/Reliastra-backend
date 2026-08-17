@@ -47,7 +47,7 @@ def ensure_check_result_partitions(months_ahead: int = 12) -> int:
     """Create monthly partitions for the next *months_ahead* months.
 
     Scheduled monthly by Celery beat; also runs once in migration
-    ``0012_production_hardening``.
+    ``0015_production_hardening``.
     """
 
     async def _run(session) -> int:

@@ -69,7 +69,7 @@ class DependencyCreateRequest(BaseModel):
     headers: dict[str, Any] | None = None
     expected_status_codes: list[int] = DEFAULT_EXPECTED_STATUS_CODES
     timeout_seconds: int = Field(default=DEFAULT_TIMEOUT_SECONDS, ge=1, le=300)
-    check_interval_seconds: int = Field(default=300, ge=10, le=86400)
+    check_interval_seconds: int = Field(default=300, ge=1, le=86400)
     regions: list[str] = Field(default=DEFAULT_REGIONS, min_length=1)
     alert_threshold_ms: int | None = Field(default=None, ge=1)
     is_active: bool = True
@@ -101,7 +101,7 @@ class DependencyUpdateRequest(BaseModel):
     headers: dict[str, Any] | None = None
     expected_status_codes: list[int] | None = None
     timeout_seconds: int | None = Field(default=None, ge=1, le=300)
-    check_interval_seconds: int | None = Field(default=None, ge=10, le=86400)
+    check_interval_seconds: int | None = Field(default=None, ge=1, le=86400)
     regions: list[str] | None = None
     alert_threshold_ms: int | None = Field(default=None, ge=1)
     is_active: bool | None = None

@@ -15,6 +15,7 @@ from app.config import settings
 from app.core.exceptions import setup_exception_handlers
 from app.core.request_context import request_id_var, set_request_id
 from app.db.session import get_engine
+from app.infrastructure.scheduler import start_scheduler, stop_scheduler
 from app.infrastructure.redis_client import (
     close_redis,
     safe_redis_get,
@@ -91,26 +92,29 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         return 200 <= status_code < 300 or status_code in {404, 409, 422}
 
     @staticmethod
-    def _identity(request: Request) -> str:
-        """FIX 7: scope the idempotency cache by the authenticated principal.
+    def _idempotency_principal(request: Request) -> str:
+        """Derive a stable per-credential principal for idempotency scoping
+        (FIX 7).
 
-        The middleware runs before auth dependencies, so the principal is
-        derived from the credentials in the request itself (API key hash or
-        JWT hash) — two different users can therefore never observe each
-        other's cached responses.
+        Prefers the verified JWT ``sub``; falls back to a digest of the API
+        key credential; finally the client IP for anonymous callers.  This
+        guarantees two different tenants can never collide on a key.
         """
-        api_key = request.headers.get("x-api-key", "").strip()
-        if api_key:
-            digest = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
-            return f"apikey:{digest}"
-        auth = request.headers.get("authorization", "").strip()
-        if auth:
-            digest = hashlib.sha256(auth.encode("utf-8")).hexdigest()[:16]
-            return f"jwt:{digest}"
-        user_id = getattr(request.state, "user_id", None)
-        if user_id:
-            return f"user:{user_id}"
-        return "anonymous"
+        auth = request.headers.get("authorization", "")
+        api_key = request.headers.get("x-api-key", "")
+        if auth.lower().startswith("bearer "):
+            token = auth.split(None, 1)[1].strip()
+            try:
+                from app.core.security import decode_token
+                payload = decode_token(token)
+                return f"user:{payload.get('sub', 'unknown')}"
+            except Exception:
+                return "user:invalid-token"
+        credential = api_key or (auth if auth.lower().startswith(("apikey ", "rel_")) else "")
+        if credential:
+            return "key:" + hashlib.sha256(credential.encode("utf-8")).hexdigest()[:32]
+        client = request.client
+        return f"ip:{client.host if client else 'unknown'}"
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
@@ -120,7 +124,13 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         try:
-            cache_key = f"idempotency:{self._identity(request)}:{idempotency_key}"
+            # The idempotency cache MUST be scoped to the authenticated
+            # principal.  A global `idempotency:{key}` namespace lets tenant A
+            # replay tenant B's cached response (cross-tenant data leak) when
+            # two clients happen to use the same key (e.g. both frontends use
+            # a fixed key for the "create org" flow).
+            principal = self._idempotency_principal(request)
+            cache_key = f"idempotency:{principal}:{idempotency_key}"
             cached_resp = await safe_redis_get(cache_key)
             if cached_resp:
                 data = json.loads(cached_resp)
@@ -171,12 +181,23 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Reliastra backend starting up...")
     get_engine()
-    # FIX 14: the in-process APScheduler was removed from the lifespan — it
-    # duplicated Celery Beat. Check scheduling now lives in the standalone
-    # Redis ZSET scheduler (python -m app.infrastructure.scheduler).
+    # FIX 14 + PaaS support: the old in-process APScheduler (which duplicated
+    # Celery Beat and ran HTTP inside the scan) is gone. When
+    # RUN_IN_PROCESS_SCHEDULER is enabled (single-container PaaS with no
+    # worker fleet), the API process runs the Redis ZSET scheduler in
+    # consume-inline mode — each check executes in its own short
+    # transaction. Atomic ZSET claims make this safe even if a standalone
+    # scheduler or Celery Beat is ALSO running (no double probes).
+    if settings.RUN_IN_PROCESS_SCHEDULER:
+        logger.info(
+            "Starting in-process check scheduler (RUN_IN_PROCESS_SCHEDULER=true)"
+        )
+        start_scheduler(consume_inline=True)
     await seed_first_admin()
     yield
     logger.info("Reliastra backend shutting down...")
+    if settings.RUN_IN_PROCESS_SCHEDULER:
+        stop_scheduler()
     try:
         from app.core.ssrf_protection import close_pinned_transports
         await close_pinned_transports()

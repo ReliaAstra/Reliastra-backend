@@ -3,6 +3,7 @@
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import text
@@ -232,3 +233,72 @@ async def test_dispatch_skipped_when_circuit_open(db_session, fake_redis, monkey
     count = await scheduler.dispatch_due_checks()
     assert count == 0
     assert dispatched == []
+
+
+@pytest.mark.asyncio
+async def test_consume_inline_executes_instead_of_dispatching(
+    db_session, fake_redis, monkeypatch
+):
+    """PaaS fallback (RUN_IN_PROCESS_SCHEDULER): due checks execute in-process,
+    each in its own transaction, instead of being dispatched to Celery."""
+    from app.modules.dependencies.repository import DependencyRepository
+    from app.modules.organizations.repository import OrganizationRepository
+    from app.modules.users.repository import UserRepository
+    from app.core.security import get_password_hash
+
+    user = await UserRepository.create(
+        db_session,
+        email="inline@example.com",
+        password_hash=get_password_hash("password123"),
+        full_name="Inline User",
+    )
+    org = await OrganizationRepository.create(
+        db_session, name="Inline Org", slug=f"org-{uuid.uuid4().hex[:8]}", plan="free"
+    )
+    await OrganizationRepository.add_member(
+        db_session, org_id=org.id, user_id=user.id, role="owner"
+    )
+    dep = await DependencyRepository.create(
+        db_session,
+        org_id=org.id,
+        application_id=None,
+        name="inline-dep",
+        endpoint_url="https://example.com/health",
+        method="GET",
+        headers=None,
+        expected_status_codes=[200],
+        timeout_seconds=10,
+        check_interval_seconds=60,
+        regions=["us-east"],
+    )
+    await db_session.commit()
+
+    await scheduler.enqueue_check(
+        str(dep.id), "us-east", datetime.now(timezone.utc) - timedelta(seconds=1)
+    )
+
+    executed = []
+
+    async def fake_execute_check(session, dependency_id, region):
+        executed.append((str(dependency_id), region))
+        return MagicMock()
+
+    async def should_dispatch_true(*args, **kwargs):
+        return True
+
+    monkeypatch.setattr(
+        "app.core.circuit_breaker.circuit_breaker.should_dispatch",
+        should_dispatch_true,
+    )
+    monkeypatch.setattr(
+        "app.modules.checks.service.check_service.execute_check",
+        fake_execute_check,
+    )
+
+    count = await scheduler.consume_due_checks_inline()
+    assert count == 1
+    assert executed == [(str(dep.id), "us-east")]
+
+    # next_check_at must advance after inline execution (FIX 1).
+    await db_session.refresh(dep)
+    assert dep.next_check_at >= datetime.now(timezone.utc) + timedelta(seconds=55)

@@ -103,13 +103,35 @@ class IncidentService:
         if existing:
             return existing
 
-        incident = await self.repository.create(
-            session=session,
-            org_id=org_id,
-            dependency_id=dependency_id,
-            severity=IncidentSeverity.MAJOR.value,
-            description=error_message,
-        )
+        # Atomic create guarded by the partial unique index
+        # uq_incidents_one_open_per_dependency (0014).  Concurrent region
+        # checks that both read "no open incident" race here; the second
+        # writer hits IntegrityError, rolls back its savepoint and returns
+        # the winner's incident instead of creating a duplicate.
+        from sqlalchemy.exc import IntegrityError
+
+        try:
+            async with session.begin_nested():
+                incident = await self.repository.create(
+                    session=session,
+                    org_id=org_id,
+                    dependency_id=dependency_id,
+                    severity=IncidentSeverity.MAJOR.value,
+                    description=error_message,
+                )
+                await session.flush()
+        except IntegrityError:
+            incident = await self.repository.get_open_for_dependency(
+                session, dependency_id
+            )
+            if incident:
+                logger.info(
+                    "Lost incident creation race for dep %s — reusing existing incident %s",
+                    dependency_id, incident.id,
+                )
+                return incident
+            raise
+
         await self.correlation_strategy.correlate(session, incident)
 
         try:

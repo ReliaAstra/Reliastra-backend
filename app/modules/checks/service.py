@@ -1,5 +1,6 @@
 import time
 import logging
+import urllib.parse
 import uuid
 from datetime import datetime, timezone
 import httpx
@@ -30,6 +31,9 @@ logger = logging.getLogger(__name__)
 # probe. Used for IP-literal targets; hostname targets use the pinned
 # transports from ssrf_protection (which keep their own pooled connections).
 _http_client: httpx.AsyncClient | None = None
+
+# Maximum redirect hops followed by a single check.
+_MAX_REDIRECTS = 5
 
 
 def get_http_client() -> httpx.AsyncClient:
@@ -225,25 +229,51 @@ class CheckService:
 
         start_time = time.time()
         try:
-            if url.lower().startswith("https://") or url.lower().startswith("http://"):
-                # Hostname targets: pin the connection to the validated IP.
-                transport = pinned_transport_for(pinned_target)
+            # Redirects are followed manually instead of via httpx
+            # (follow_redirects) so that EVERY hop is re-validated against
+            # the SSRF policy and pinned to a freshly validated IP (FIX 26).
+            # Vendor endpoints routinely redirect (http->https, www->apex,
+            # CDN routing); blindly following them with a pinned transport
+            # would silently send cross-host requests to the wrong IP. The
+            # hop cap makes a redirect loop a failed check, not an unbounded
+            # request.
+            redirects_followed = 0
+            current_url = url
+            current_target = pinned_target
+            redirect_error: str | None = None
+            while True:
+                transport = pinned_transport_for(current_target)
                 async with httpx.AsyncClient(
                     transport=transport, timeout=timeout
                 ) as client:
                     response = await client.request(
                         method=method,
-                        url=url,
+                        url=current_url,
                         headers=headers,
                     )
-            else:  # pragma: no cover - resolve_pinned_target enforces schemes
-                client = get_http_client()
-                response = await client.request(
-                    method=method, url=url, headers=headers, timeout=timeout
-                )
+                if response.status_code in {301, 302, 303, 307, 308} and response.headers.get("location"):
+                    if redirects_followed >= _MAX_REDIRECTS:
+                        redirect_error = f"Too many redirects (> {_MAX_REDIRECTS})"
+                        break
+                    next_url = urllib.parse.urljoin(
+                        current_url, response.headers["location"]
+                    )
+                    try:
+                        current_target = resolve_pinned_target(next_url)
+                    except ValueError as exc:
+                        redirect_error = f"Redirect blocked by security policy: {exc}"
+                        break
+                    current_url = next_url
+                    redirects_followed += 1
+                    continue
+                break
+
             latency_ms = (time.time() - start_time) * 1000.0
             status_code = response.status_code
-            if response.status_code in expected_codes:
+            if redirect_error:
+                is_up = False
+                error_message = redirect_error
+            elif response.status_code in expected_codes:
                 is_up = True
             else:
                 is_up = False

@@ -15,12 +15,19 @@ APScheduler clone) with a single lightweight async loop:
 
 Claiming uses ``ZRANGEBYSCORE`` + ``ZREM`` (the ``ZREM`` return value is the
 atomic claim), so any number of scheduler replicas can run without double
-dispatch. The scheduler is deliberately runnable standalone:
+dispatch.
 
-    python -m app.infrastructure.scheduler
+Run modes:
 
-The FastAPI lifespan no longer starts it (it must not duplicate the worker
-fleet), which is why docker-compose/Procfile run it as its own process.
+* **Standalone (docker-compose / Procfile):** ``python -m
+  app.infrastructure.scheduler`` — dispatch-only; Celery workers execute the
+  checks.
+* **In-process (single-container PaaS, no worker fleet):**
+  ``RUN_IN_PROCESS_SCHEDULER=true`` makes the FastAPI lifespan start the
+  same poller in *consume-inline* mode: due entries are executed inside the
+  API process, each check in its own short-lived session/transaction (never
+  inside the scan). The two modes can even coexist — atomic ZREM claims make
+  double-probes impossible.
 """
 
 from __future__ import annotations
@@ -217,33 +224,107 @@ async def dispatch_due_checks(
     return dispatched
 
 
-async def _tick(now: datetime | None = None) -> None:
-    """One scheduler tick: dispatch due entries from the ZSET queue."""
+async def consume_due_checks_inline(
+    now: datetime | None = None, limit: int = DISPATCH_BATCH_LIMIT
+) -> int:
+    """Execute due checks inside the current process (PaaS fallback mode).
+
+    Each check runs in its own short-lived session with a per-check commit
+    (FIX 4: HTTP never runs inside a long-held transaction). The circuit
+    breaker is consulted exactly like the Celery dispatch path, and
+    ``next_check_at`` is advanced afterwards in one batch UPDATE.
+    """
+    import uuid as uuid_mod
+
+    from app.core.circuit_breaker import circuit_breaker
+    from app.db.session import get_session_maker
+    from app.modules.checks.service import check_service
+
+    due = await pop_due_checks(now=now, limit=limit)
+    executed_ids: list[str] = []
+    executed = 0
+    session_maker = get_session_maker()
+    for dependency_id, region in due:
+        try:
+            allowed = await circuit_breaker.should_dispatch(dependency_id)
+            if not allowed:
+                logger.info(
+                    "Circuit open for dependency %s — skipping inline check (region=%s)",
+                    dependency_id,
+                    region,
+                )
+                continue
+            async with session_maker() as session:
+                try:
+                    await check_service.execute_check(
+                        session, uuid_mod.UUID(dependency_id), region
+                    )
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
+                    raise
+            executed += 1
+            if dependency_id not in executed_ids:
+                executed_ids.append(dependency_id)
+        except Exception as exc:
+            logger.warning(
+                "Inline check failed dep=%s region=%s: %s — requeueing",
+                dependency_id,
+                region,
+                exc,
+            )
+            requeue_at = datetime.now(timezone.utc).timestamp() + REDISPATCH_DELAY_SECONDS
+            try:
+                from app.infrastructure.redis_client import get_redis
+
+                await get_redis().zadd(
+                    CHECK_QUEUE_KEY,
+                    {_member(dependency_id, region): requeue_at},
+                )
+            except Exception:
+                pass  # next scan will re-enqueue it anyway
+
+    if executed:
+        logger.info("Scheduler: executed %s checks inline", executed)
+    await _advance_next_check_at(executed_ids)
+    return executed
+
+
+async def _tick(now: datetime | None = None, consume_inline: bool = False) -> None:
+    """One scheduler tick: dispatch (or execute) due entries from the queue."""
     current = now or datetime.now(timezone.utc)
     try:
-        await dispatch_due_checks(now=current)
+        if consume_inline:
+            await consume_due_checks_inline(now=current)
+        else:
+            await dispatch_due_checks(now=current)
     except Exception:
-        logger.exception("dispatch_due_checks failed")
+        logger.exception("Scheduler tick failed (inline=%s)", consume_inline)
 
 
-async def run_scheduler(stop_event: asyncio.Event | None = None) -> None:
+async def run_scheduler(
+    stop_event: asyncio.Event | None = None, consume_inline: bool = False
+) -> None:
     """Run the scheduler loop until *stop_event* is set.
 
     * Every 5s (``POLL_INTERVAL_SECONDS``): pop due entries from the Redis
-      ZSET and fire ``execute_check.delay(...)``.
+      ZSET and fire ``execute_check.delay(...)`` — or, when
+      ``consume_inline`` is set (single-container PaaS), execute them in
+      this process.
     * Every 30s (``SCAN_INTERVAL_SECONDS``): scan PostgreSQL for newly due
       dependencies and refill the queue.
     """
     logger.info(
-        "Check queue scheduler started (poll=%ss scan=%ss queue=%s)",
+        "Check queue scheduler started (poll=%ss scan=%ss queue=%s inline=%s)",
         POLL_INTERVAL_SECONDS,
         SCAN_INTERVAL_SECONDS,
         CHECK_QUEUE_KEY,
+        consume_inline,
     )
     stop = stop_event or asyncio.Event()
     ticks = 0
     while not stop.is_set():
-        await _tick()
+        await _tick(consume_inline=consume_inline)
         ticks += 1
         if ticks % 6 == 0:
             # Scan the DB roughly every SCAN_INTERVAL_SECONDS (6 ticks x 5s).
@@ -257,11 +338,11 @@ async def run_scheduler(stop_event: asyncio.Event | None = None) -> None:
             continue
 
 
-def start_scheduler() -> asyncio.Task | None:
+def start_scheduler(consume_inline: bool = False) -> asyncio.Task | None:
     """Start the scheduler as a background task on the running event loop.
 
-    Used by tests and process entrypoints. The FastAPI lifespan deliberately
-    does NOT call this (see module docstring).
+    The FastAPI lifespan calls this only when ``RUN_IN_PROCESS_SCHEDULER`` is
+    enabled (single-container PaaS), in ``consume_inline`` mode.
     """
     global _scheduler_task, _stop_event
     if _scheduler_task is not None and not _scheduler_task.done():
@@ -273,7 +354,9 @@ def start_scheduler() -> asyncio.Task | None:
     except RuntimeError:
         logger.warning("start_scheduler() requires a running event loop")
         return None
-    _scheduler_task = loop.create_task(run_scheduler(_stop_event))
+    _scheduler_task = loop.create_task(
+        run_scheduler(_stop_event, consume_inline=consume_inline)
+    )
     return _scheduler_task
 
 

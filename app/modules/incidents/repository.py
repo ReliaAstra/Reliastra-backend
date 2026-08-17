@@ -46,7 +46,10 @@ class IncidentRepository:
             Incident.status == IncidentStatus.OPEN.value,
         )
         result = await session.execute(query)
-        return result.scalar_one_or_none()
+        # `.first()` instead of `.scalar_one_or_none()`: legacy duplicate open
+        # incidents (pre-0014) would raise MultipleResultsFound and crash the
+        # quorum path.  The partial unique index now prevents new duplicates.
+        return result.scalars().first()
 
     @staticmethod
     async def list_for_org(
