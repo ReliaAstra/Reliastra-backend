@@ -18,9 +18,23 @@ class ApiKeyRepository:
     async def get_by_hashed_key(
         session: AsyncSession, hashed_key: str
     ) -> ApiKey | None:
+        """Exact-match lookup — only valid for deterministic hashes (legacy
+        SHA-256). bcrypt hashes must be located via ``list_by_prefix``."""
         query = select(ApiKey).where(ApiKey.hashed_key == hashed_key)
         result = await session.execute(query)
         return result.scalar_one_or_none()
+
+    @staticmethod
+    async def list_by_prefix(
+        session: AsyncSession, prefix: str
+    ) -> list[ApiKey]:
+        query = (
+            select(ApiKey)
+            .where(ApiKey.prefix == prefix)
+            .order_by(ApiKey.created_at.desc())
+        )
+        result = await session.execute(query)
+        return list(result.scalars().all())
 
     @staticmethod
     async def list_for_org(
@@ -66,3 +80,29 @@ class ApiKeyRepository:
         api_key.last_used_at = datetime.now(timezone.utc)
         session.add(api_key)
         await session.flush()
+
+    @staticmethod
+    async def update_last_used_batch(
+        session: AsyncSession,
+        timestamps: dict[uuid.UUID, datetime],
+    ) -> int:
+        """Set ``last_used_at`` for many keys at once (FIX 21 flush path).
+
+        Uses ``greatest`` so a newer value already in the DB is never
+        overwritten by an older Redis timestamp.
+        """
+        from sqlalchemy import case, func, update
+
+        if not timestamps:
+            return 0
+        whens = [
+            (ApiKey.id == key_id, func.greatest(ApiKey.last_used_at, value))
+            for key_id, value in timestamps.items()
+        ]
+        stmt = (
+            update(ApiKey)
+            .where(ApiKey.id.in_([key_id for key_id in timestamps]))
+            .values(last_used_at=case(*whens, else_=ApiKey.last_used_at))
+        )
+        result = await session.execute(stmt)
+        return int(result.rowcount or 0)

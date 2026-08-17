@@ -93,6 +93,8 @@ async def get_current_user(
         request.state.api_key_org_id = api_key.org_id
         request.state.api_key_scopes = api_key.scopes
         request.state.current_role = Role.ADMIN.value
+        # FIX 7/36: authenticated principal for idempotency scoping & tracing.
+        request.state.user_id = f"apikey:{api_key.id}"
 
         required_scope = getattr(request.state, "required_scope", None)
         required_scope = required_scope or _infer_scope(request)
@@ -130,6 +132,8 @@ async def get_current_user(
             raise UnauthorizedException("User not found or disabled")
 
         request.state.auth_method = "jwt"
+        # FIX 7/36: authenticated principal for idempotency scoping & tracing.
+        request.state.user_id = str(user.id)
         return user
 
     raise UnauthorizedException("Authentication required (Bearer token or X-API-Key header)")

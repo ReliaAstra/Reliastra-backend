@@ -58,6 +58,7 @@ async def test_engine(setup_test_db_server: str) -> AsyncGenerator[AsyncEngine, 
     async with engine.begin() as conn:
         for table in [
             "audit_logs",
+            "observation_outbox",
             "refresh_tokens",
             "api_keys",
             "alert_configs",
@@ -85,6 +86,12 @@ async def mock_redis() -> AsyncGenerator[fakeredis.aioredis.FakeRedis, None]:
     set_test_redis(fake_redis)
     yield fake_redis
     await fake_redis.close()
+
+
+@pytest_asyncio.fixture(scope="function")
+async def fake_redis(mock_redis: fakeredis.aioredis.FakeRedis) -> AsyncGenerator[fakeredis.aioredis.FakeRedis, None]:
+    """Alias for the autouse fakeredis fixture (kept for explicit tests)."""
+    yield mock_redis
 
 
 @pytest_asyncio.fixture(scope="function")

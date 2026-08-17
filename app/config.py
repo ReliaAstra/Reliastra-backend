@@ -120,6 +120,11 @@ class Settings(BaseSettings):
         default="development",
         description="Current environment (development, staging, production)",
     )
+    TRUSTED_PROXY_HOPS: int = Field(
+        default=1,
+        description="Number of trusted reverse-proxy hops used when parsing "
+                    "X-Forwarded-For for rate limiting",
+    )
 
     @property
     def database_url_with_ssl(self) -> str:

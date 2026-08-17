@@ -281,9 +281,11 @@ async def verify_transaction(
 @router.post("/billing/webhook", response_model=PaystackWebhookResponse)
 async def paystack_webhook(
     request: Request,
-    x_paystack_signature: str | None = Header(
-        default=None, alias="x-paystack-signature"
-    ),
+    # FIX 10: the Paystack signature header is mandatory (OpenAPI
+    # `required: true`). Requests without it are rejected by FastAPI with a
+    # 422 before reaching the handler; the service re-checks for defense in
+    # depth and verifies the HMAC-SHA512.
+    x_paystack_signature: str = Header(alias="x-paystack-signature"),
     db: AsyncSession = Depends(get_db),
     service: BillingService = Depends(get_bill_service),
 ) -> PaystackWebhookResponse:

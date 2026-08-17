@@ -1,15 +1,46 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import time
 import logging
 from fastapi import Request
+from app.config import settings
 from app.core.exceptions import RateLimitExceededException
 
 logger = logging.getLogger(__name__)
 
 # Hard ceiling on any single Redis pipeline call (seconds).
 _RATE_LIMIT_REDIS_TIMEOUT = 2.0
+
+# Maximum trusted proxy hops honored from X-Forwarded-For. The immediate
+# reverse proxy appends one entry; deeper client-supplied entries are ignored
+# so clients cannot spoof arbitrary IPs past the proxy.
+_TRUSTED_PROXY_HOPS = getattr(settings, "TRUSTED_PROXY_HOPS", 1)
+
+
+def client_ip_from_request(request: Request) -> str:
+    """Return the client IP for rate limiting / audit purposes.
+
+    Load balancers terminate TLS, so ``request.client.host`` is the LB's IP
+    and every tenant would share one rate-limit bucket. Instead we read
+    ``X-Forwarded-For`` and take the entry added by the *last trusted hop*
+    (rightmost position), validating it is a real IP address before trusting
+    it. If the header is missing or malformed we fall back to the socket peer
+    address.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        hops = [part.strip() for part in forwarded.split(",") if part.strip()]
+        if hops:
+            candidate = hops[-1] if len(hops) <= _TRUSTED_PROXY_HOPS else hops[-_TRUSTED_PROXY_HOPS]
+            try:
+                ipaddress.ip_address(candidate)
+                return candidate
+            except ValueError:
+                logger.debug("Ignoring invalid X-Forwarded-For entry: %r", candidate)
+    client = request.client
+    return client.host if client else "unknown_ip"
 
 
 class SlidingWindowRateLimiter:
@@ -83,6 +114,5 @@ public_vendor_limiter = SlidingWindowRateLimiter(limit=60, window_seconds=60, ke
 
 async def enforce_rate_limit(request: Request, limiter: SlidingWindowRateLimiter, identifier: str | None = None) -> None:
     if identifier is None:
-        client = request.client
-        identifier = client.host if client else "unknown_ip"
+        identifier = client_ip_from_request(request)
     await limiter.check(identifier)

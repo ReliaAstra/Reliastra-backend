@@ -69,6 +69,34 @@ async def safe_redis_setex(key: str, seconds: int, value: str, timeout: float = 
         return False
 
 
+async def safe_redis_set_nx(key: str, value: str, ex: int | None = None, timeout: float = 2.0) -> bool:
+    """SET NX wrapper — returns True when the key was newly created.
+
+    Used for idempotent claims (webhook event dedupe, half-open probes,
+    alert dedupe). Returns False on Redis failure (callers decide whether to
+    fail open).
+    """
+    try:
+        redis = get_redis()
+        result = await asyncio.wait_for(
+            redis.set(key, value, nx=True, ex=ex), timeout=timeout
+        )
+        return bool(result)
+    except Exception:
+        logger.debug("safe_redis_set_nx failed for key=%s", key, exc_info=True)
+        return False
+
+
+async def safe_redis_incr(key: str, timeout: float = 2.0) -> int | None:
+    """INCR wrapper — returns the new value, or None on Redis failure."""
+    try:
+        redis = get_redis()
+        return int(await asyncio.wait_for(redis.incr(key), timeout=timeout))
+    except Exception:
+        logger.debug("safe_redis_incr failed for key=%s", key, exc_info=True)
+        return None
+
+
 async def safe_redis_ping(timeout: float = 2.0) -> bool:
     """Ping Redis with asyncio timeout. Returns True if reachable."""
     try:

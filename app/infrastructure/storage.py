@@ -1,13 +1,21 @@
 import io
-import os
 import logging
-import tempfile
 from typing import Any
 from urllib.parse import urlparse
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class StorageError(RuntimeError):
+    """Raised when object storage is unavailable or an operation fails.
+
+    FIX 35: there is deliberately NO local-filesystem fallback. Silently
+    writing evidence artifacts to ``/tmp`` (and returning success) loses data
+    that SLA reports depend on. Callers (Celery tasks) let the exception
+    propagate so the task retries until the object store is healthy again.
+    """
 
 # ---------------------------------------------------------------------------
 # Determine whether the configured endpoint needs boto3 (path-style / S3
@@ -57,10 +65,6 @@ class StorageClient:
         self._backend: str = "none"  # "boto3" | "minio" | "none"
         self._boto3_client: Any = None
         self._minio_client: Any = None
-        self._local_fallback_dir: str = os.path.join(
-            tempfile.gettempdir(), "reliastra_storage"
-        )
-        os.makedirs(self._local_fallback_dir, exist_ok=True)
         self._init_client()
 
     # ------------------------------------------------------------------
@@ -128,16 +132,20 @@ class StorageClient:
     # Bucket helpers
     # ------------------------------------------------------------------
 
-    def ensure_bucket_exists(self) -> bool:
+    def ensure_bucket_exists(self) -> None:
+        """Verify (and create, if missing) the target bucket. Raises
+        ``StorageError`` when the object store is unusable (FIX 35)."""
         if self._backend == "none":
-            return True
+            raise StorageError(
+                "Object storage client is not initialized — "
+                "check MINIO_ENDPOINT / MINIO credentials"
+            )
         try:
             if self._backend == "boto3":
                 self._boto3_client.head_bucket(Bucket=self.bucket)
             else:
                 if not self._minio_client.bucket_exists(self.bucket):
                     self._minio_client.make_bucket(self.bucket)
-            return True
         except Exception as exc:
             # Bucket missing (404) — attempt to create it. Only the boto3
             # backend exposes ``exceptions.ClientError``; guarding on the
@@ -149,15 +157,12 @@ class StorageClient:
                 if isinstance(exc, client_error):
                     try:
                         self._boto3_client.create_bucket(Bucket=self.bucket)
-                        return True
+                        return
                     except Exception as create_exc:
-                        logger.warning(
-                            "S3 bucket creation failed, using local fallback: %s",
-                            create_exc,
-                        )
-                        return False
-            logger.warning("S3 bucket check failed, using local fallback: %s", exc)
-            return False
+                        raise StorageError(
+                            f"S3 bucket creation failed: {create_exc}"
+                        ) from create_exc
+            raise StorageError(f"S3 bucket check failed: {exc}") from exc
 
     # ------------------------------------------------------------------
     # Upload
@@ -169,39 +174,35 @@ class StorageClient:
         object_name: str,
         content_type: str = "application/pdf",
     ) -> str:
-        if self.ensure_bucket_exists() and self.client:
-            try:
-                if self._backend == "boto3":
-                    self._boto3_client.put_object(
-                        Bucket=self.bucket,
-                        Key=object_name,
-                        Body=data,
-                        ContentType=content_type,
-                    )
-                else:
-                    self._minio_client.put_object(
-                        bucket_name=self.bucket,
-                        object_name=object_name,
-                        data=io.BytesIO(data),
-                        length=len(data),
-                        content_type=content_type,
-                    )
-                logger.info(
-                    "Uploaded object '%s' to bucket '%s' via %s",
-                    object_name,
-                    self.bucket,
-                    self._backend,
+        # FIX 35: raise on any storage failure — no silent local fallback.
+        self.ensure_bucket_exists()
+        try:
+            if self._backend == "boto3":
+                self._boto3_client.put_object(
+                    Bucket=self.bucket,
+                    Key=object_name,
+                    Body=data,
+                    ContentType=content_type,
                 )
-                return object_name
-            except Exception as exc:
-                logger.warning("S3 upload failed, falling back to local: %s", exc)
-
-        # Local filesystem fallback
-        local_path = os.path.join(self._local_fallback_dir, object_name.replace("/", "_"))
-        with open(local_path, "wb") as f:
-            f.write(data)
-        logger.info("Uploaded object '%s' to local fallback '%s'", object_name, local_path)
-        return object_name
+            else:
+                self._minio_client.put_object(
+                    bucket_name=self.bucket,
+                    object_name=object_name,
+                    data=io.BytesIO(data),
+                    length=len(data),
+                    content_type=content_type,
+                )
+            logger.info(
+                "Uploaded object '%s' to bucket '%s' via %s",
+                object_name,
+                self.bucket,
+                self._backend,
+            )
+            return object_name
+        except Exception as exc:
+            raise StorageError(
+                f"Upload of '{object_name}' failed: {exc}"
+            ) from exc
 
     def upload_file(
         self,
@@ -218,27 +219,24 @@ class StorageClient:
     # ------------------------------------------------------------------
 
     def download_bytes(self, object_name: str) -> bytes:
-        if self.ensure_bucket_exists() and self.client:
-            try:
-                if self._backend == "boto3":
-                    response = self._boto3_client.get_object(
-                        Bucket=self.bucket, Key=object_name
-                    )
-                    data = response["Body"].read()
-                else:
-                    response = self._minio_client.get_object(self.bucket, object_name)
-                    data = response.read()
-                    response.close()
-                    response.release_conn()
-                return data
-            except Exception as exc:
-                logger.warning("S3 download failed, trying local fallback: %s", exc)
-
-        local_path = os.path.join(self._local_fallback_dir, object_name.replace("/", "_"))
-        if os.path.exists(local_path):
-            with open(local_path, "rb") as f:
-                return f.read()
-        raise FileNotFoundError(f"Object {object_name} not found in storage.")
+        # FIX 35: raise on any storage failure — no silent local fallback.
+        self.ensure_bucket_exists()
+        try:
+            if self._backend == "boto3":
+                response = self._boto3_client.get_object(
+                    Bucket=self.bucket, Key=object_name
+                )
+                data = response["Body"].read()
+            else:
+                response = self._minio_client.get_object(self.bucket, object_name)
+                data = response.read()
+                response.close()
+                response.release_conn()
+            return data
+        except Exception as exc:
+            raise StorageError(
+                f"Download of '{object_name}' failed: {exc}"
+            ) from exc
 
     def download_file(self, object_name: str, dest_path: str) -> None:
         data = self.download_bytes(object_name)
@@ -252,28 +250,28 @@ class StorageClient:
     def get_presigned_url(
         self, object_name: str, expires_seconds: int = 3600
     ) -> str:
-        if self.ensure_bucket_exists() and self.client:
-            try:
-                if self._backend == "boto3":
-                    url = self._boto3_client.generate_presigned_url(
-                        "get_object",
-                        Params={"Bucket": self.bucket, "Key": object_name},
-                        ExpiresIn=expires_seconds,
-                    )
-                else:
-                    from datetime import timedelta
+        # FIX 35: raise on any storage failure — no fake local preview URLs.
+        self.ensure_bucket_exists()
+        try:
+            if self._backend == "boto3":
+                url = self._boto3_client.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": self.bucket, "Key": object_name},
+                    ExpiresIn=expires_seconds,
+                )
+            else:
+                from datetime import timedelta
 
-                    url = self._minio_client.presigned_get_object(
-                        self.bucket,
-                        object_name,
-                        expires=timedelta(seconds=expires_seconds),
-                    )
-                return str(url)
-            except Exception as exc:
-                logger.warning("S3 presigned URL failed: %s", exc)
-
-        # Return mock / local preview URL for fallback/testing
-        return f"http://localhost:8000/v1/storage/download/{object_name}"
+                url = self._minio_client.presigned_get_object(
+                    self.bucket,
+                    object_name,
+                    expires=timedelta(seconds=expires_seconds),
+                )
+            return str(url)
+        except Exception as exc:
+            raise StorageError(
+                f"Presigned URL generation for '{object_name}' failed: {exc}"
+            ) from exc
 
 
 storage_client = StorageClient()

@@ -1,6 +1,8 @@
 import json
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -83,10 +85,86 @@ class VendorService:
         return seeded_count
 
     async def list_public_vendors(
-        self, session: AsyncSession
+        self, session: AsyncSession, limit: int = 50, cursor: uuid.UUID | None = None
     ) -> list[VendorResponse]:
-        vendors = await self.repository.list_public(session)
+        vendors = await self.repository.list_public(
+            session, limit=limit, cursor=cursor
+        )
         return [VendorResponse.model_validate(vendor) for vendor in vendors]
+
+    async def get_vendor_details_bulk(
+        self, session: AsyncSession
+    ) -> list[VendorDetailResponse]:
+        """FIX 22: build the vendor status board with 2 queries total.
+
+        One query for all public vendors, one batched query for the latest
+        observations across every vendor endpoint — instead of N vendors ×
+        detail calls.
+        """
+        vendors = await self.repository.list_public(session)
+        if not vendors:
+            return []
+
+        # Collect every endpoint URL (deduplicated) and the legacy base URLs.
+        url_to_vendor: dict[str, str] = {}
+        all_urls: list[str] = []
+        for vendor in vendors:
+            endpoints = await self.repository.list_vendor_endpoints(
+                session, vendor.vendor_name
+            )
+            urls = list(
+                dict.fromkeys(
+                    [vendor.endpoint_url]
+                    + [endpoint.endpoint_url for endpoint in endpoints]
+                )
+            )
+            for url in urls:
+                url_to_vendor.setdefault(url, vendor.vendor_name)
+                all_urls.append(url)
+
+        observations = await ObservationRepository.list_for_endpoints(
+            session, all_urls, limit=200
+        )
+        latest_by_url: dict[str, Any] = {}
+        for obs in observations:
+            if obs.endpoint_url not in latest_by_url:
+                latest_by_url[obs.endpoint_url] = obs
+
+        result: list[VendorDetailResponse] = []
+        for vendor in vendors:
+            data = VendorResponse.model_validate(vendor).model_dump()
+            vendor_obs = [
+                obs
+                for url, obs in latest_by_url.items()
+                if url_to_vendor.get(url) == vendor.vendor_name
+            ]
+            if vendor_obs:
+                data["recent_status"] = (
+                    "degraded"
+                    if any(
+                        item.error_type or item.status_code is None
+                        for item in vendor_obs
+                    )
+                    else "operational"
+                )
+            else:
+                # During dual-write rollout, preserve status visibility for legacy rows.
+                legacy = await CheckRepository.get_vendor_recent_status(
+                    session, vendor.endpoint_url, limit=5
+                )
+                data["recent_status"] = (
+                    "operational"
+                    if legacy and all(item.is_up for item in legacy)
+                    else "degraded" if legacy else "unknown"
+                )
+            data["endpoints"] = [
+                VendorEndpointResponse.model_validate(endpoint)
+                for endpoint in await self.repository.list_vendor_endpoints(
+                    session, vendor.vendor_name
+                )
+            ]
+            result.append(VendorDetailResponse.model_validate(data))
+        return result
 
     async def _vendor_and_urls(self, session: AsyncSession, vendor_name: str):
         vendor = await self.repository.get_by_name(session, vendor_name)

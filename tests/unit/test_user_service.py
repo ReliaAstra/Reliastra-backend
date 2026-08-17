@@ -18,6 +18,8 @@ async def test_get_profile_success():
         full_name="Test User",
         is_active=True,
         is_superuser=False,
+        avatar_url=None,
+        auth_provider=None,
         created_at=now,
         updated_at=now,
     )
@@ -54,6 +56,8 @@ async def test_update_profile_success():
         full_name="Old Name",
         is_active=True,
         is_superuser=False,
+        avatar_url=None,
+        auth_provider=None,
         created_at=now,
         updated_at=now,
     )
@@ -64,6 +68,8 @@ async def test_update_profile_success():
         email="newemail@reliastra.com",
         full_name="New Name",
         is_active=True,
+        avatar_url=None,
+        auth_provider=None,
         is_superuser=False,
         created_at=now,
         updated_at=now,

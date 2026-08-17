@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.pagination import CursorPagination
 from app.dependencies import get_current_org
 from app.db.session import get_db
 from app.modules.dashboard.schemas import (
@@ -88,14 +89,30 @@ async def get_dependency_health(
     return await service.get_dependency_health(db, org_id)
 
 
-@router.get("/incident-timeline", response_model=list[IncidentDetailResponse])
+@router.get(
+    "/incident-timeline",
+    response_model=CursorPagination[IncidentDetailResponse],
+)
 async def get_incident_timeline(
     org_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: DashboardService = Depends(get_dash_service),
-) -> list[IncidentDetailResponse]:
-    return await service.get_incident_timeline(db, org_id)
+    cursor: uuid.UUID | None = Query(
+        default=None, description="Incident id of the last item on the previous page"
+    ),
+    limit: int = Query(default=20, ge=1, le=100),
+) -> CursorPagination[IncidentDetailResponse]:
+    """FIX 17: cursor-paginated incident timeline."""
+    rows = await service.get_incident_timeline(
+        db, org_id, limit=limit + 1, cursor=cursor
+    )
+    has_more = len(rows) > limit
+    items = rows[:limit]
+    next_cursor = str(items[-1].id) if has_more and items else None
+    return CursorPagination(
+        items=items, next_cursor=next_cursor, has_more=has_more
+    )
 
 
 @router.get("/vendor-status", response_model=list[VendorDetailResponse])

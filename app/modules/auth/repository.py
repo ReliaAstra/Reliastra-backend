@@ -1,7 +1,7 @@
 import hashlib
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.auth.models import (
     RefreshToken,
@@ -23,11 +23,15 @@ class AuthRepository:
         user_id: uuid.UUID,
         token_str: str,
         expires_at: datetime,
+        token_family: uuid.UUID | None = None,
+        token_sequence: int = 1,
     ) -> RefreshToken:
         token_hash = AuthRepository._hash_token(token_str)
         rt = RefreshToken(
             user_id=user_id,
             token_hash=token_hash,
+            token_family=token_family or uuid.uuid4(),
+            token_sequence=token_sequence,
             expires_at=expires_at,
             is_revoked=False,
         )
@@ -43,6 +47,33 @@ class AuthRepository:
         query = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
         result = await session.execute(query)
         return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_latest_sequence(
+        session: AsyncSession, token_family: uuid.UUID
+    ) -> int:
+        query = select(func.max(RefreshToken.token_sequence)).where(
+            RefreshToken.token_family == token_family
+        )
+        result = await session.execute(query)
+        return int(result.scalar() or 0)
+
+    @staticmethod
+    async def revoke_family(
+        session: AsyncSession, token_family: uuid.UUID
+    ) -> int:
+        """Revoke every token in a family (FIX 28 reuse detection)."""
+        query = select(RefreshToken).where(
+            RefreshToken.token_family == token_family
+        )
+        result = await session.execute(query)
+        count = 0
+        for rt in result.scalars():
+            rt.is_revoked = True
+            session.add(rt)
+            count += 1
+        await session.flush()
+        return count
 
     @staticmethod
     async def revoke_refresh_token(

@@ -322,6 +322,40 @@ class BillingService:
             verified=True, plan=plan, reference=reference
         )
 
+    @staticmethod
+    def _webhook_event_id(payload: dict[str, Any]) -> str | None:
+        """Stable per-event identifier for idempotency (FIX 31)."""
+        data = payload.get("data")
+        data = data if isinstance(data, dict) else {}
+        event_type = str(payload.get("event", ""))
+        event_id = (
+            data.get("id")
+            or data.get("event_id")
+            or data.get("reference")
+            or data.get("subscription_code")
+        )
+        if not event_type or not event_id:
+            return None
+        return f"{event_type}:{event_id}"
+
+    async def _claim_webhook_event(self, event_id: str) -> bool:
+        """Return True when this process should process *event_id*.
+
+        Uses a Redis SET-NX with a 24h TTL so Paystack retries (which resend
+        the same event) never double-process ``charge.success``. Redis
+        failures fail open (the webhook is processed) rather than dropping
+        payments.
+        """
+        try:
+            from app.infrastructure.redis_client import safe_redis_set_nx
+
+            claimed = await safe_redis_set_nx(
+                f"paystack:event:{event_id}", "1", ex=24 * 3600
+            )
+            return bool(claimed)
+        except Exception:
+            return True
+
     async def handle_webhook(
         self,
         session: AsyncSession,
@@ -348,6 +382,12 @@ class BillingService:
         data = payload.get("data")
         data = data if isinstance(data, dict) else {}
         logger.info("Received verified Paystack webhook: %s", event_type)
+
+        # FIX 31: idempotency — skip events already processed in the last 24h.
+        event_id = self._webhook_event_id(payload)
+        if event_id and not await self._claim_webhook_event(event_id):
+            logger.info("Skipping duplicate Paystack webhook event %s", event_id)
+            return PaystackWebhookResponse(received=True, event_type=event_type)
 
         if event_type == "charge.success" and data.get("reference"):
             await self.verify_transaction(session, str(data["reference"]))

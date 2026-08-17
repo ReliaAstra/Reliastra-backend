@@ -1,12 +1,19 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, ForeignKey, DateTime, Boolean
+from sqlalchemy import String, ForeignKey, DateTime, Boolean, Integer
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base, UUIDMixin
 
 
 class RefreshToken(UUIDMixin, Base):
-    """Stores refresh token hashes for JWT session management."""
+    """Stores refresh token hashes for JWT session management.
+
+    FIX 28: every token belongs to a ``token_family`` (a UUID created at
+    login/register) and carries a monotonically increasing ``token_sequence``.
+    Using a token whose sequence is below the family's latest sequence proves
+    replay/theft — the entire family is revoked.
+    """
 
     __tablename__ = "refresh_tokens"
 
@@ -17,6 +24,15 @@ class RefreshToken(UUIDMixin, Base):
     )
     token_hash: Mapped[str] = mapped_column(
         String(64), unique=True, index=True, nullable=False
+    )
+    token_family: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        default=uuid.uuid4,
+        nullable=False,
+        index=True,
+    )
+    token_sequence: Mapped[int] = mapped_column(
+        Integer, default=1, nullable=False
     )
     is_revoked: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False

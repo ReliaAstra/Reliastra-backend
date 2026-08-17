@@ -1,12 +1,15 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from app.core.permissions import Plan, Role
 
 
 class OrganizationCreateRequest(BaseModel):
     name: str
-    slug: str | None = None
+    # FIX 34: slug validation — lowercase letters, digits and hyphens only.
+    slug: str | None = Field(
+        default=None, pattern=r"^[a-z0-9-]+$", min_length=1, max_length=50
+    )
 
 
 class OrganizationUpdateRequest(BaseModel):

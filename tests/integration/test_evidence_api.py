@@ -2,9 +2,20 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_evidence_endpoints(async_client, auth_data, db_session):
+async def test_evidence_endpoints(async_client, auth_data, db_session, mocker):
     headers = auth_data["headers"]
     org_id = auth_data["org_id"]
+
+    # FIX 35: the storage client now raises on S3 failures (no local
+    # fallback), so tests stub the uploads instead of relying on /tmp.
+    mocker.patch(
+        "app.modules.evidence.service.storage_client.upload_bytes",
+        return_value="evidence/x.pdf",
+    )
+    mocker.patch(
+        "app.modules.evidence.service.storage_client.get_presigned_url",
+        return_value="http://storage.test/evidence/x.pdf",
+    )
 
     # Create dep + incident + evidence
     dep_res = await async_client.post(

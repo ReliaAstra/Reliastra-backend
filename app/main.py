@@ -1,15 +1,19 @@
+import hashlib
 import json
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from starlette.concurrency import iterate_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from app.config import settings
 from app.core.exceptions import setup_exception_handlers
+from app.core.request_context import request_id_var, set_request_id
 from app.db.session import get_engine
 from app.infrastructure.redis_client import (
     close_redis,
@@ -17,7 +21,6 @@ from app.infrastructure.redis_client import (
     safe_redis_ping,
     safe_redis_setex,
 )
-from app.infrastructure.scheduler import start_scheduler, stop_scheduler
 from app.modules.agencies.router import router as agencies_router
 from app.modules.ai_integration.router import router as ai_providers_router
 from app.modules.api_keys.router import router as api_keys_router
@@ -47,6 +50,11 @@ from app.modules.admin.seed import seed_first_admin
 
 logger = logging.getLogger(__name__)
 
+# FIX 13: /health/ready results are cached for 5 seconds so K8s probe storms
+# during an outage do not multiply DB/Redis load.
+_READY_CACHE_TTL_SECONDS = 5.0
+_ready_cache: dict[str, Any] = {"ts": 0.0, "payload": None}
+
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
     """Injects a unique X-Request-ID into every incoming request for distributed tracing."""
@@ -56,7 +64,13 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
         request.state.request_id = request_id
-        response = await call_next(request)
+        # FIX 36: propagate the request id into the context var so Celery
+        # task dispatches made from service code can pass it along.
+        token = set_request_id(request_id)
+        try:
+            response = await call_next(request)
+        finally:
+            request_id_var.reset(token)
         response.headers["X-Request-ID"] = request_id
         return response
 
@@ -69,6 +83,35 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         "transfer-encoding", "upgrade", "content-encoding",
     }
 
+    # FIX 40: deterministic error responses are cacheable too (409 conflict,
+    # 422 validation, 404 not found). 5xx responses are never cached so
+    # transient infrastructure failures are not frozen for 24 hours.
+    @staticmethod
+    def _is_cacheable_status(status_code: int) -> bool:
+        return 200 <= status_code < 300 or status_code in {404, 409, 422}
+
+    @staticmethod
+    def _identity(request: Request) -> str:
+        """FIX 7: scope the idempotency cache by the authenticated principal.
+
+        The middleware runs before auth dependencies, so the principal is
+        derived from the credentials in the request itself (API key hash or
+        JWT hash) — two different users can therefore never observe each
+        other's cached responses.
+        """
+        api_key = request.headers.get("x-api-key", "").strip()
+        if api_key:
+            digest = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
+            return f"apikey:{digest}"
+        auth = request.headers.get("authorization", "").strip()
+        if auth:
+            digest = hashlib.sha256(auth.encode("utf-8")).hexdigest()[:16]
+            return f"jwt:{digest}"
+        user_id = getattr(request.state, "user_id", None)
+        if user_id:
+            return f"user:{user_id}"
+        return "anonymous"
+
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
@@ -77,7 +120,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         try:
-            cache_key = f"idempotency:{idempotency_key}"
+            cache_key = f"idempotency:{self._identity(request)}:{idempotency_key}"
             cached_resp = await safe_redis_get(cache_key)
             if cached_resp:
                 data = json.loads(cached_resp)
@@ -89,7 +132,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                 )
 
             response = await call_next(request)
-            if 200 <= response.status_code < 300:
+            if self._is_cacheable_status(response.status_code):
                 body = [section async for section in response.body_iterator]
                 response.body_iterator = iterate_in_threadpool(iter(body))  # type: ignore
                 content = b"".join(body).decode("utf-8")
@@ -128,11 +171,27 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Reliastra backend starting up...")
     get_engine()
-    start_scheduler()
+    # FIX 14: the in-process APScheduler was removed from the lifespan — it
+    # duplicated Celery Beat. Check scheduling now lives in the standalone
+    # Redis ZSET scheduler (python -m app.infrastructure.scheduler).
     await seed_first_admin()
     yield
     logger.info("Reliastra backend shutting down...")
-    stop_scheduler()
+    try:
+        from app.core.ssrf_protection import close_pinned_transports
+        await close_pinned_transports()
+    except Exception:  # pragma: no cover - shutdown must never raise
+        logger.debug("Error closing pinned transports", exc_info=True)
+    try:
+        from app.modules.checks.service import close_http_client
+        await close_http_client()
+    except Exception:  # pragma: no cover - shutdown must never raise
+        logger.debug("Error closing check HTTP client", exc_info=True)
+    try:
+        from app.modules.notifications.service import close_notification_http_client
+        await close_notification_http_client()
+    except Exception:  # pragma: no cover - shutdown must never raise
+        logger.debug("Error closing notification HTTP client", exc_info=True)
     await close_redis()
 
 
@@ -200,8 +259,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(public_announcements_router)
 
-    @app.get("/health", tags=["Health"])
-    async def health_check(response: Response) -> dict[str, Any]:
+    async def _run_health_checks() -> tuple[dict[str, Any], int]:
         checks: dict[str, Any] = {}
         overall_status = "ok"
 
@@ -227,13 +285,58 @@ def create_app() -> FastAPI:
             checks["redis"] = "unavailable: connection refused"
             overall_status = "degraded"
 
-        response.status_code = 200 if overall_status == "ok" else 503
-        return {
+        status_code = 200 if overall_status == "ok" else 503
+        payload = {
             "status": overall_status,
             "service": "reliastra-backend",
             "version": "0.1.0",
             "checks": checks,
         }
+        return payload, status_code
+
+    async def _ready_response() -> Response:
+        now = time.monotonic()
+        if (
+            _ready_cache["payload"] is None
+            or now - _ready_cache["ts"] > _READY_CACHE_TTL_SECONDS
+        ):
+            payload, status_code = await _run_health_checks()
+            _ready_cache["payload"] = (payload, status_code)
+            _ready_cache["ts"] = now
+        payload, status_code = _ready_cache["payload"]
+        return Response(
+            content=json.dumps(payload),
+            status_code=status_code,
+            media_type="application/json",
+        )
+
+    @app.get("/health", tags=["Health"])
+    async def health_check() -> Response:
+        """Full health check (DB + Redis), cached for 5s (FIX 13)."""
+        return await _ready_response()
+
+    @app.get("/health/live", tags=["Health"])
+    async def liveness_check() -> dict[str, Any]:
+        """FIX 13: cheap liveness probe — no DB/Redis access."""
+        return {
+            "status": "ok",
+            "service": "reliastra-backend",
+            "version": "0.1.0",
+        }
+
+    @app.get("/health/ready", tags=["Health"])
+    async def readiness_check() -> Response:
+        """FIX 13: readiness probe — DB + Redis, cached for 5s."""
+        return await _ready_response()
+
+    @app.get("/metrics", tags=["Observability"])
+    async def metrics() -> PlainTextResponse:
+        """FIX 12: Prometheus exposition endpoint."""
+        from app.core.metrics import metrics_content_type, render_metrics
+
+        return PlainTextResponse(
+            content=render_metrics(), media_type=metrics_content_type()
+        )
 
     return app
 

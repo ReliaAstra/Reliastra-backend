@@ -17,7 +17,7 @@ async def test_billing_endpoints(async_client, auth_data, monkeypatch):
     assert plan_res.status_code == 200, plan_res.text
     plan_data = plan_res.json()
     assert plan_data["plan"] == "free"
-    assert plan_data["max_dependencies"] == 5
+    assert plan_data["max_dependencies"] == 3
     assert plan_data["subscription_status"] is None
 
     secret = "integration-paystack-secret"

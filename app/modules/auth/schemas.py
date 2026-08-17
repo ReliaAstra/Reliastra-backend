@@ -1,22 +1,17 @@
 import uuid
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.modules.auth.constants import TOKEN_TYPE_BEARER
 
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str
+    # FIX 33: minimum password length is enforced at the schema level so
+    # OpenAPI advertises it and short passwords are rejected before hashing.
+    password: str = Field(min_length=8, max_length=128)
     full_name: str
     org_name: str | None = None
     ref_code: str | None = None
-
-    @field_validator("password")
-    @classmethod
-    def validate_password(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters long")
-        return v
 
 
 class LoginRequest(BaseModel):
@@ -98,14 +93,8 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str
-    new_password: str
-
-    @field_validator("new_password")
-    @classmethod
-    def validate_new_password(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters long")
-        return v
+    # FIX 33: minimum password length enforced at the schema level.
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 class ResetPasswordResponse(BaseModel):

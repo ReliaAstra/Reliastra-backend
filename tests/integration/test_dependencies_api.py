@@ -22,7 +22,9 @@ async def test_dependencies_endpoints(async_client, auth_data):
     dep = create_res.json()
     dep_id = dep["id"]
     assert dep["name"] == "Stripe API"
-    assert dep["headers"] == {"Authorization": "Bearer sk_test_123"}
+    # FIX 23: decrypted headers are never returned; only the presence flag.
+    assert dep["headers"] is None
+    assert dep["has_headers"] is True
 
     # GET /v1/orgs/{org_id}/dependencies
     list_res = await async_client.get(

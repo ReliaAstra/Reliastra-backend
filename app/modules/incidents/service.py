@@ -128,6 +128,13 @@ class IncidentService:
         except Exception as exc:
             logger.warning("Failed to dispatch alert for incident %s: %s", incident.id, exc)
 
+        try:
+            from app.core.metrics import incidents_total
+
+            incidents_total.labels(action="opened").inc()
+        except Exception:  # pragma: no cover - metrics must never break flow
+            pass
+
         return incident
 
     async def resolve_incident(
@@ -188,15 +195,34 @@ class IncidentService:
 
         # Evidence is generated for every resolved incident, not only incidents
         # that happened to have a temporal correlation.
+        # FIX 18: generation is dispatched asynchronously to Celery so the
+        # resolve path (itself often running inside a check transaction)
+        # returns immediately instead of rendering HTML+PDF inline. The
+        # countdown lets the resolve transaction commit before the worker
+        # reads the incident.
         try:
-            from app.modules.evidence.service import evidence_service
+            from app.modules.evidence.tasks import generate_evidence_report
+            from app.core.request_context import get_request_id
 
-            await evidence_service.generate_for_incident(session, incident.id)
+            # FIX 36: propagate the inbound request id for distributed tracing.
+            generate_evidence_report.apply_async(
+                args=[str(incident.id)],
+                kwargs={"request_id": get_request_id()},
+                countdown=5,
+            )
             logger.info(
-                "Generated evidence report for incident %s", incident.id
+                "Dispatched async evidence generation for incident %s",
+                incident.id,
             )
         except Exception as exc:
-            logger.warning("Could not generate evidence report: %s", exc)
+            logger.warning("Could not dispatch evidence report task: %s", exc)
+
+        try:
+            from app.core.metrics import incidents_total
+
+            incidents_total.labels(action="resolved").inc()
+        except Exception:  # pragma: no cover - metrics must never break flow
+            pass
 
         return updated
 

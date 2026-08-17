@@ -1,10 +1,14 @@
 import abc
 import asyncio
+import hashlib
+import hmac
 import logging
+import time
 import uuid
 from typing import Any
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.config import settings
 from app.core.exceptions import ResourceNotFoundException
 from app.core.ssrf_protection import validate_outbound_url
 from app.infrastructure.email import email_client
@@ -20,6 +24,56 @@ from app.modules.notifications.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+# FIX 20: module-level pooled HTTP client shared by Slack/Webhook/PagerDuty —
+# no more fresh httpx.AsyncClient() (and handshake) per alert.
+_notification_http_client: httpx.AsyncClient | None = None
+
+
+def get_notification_http_client() -> httpx.AsyncClient:
+    global _notification_http_client
+    if _notification_http_client is None:
+        _notification_http_client = httpx.AsyncClient(
+            limits=httpx.Limits(
+                max_connections=50, max_keepalive_connections=10
+            ),
+            timeout=httpx.Timeout(10.0),
+        )
+    return _notification_http_client
+
+
+async def close_notification_http_client() -> None:
+    global _notification_http_client
+    if _notification_http_client is not None:
+        await _notification_http_client.aclose()
+        _notification_http_client = None
+
+
+def _webhook_secret_for_org(org_id: uuid.UUID) -> bytes:
+    """Deterministic per-org webhook signing secret (FIX 30).
+
+    Derived from the server SECRET_KEY + org id so it never has to be stored
+    in plaintext and differs across organizations.
+    """
+    return hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        f"webhook:{org_id}".encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+
+
+def sign_webhook_payload(org_id: uuid.UUID, body: bytes) -> dict[str, str]:
+    """Return the X-Reliastra-Signature / X-Reliastra-Timestamp headers."""
+    timestamp = str(int(time.time()))
+    signature = hmac.new(
+        _webhook_secret_for_org(org_id),
+        f"{timestamp}.".encode("utf-8") + body,
+        hashlib.sha256,
+    ).hexdigest()
+    return {
+        "X-Reliastra-Signature": f"t={timestamp},sha256={signature}",
+        "X-Reliastra-Timestamp": timestamp,
+    }
 
 
 class BaseNotificationChannel(abc.ABC):
@@ -59,26 +113,65 @@ class SlackChannel(BaseNotificationChannel):
             "text": f"*{alert.title}* [{alert.severity.upper()}]\n{alert.body}"
         }
         try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                resp = await client.post(webhook_url, json=payload)
-                return resp.status_code < 400
+            client = get_notification_http_client()
+            resp = await client.post(webhook_url, json=payload)
+            return resp.status_code < 400
         except Exception as exc:
             logger.warning("Slack webhook send failed: %s", exc)
             return False
 
 
 class PagerDutyChannel(BaseNotificationChannel):
+    """PagerDuty Events API v2 integration (FIX 19).
+
+    POSTs a ``trigger`` event to https://events.pagerduty.com/v2/enqueue with
+    the routing key from the alert config — the previous implementation only
+    logged and returned True without sending anything.
+    """
+
+    EVENTS_API_URL = "https://events.pagerduty.com/v2/enqueue"
+    _SEVERITY_MAP = {
+        "critical": "critical",
+        "major": "error",
+        "minor": "warning",
+    }
+
     async def send(self, alert: AlertPayload, config: dict[str, Any]) -> bool:
         routing_key = config.get("routing_key")
         if not routing_key:
             logger.warning("PagerDutyChannel config missing 'routing_key'")
             return False
-        logger.info(
-            "Sending PagerDuty alert: routing_key=%s, title=%s",
-            routing_key,
-            alert.title,
-        )
-        return True
+        payload = {
+            "routing_key": routing_key,
+            "event_action": "trigger",
+            "payload": {
+                "summary": alert.title,
+                "source": "reliastra",
+                "severity": self._SEVERITY_MAP.get(
+                    str(alert.severity).lower(), "info"
+                ),
+                "custom_details": {
+                    "body": alert.body,
+                    "incident_id": (
+                        str(alert.incident_id) if alert.incident_id else None
+                    ),
+                    "metadata": alert.metadata,
+                },
+            },
+        }
+        try:
+            client = get_notification_http_client()
+            resp = await client.post(self.EVENTS_API_URL, json=payload)
+            if resp.status_code >= 400:
+                logger.warning(
+                    "PagerDuty Events API returned %s: %s",
+                    resp.status_code,
+                    resp.text[:300],
+                )
+            return resp.status_code < 400
+        except Exception as exc:
+            logger.warning("PagerDuty alert send failed: %s", exc)
+            return False
 
 
 class WebhookChannel(BaseNotificationChannel):
@@ -94,9 +187,14 @@ class WebhookChannel(BaseNotificationChannel):
             logger.warning("Webhook URL blocked by SSRF protection: %s", exc)
             return False
         try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                resp = await client.post(url, json=alert.model_dump(mode="json"))
-                return resp.status_code < 400
+            body = alert.model_dump_json().encode("utf-8")
+            # FIX 30: sign outbound webhooks with the per-org HMAC secret so
+            # customers can verify authenticity and reject replays.
+            headers = sign_webhook_payload(alert.org_id, body)
+            headers["Content-Type"] = "application/json"
+            client = get_notification_http_client()
+            resp = await client.post(url, content=body, headers=headers)
+            return resp.status_code < 400
         except Exception as exc:
             logger.warning("Webhook send failed: %s", exc)
             return False
@@ -207,9 +305,41 @@ class NotificationService:
             message="Test alert sent successfully" if success else "Failed to send test alert",
         )
 
+    def _alert_fingerprint(self, alert: AlertPayload) -> str:
+        key = (
+            f"{alert.org_id}|{alert.severity}|{alert.title}|"
+            f"{alert.incident_id or alert.metadata.get('dependency_id', '')}"
+        )
+        return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+    async def _is_duplicate_alert(self, alert: AlertPayload) -> bool:
+        """FIX 39: deduplicate near-identical alerts within a 60s window.
+
+        An incident storm previously multiplied outbound requests (100
+        incidents × N channels). Redis SET-NX claims the window; Redis
+        failures fail open so alerts are never silently dropped.
+        """
+        try:
+            from app.infrastructure.redis_client import safe_redis_set_nx
+
+            claimed = await safe_redis_set_nx(
+                f"alert:dedup:{self._alert_fingerprint(alert)}",
+                "1",
+                ex=60,
+            )
+            return not claimed
+        except Exception:
+            return False
+
     async def dispatch_alert(
         self, session: AsyncSession, alert: AlertPayload
     ) -> int:
+        if await self._is_duplicate_alert(alert):
+            logger.info(
+                "Suppressing duplicate alert within 60s window: %s",
+                alert.title,
+            )
+            return 0
         configs = await self.repository.list_for_org(
             session, alert.org_id, active_only=True
         )

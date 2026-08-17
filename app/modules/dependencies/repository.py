@@ -58,12 +58,23 @@ class DependencyRepository:
     @staticmethod
     async def get_due_dependencies(
         session: AsyncSession,
+        limit: int = 500,
     ) -> list[Dependency]:
+        """Return at most *limit* due, active dependencies (oldest first).
+
+        Bounded so a scheduling outage can never load the entire table into
+        memory or build an unbounded dispatch burst.
+        """
         now = datetime.now(timezone.utc)
-        query = select(Dependency).where(
-            Dependency.is_active == True,  # noqa: E712
-            Dependency.is_deleted == False,  # noqa: E712
-            Dependency.next_check_at <= now,
+        query = (
+            select(Dependency)
+            .where(
+                Dependency.is_active == True,  # noqa: E712
+                Dependency.is_deleted == False,  # noqa: E712
+                Dependency.next_check_at <= now,
+            )
+            .order_by(Dependency.next_check_at.asc())
+            .limit(limit)
         )
         result = await session.execute(query)
         return list(result.scalars().all())

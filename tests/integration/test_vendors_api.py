@@ -9,10 +9,12 @@ async def test_public_vendors_endpoints(async_client, db_session):
     await vendor_service.seed_vendors(db_session)
     await db_session.commit()
 
-    # GET /v1/public/vendors
+    # GET /v1/public/vendors (FIX 17: cursor-paginated envelope)
     list_res = await async_client.get("/v1/public/vendors")
     assert list_res.status_code == 200, list_res.text
-    vendors = list_res.json()
+    envelope = list_res.json()
+    assert set(envelope.keys()) >= {"items", "next_cursor", "has_more"}
+    vendors = envelope["items"]
     assert len(vendors) >= 5
 
     # GET /v1/public/vendors/{vendor_name}

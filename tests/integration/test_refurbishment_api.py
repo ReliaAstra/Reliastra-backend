@@ -3,6 +3,7 @@ import hmac
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 from sqlalchemy import select
 
@@ -17,13 +18,21 @@ from app.modules.observations.models import Observation
 
 
 @pytest.mark.asyncio
-async def test_agency_ai_and_dashboard_endpoints(async_client, auth_data, mocker):
+async def test_agency_ai_and_dashboard_endpoints(
+    async_client, auth_data, db_session, mocker
+):
     health = await async_client.get("/health")
     assert health.status_code == 200
     assert health.json()["status"] == "ok"
 
     headers = auth_data["headers"]
     org_id = auth_data["org_id"]
+
+    # Public vendor endpoints need the seed vendors to exist.
+    from app.modules.vendors.service import vendor_service
+
+    await vendor_service.seed_vendors(db_session)
+    await db_session.commit()
 
     client_response = await async_client.post(
         f"/v1/orgs/{org_id}/clients",
@@ -114,15 +123,33 @@ async def test_observation_attribution_snapshot_and_verification(
     dependency_id = uuid.UUID(dependency_response.json()["id"])
 
     mocker.patch(
-        "app.modules.checks.service.validate_outbound_url", return_value=None
+        "app.modules.checks.service.resolve_pinned_target",
+        return_value=MagicMock(
+            url="https://example.com/health",
+            hostname="example.com",
+            port=443,
+            ips=["93.184.216.34"],
+        ),
     )
-    http_client = AsyncMock()
-    http_client.__aenter__.return_value = http_client
-    http_client.request = AsyncMock(return_value=MagicMock(status_code=500))
-    mocker.patch("app.modules.checks.service.httpx.AsyncClient", return_value=http_client)
+
+    class _FakePinnedTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request):
+            return httpx.Response(status_code=500, request=request)
+
+    mocker.patch(
+        "app.modules.checks.service.pinned_transport_for",
+        return_value=_FakePinnedTransport(),
+    )
 
     await check_service.execute_check(db_session, dependency_id, "us-east")
     await check_service.execute_check(db_session, dependency_id, "eu-west")
+
+    # FIX 9: observations are delivered via the transactional outbox.
+    from app.modules.observations.outbox import process_outbox_batch
+
+    processed = await process_outbox_batch(db_session)
+    await db_session.commit()
+    assert processed == 2
 
     observations = list(
         (
@@ -140,8 +167,10 @@ async def test_observation_attribution_snapshot_and_verification(
         db_session, dependency_id
     )
     assert incident is not None
+    # FIX 18: evidence generation is dispatched asynchronously via
+    # apply_async (with a commit-safety countdown), not executed inline.
     mocker.patch(
-        "app.modules.evidence.tasks.generate_evidence_report.delay"
+        "app.modules.evidence.tasks.generate_evidence_report.apply_async"
     )
     await incident_service.resolve_incident(
         db_session, incident.id, org_id=uuid.UUID(org_id)
