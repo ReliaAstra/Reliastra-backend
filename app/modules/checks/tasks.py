@@ -44,7 +44,13 @@ def schedule_checks() -> int:
                 logger.exception("Error in schedule_checks task: %s", exc)
                 return 0
 
-    return run_async(_run())
+    try:
+        return run_async(_run())
+    finally:
+        # Each task runs on a fresh asyncio loop; asyncpg connections are
+        # loop-bound, so the shared engine must not outlive the loop.
+        from app.db.session import reset_engine
+        reset_engine()
 
 
 @celery_app.task(name="app.modules.checks.tasks.execute_check")
@@ -78,4 +84,8 @@ def execute_check(dependency_id: str, region: str) -> dict[str, Any] | None:
                 )
                 return None
 
-    return run_async(_run())
+    try:
+        return run_async(_run())
+    finally:
+        from app.db.session import reset_engine
+        reset_engine()

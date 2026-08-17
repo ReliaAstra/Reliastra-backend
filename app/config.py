@@ -120,6 +120,15 @@ class Settings(BaseSettings):
         default="development",
         description="Current environment (development, staging, production)",
     )
+    RUN_IN_PROCESS_SCHEDULER: bool = Field(
+        default=True,
+        description=(
+            "Run the APScheduler inside the API process.  Required on "
+            "single-container PaaS where Celery Beat cannot run; MUST be "
+            "disabled when Celery Beat is running (docker-compose) to avoid "
+            "every dependency being scheduled and probed twice."
+        ),
+    )
 
     @property
     def database_url_with_ssl(self) -> str:

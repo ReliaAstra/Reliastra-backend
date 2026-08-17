@@ -35,6 +35,20 @@ async def test_check_and_create_incident_new():
         repository=inc_repo, correlation_strategy=mock_strategy
     )
     session = AsyncMock()
+
+    class _AsyncCM:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+    # check_and_create_incident now wraps the insert in an atomic savepoint
+    # (begin_nested) so the partial unique index can dedupe racing writers.
+    # Use a plain MagicMock so begin_nested() returns the CM synchronously
+    # (AsyncMock would return a coroutine, which async-with rejects).
+    session.begin_nested = MagicMock(return_value=_AsyncCM())
+
     result = await service.check_and_create_incident(session, org_id, dep_id, "Down")
 
     assert result.id == inc_id

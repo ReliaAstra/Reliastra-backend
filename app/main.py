@@ -69,6 +69,31 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         "transfer-encoding", "upgrade", "content-encoding",
     }
 
+    @staticmethod
+    def _idempotency_principal(request: Request) -> str:
+        """Derive a stable per-credential principal for idempotency scoping.
+
+        Prefers the verified JWT ``sub``; falls back to a digest of the API
+        key credential; finally the client IP for anonymous callers.  This
+        guarantees two different tenants can never collide on a key.
+        """
+        import hashlib
+        auth = request.headers.get("authorization", "")
+        api_key = request.headers.get("x-api-key", "")
+        if auth.lower().startswith("bearer "):
+            token = auth.split(None, 1)[1].strip()
+            try:
+                from app.core.security import decode_token
+                payload = decode_token(token)
+                return f"user:{payload.get('sub', 'unknown')}"
+            except Exception:
+                return "user:invalid-token"
+        credential = api_key or (auth if auth.lower().startswith(("apikey ", "rel_")) else "")
+        if credential:
+            return "key:" + hashlib.sha256(credential.encode("utf-8")).hexdigest()[:32]
+        client = request.client
+        return f"ip:{client.host if client else 'unknown'}"
+
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
@@ -77,7 +102,13 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         try:
-            cache_key = f"idempotency:{idempotency_key}"
+            # The idempotency cache MUST be scoped to the authenticated
+            # principal.  A global `idempotency:{key}` namespace lets tenant A
+            # replay tenant B's cached response (cross-tenant data leak) when
+            # two clients happen to use the same key (e.g. both frontends use
+            # a fixed key for the "create org" flow).
+            principal = self._idempotency_principal(request)
+            cache_key = f"idempotency:{principal}:{idempotency_key}"
             cached_resp = await safe_redis_get(cache_key)
             if cached_resp:
                 data = json.loads(cached_resp)
@@ -128,7 +159,13 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Reliastra backend starting up...")
     get_engine()
-    start_scheduler()
+    # In-process scheduler is the single-container PaaS fallback.  When
+    # Celery Beat is running (docker-compose) it must stay off, otherwise
+    # schedule_due_checks executes twice per tick (duplicate probes,
+    # double DB writes, quorum noise).
+    if settings.RUN_IN_PROCESS_SCHEDULER:
+        logger.info("Starting in-process APScheduler (RUN_IN_PROCESS_SCHEDULER=true)")
+        start_scheduler()
     await seed_first_admin()
     yield
     logger.info("Reliastra backend shutting down...")

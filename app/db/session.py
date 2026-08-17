@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
@@ -193,3 +194,25 @@ def set_test_engine(engine: AsyncEngine) -> None:
         expire_on_commit=False,
         autoflush=False,
     )
+
+
+def reset_engine() -> None:
+    """Drop the cached engine/sessionmaker so the next caller rebuilds them.
+
+    Used by the Celery tasks: each task runs its coroutine in a fresh asyncio
+    event loop, but asyncpg connections are bound to the loop that created
+    them.  Reusing the module-global engine across loops raises
+    "Task got Future attached to a different loop" and silently drops the
+    task (measured: schedule_checks returned 0 while the API scheduler did all
+    the work).  Resetting per task bounds the leak to one pool per task and
+    guarantees loop affinity.
+    """
+    global _engine, _sessionmaker
+    engine = _engine
+    _engine = None
+    _sessionmaker = None
+    if engine is not None:
+        try:
+            asyncio.run(engine.dispose())
+        except Exception:
+            logger.debug("engine dispose during reset failed", exc_info=True)
