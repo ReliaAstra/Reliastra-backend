@@ -17,7 +17,7 @@ from app.modules.notifications.service import (
 from app.modules.organizations.models import Organization
 
 router = APIRouter(
-    prefix="/v1/orgs/{org_id}/notifications", tags=["Notifications"]
+    prefix="/v1/notifications", tags=["Notifications"]
 )
 
 
@@ -27,12 +27,11 @@ def get_notif_service() -> NotificationService:
 
 @router.get("/configs", response_model=list[AlertConfigResponse])
 async def list_alert_configs(
-    org_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: NotificationService = Depends(get_notif_service),
 ) -> list[AlertConfigResponse]:
-    return await service.list_configs(db, org_id)
+    return await service.list_configs(db, current_org.id)
 
 
 @router.post(
@@ -42,24 +41,22 @@ async def list_alert_configs(
     dependencies=[Depends(require_member)],
 )
 async def create_alert_config(
-    org_id: uuid.UUID,
     request: AlertConfigCreateRequest,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: NotificationService = Depends(get_notif_service),
 ) -> AlertConfigResponse:
-    return await service.create_config(db, org_id, request)
+    return await service.create_config(db, current_org.id, request)
 
 
 @router.get("/configs/{config_id}", response_model=AlertConfigResponse)
 async def get_alert_config(
-    org_id: uuid.UUID,
     config_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: NotificationService = Depends(get_notif_service),
 ) -> AlertConfigResponse:
-    return await service.get_config(db, org_id, config_id)
+    return await service.get_config(db, current_org.id, config_id)
 
 
 @router.patch(
@@ -68,14 +65,13 @@ async def get_alert_config(
     dependencies=[Depends(require_member)],
 )
 async def update_alert_config(
-    org_id: uuid.UUID,
     config_id: uuid.UUID,
     request: AlertConfigUpdateRequest,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: NotificationService = Depends(get_notif_service),
 ) -> AlertConfigResponse:
-    return await service.update_config(db, org_id, config_id, request)
+    return await service.update_config(db, current_org.id, config_id, request)
 
 
 @router.delete(
@@ -84,13 +80,12 @@ async def update_alert_config(
     dependencies=[Depends(require_member)],
 )
 async def delete_alert_config(
-    org_id: uuid.UUID,
     config_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: NotificationService = Depends(get_notif_service),
 ) -> None:
-    await service.delete_config(db, org_id, config_id)
+    await service.delete_config(db, current_org.id, config_id)
 
 
 @router.post(
@@ -99,10 +94,9 @@ async def delete_alert_config(
     dependencies=[Depends(require_member)],
 )
 async def send_test_notification(
-    org_id: uuid.UUID,
     request: AlertTestRequest,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: NotificationService = Depends(get_notif_service),
 ) -> AlertTestResponse:
-    return await service.send_test_alert(db, org_id, request.config_id)
+    return await service.send_test_alert(db, current_org.id, request.config_id)

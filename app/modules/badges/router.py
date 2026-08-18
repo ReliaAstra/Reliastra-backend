@@ -15,7 +15,7 @@ from app.modules.badges.service import badge_service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/v1/public/vendors", tags=["Badges"])
+router = APIRouter(prefix="/v1/vendors", tags=["Badges"])
 
 badge_limiter = SlidingWindowRateLimiter(
     limit=60, window_seconds=60, key_prefix="rl_badge"

@@ -23,12 +23,12 @@ async def test_orgs_endpoints(async_client, auth_data):
     assert new_org["name"] == "Second Org"
 
     # GET /v1/orgs/{org_id}
-    get_res = await async_client.get(f"/v1/orgs/{org_id}", headers=headers)
+    get_res = await async_client.get("/v1/orgs/current", headers=headers)
     assert get_res.status_code == 200
 
     # PATCH /v1/orgs/{org_id}
     patch_res = await async_client.patch(
-        f"/v1/orgs/{org_id}",
+        "/v1/orgs/current",
         headers=headers,
         json={"name": "Renamed Org"},
     )
@@ -47,7 +47,7 @@ async def test_orgs_endpoints(async_client, auth_data):
     )
 
     invite_res = await async_client.post(
-        f"/v1/orgs/{org_id}/members",
+        "/v1/orgs/members",
         headers=headers,
         json={"email": "invitee@reliastra.com", "role": "member"},
     )
@@ -56,7 +56,7 @@ async def test_orgs_endpoints(async_client, auth_data):
 
     # GET /v1/orgs/{org_id}/members
     members_res = await async_client.get(
-        f"/v1/orgs/{org_id}/members", headers=headers
+        "/v1/orgs/members", headers=headers
     )
     assert members_res.status_code == 200
     members_payload = members_res.json()
@@ -66,7 +66,7 @@ async def test_orgs_endpoints(async_client, auth_data):
 
     # PATCH /v1/orgs/{org_id}/members/{member_id}
     role_res = await async_client.patch(
-        f"/v1/orgs/{org_id}/members/{member_data['id']}",
+        f"/v1/orgs/members/{member_data['id']}",
         headers=headers,
         json={"role": "admin"},
     )
@@ -75,7 +75,7 @@ async def test_orgs_endpoints(async_client, auth_data):
 
     # DELETE /v1/orgs/{org_id}/members/{member_id}
     del_res = await async_client.delete(
-        f"/v1/orgs/{org_id}/members/{member_data['id']}",
+        f"/v1/orgs/members/{member_data['id']}",
         headers=headers,
     )
     assert del_res.status_code == 204

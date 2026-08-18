@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/v1/public/vendors", tags=["Timeline Share"])
+router = APIRouter(prefix="/v1/vendors", tags=["Timeline Share"])
 
 timeline_share_limiter = SlidingWindowRateLimiter(
     limit=30,

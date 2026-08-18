@@ -17,7 +17,7 @@ from app.modules.vendors.schemas import (
 )
 from app.modules.vendors.service import VendorService, vendor_service
 
-router = APIRouter(prefix="/v1/public/vendors", tags=["Public Vendors"])
+router = APIRouter(prefix="/v1/vendors", tags=["Vendors"])
 
 developer_limiter = SlidingWindowRateLimiter(
     limit=30, window_seconds=60, key_prefix="rl_developer"
@@ -44,6 +44,7 @@ async def list_public_vendors(
         default=None, description="Vendor id of the last item on the previous page"
     ),
     limit: int = Query(default=50, ge=1, le=100),
+    public: bool = Query(default=True, description="Public catalog access"),
 ) -> CursorPagination[VendorResponse]:
     """FIX 17: cursor-paginated vendor listing, Redis-cached for 60s."""
     await _rate_limit(request)

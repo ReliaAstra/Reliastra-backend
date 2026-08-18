@@ -78,16 +78,17 @@ async def test_full_e2e_flow(async_client, db_session, test_http_server, mocker)
         },
     )
     assert reg_res.status_code == 201, reg_res.text
-    token_data = reg_res.json()
-    headers = {"Authorization": f"Bearer {token_data['access_token']}"}
-
-    orgs_res = await async_client.get("/v1/orgs", headers=headers)
-    assert orgs_res.status_code == 200
-    org_id = orgs_res.json()[0]["id"]
+    body = reg_res.json()
+    token_data = body["tokens"]
+    org_id = body["organization"]["id"]
+    headers = {
+        "Authorization": f"Bearer {token_data['access_token']}",
+        "X-Organization-ID": org_id,
+    }
 
     # 2. Configure notification channel
     notif_res = await async_client.post(
-        f"/v1/orgs/{org_id}/notifications/configs",
+        "/v1/notifications/configs",
         headers=headers,
         json={
             "channel_type": "email",
@@ -99,7 +100,7 @@ async def test_full_e2e_flow(async_client, db_session, test_http_server, mocker)
 
     # 3. Create two dependencies pointing to the 500 test server
     dep1_res = await async_client.post(
-        f"/v1/orgs/{org_id}/dependencies",
+        "/v1/dependencies",
         headers=headers,
         json={
             "name": "Vendor Stripe API",
@@ -113,7 +114,7 @@ async def test_full_e2e_flow(async_client, db_session, test_http_server, mocker)
     dep1_id = dep1_res.json()["id"]
 
     dep2_res = await async_client.post(
-        f"/v1/orgs/{org_id}/dependencies",
+        "/v1/dependencies",
         headers=headers,
         json={
             "name": "Internal Customer Service",
@@ -154,10 +155,10 @@ async def test_full_e2e_flow(async_client, db_session, test_http_server, mocker)
 
     # 5. Verify incidents created
     inc_list_res = await async_client.get(
-        f"/v1/orgs/{org_id}/incidents", headers=headers
+        "/v1/incidents", headers=headers
     )
     assert inc_list_res.status_code == 200
-    incidents = inc_list_res.json()
+    incidents = inc_list_res.json()["data"]
     assert len(incidents) >= 1
     target_incident = next(
         inc for inc in incidents if inc["dependency_id"] == dep1_id
@@ -167,7 +168,7 @@ async def test_full_e2e_flow(async_client, db_session, test_http_server, mocker)
 
     # 6. Verify correlation created between Dep 1 and Dep 2
     inc_detail_res = await async_client.get(
-        f"/v1/orgs/{org_id}/incidents/{inc_id}", headers=headers
+        f"/v1/incidents/{inc_id}", headers=headers
     )
     assert inc_detail_res.status_code == 200
     detail_data = inc_detail_res.json()
@@ -179,7 +180,7 @@ async def test_full_e2e_flow(async_client, db_session, test_http_server, mocker)
 
     # 7. Resolve incident and verify evidence report generated
     resolve_res = await async_client.patch(
-        f"/v1/orgs/{org_id}/incidents/{inc_id}",
+        f"/v1/incidents/{inc_id}",
         headers=headers,
         json={"status": "resolved"},
     )
@@ -188,7 +189,7 @@ async def test_full_e2e_flow(async_client, db_session, test_http_server, mocker)
 
     # Generate/fetch evidence report
     evid_res = await async_client.get(
-        f"/v1/orgs/{org_id}/incidents/{inc_id}/evidence", headers=headers
+        f"/v1/incidents/{inc_id}/evidence", headers=headers
     )
     assert evid_res.status_code == 200
     evid_data = evid_res.json()
@@ -197,7 +198,7 @@ async def test_full_e2e_flow(async_client, db_session, test_http_server, mocker)
 
     # Verify evidence list endpoint
     list_evid_res = await async_client.get(
-        f"/v1/orgs/{org_id}/evidence", headers=headers
+        "/v1/evidence", headers=headers
     )
     assert list_evid_res.status_code == 200
     assert len(list_evid_res.json()) >= 1

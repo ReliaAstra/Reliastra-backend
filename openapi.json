@@ -1,0 +1,221 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Reliastra MVP API",
+    "version": "0.2.0",
+    "description": "External dependency intelligence platform API. Tenant context is supplied via X-Organization-ID (or Reliastra-Organization). List endpoints use cursor pagination."
+  },
+  "servers": [{ "url": "/" }],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" },
+      "apiKey": { "type": "apiKey", "in": "header", "name": "X-API-Key" }
+    },
+    "parameters": {
+      "OrganizationHeader": {
+        "name": "X-Organization-ID",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" },
+        "description": "Active organization. Reliastra-Organization is accepted as an alias."
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "schema": { "type": "string" }
+      },
+      "Public": {
+        "name": "public",
+        "in": "query",
+        "schema": { "type": "boolean" },
+        "description": "Request the public (unauthenticated) view of this resource."
+      }
+    },
+    "schemas": {
+      "ErrorDetail": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "issue": { "type": "string" }
+        }
+      },
+      "HTTPValidationError": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message", "details", "request_id"],
+            "properties": {
+              "code": { "type": "string", "example": "VALIDATION_ERROR" },
+              "message": { "type": "string" },
+              "details": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/ErrorDetail" }
+              },
+              "request_id": { "type": "string" }
+            }
+          }
+        }
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "next_cursor": { "type": "string", "nullable": true },
+          "has_more": { "type": "boolean" },
+          "limit": { "type": "integer" }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": { "type": "string" },
+          "refresh_token": { "type": "string" },
+          "token_type": { "type": "string" },
+          "expires_in": { "type": "integer" }
+        }
+      },
+      "RegisterResponse": {
+        "type": "object",
+        "required": ["user", "organization", "tokens"],
+        "properties": {
+          "user": { "type": "object" },
+          "organization": { "type": "object" },
+          "tokens": { "$ref": "#/components/schemas/TokenResponse" }
+        }
+      },
+      "EvidenceGateResponse": {
+        "type": "object",
+        "properties": {
+          "download_url": { "type": "string" },
+          "report_id": { "type": "string", "format": "uuid" },
+          "report_token": { "type": "string" },
+          "expires_at": { "type": "string", "format": "date-time" },
+          "account_created": { "type": "boolean" },
+          "login_url": { "type": "string", "nullable": true },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/v1/auth/register": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Register and receive user, default organization, and tokens",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RegisterResponse" }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TokenResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/dependencies": {
+      "get": {
+        "tags": ["Dependencies"],
+        "parameters": [
+          { "$ref": "#/components/parameters/OrganizationHeader" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ],
+        "security": [{ "bearerAuth": [] }, { "apiKey": [] }]
+      },
+      "post": {
+        "tags": ["Dependencies"],
+        "parameters": [
+          { "$ref": "#/components/parameters/OrganizationHeader" }
+        ],
+        "security": [{ "bearerAuth": [] }, { "apiKey": [] }]
+      }
+    },
+    "/v1/incidents": {
+      "get": {
+        "tags": ["Incidents"],
+        "parameters": [
+          { "$ref": "#/components/parameters/OrganizationHeader" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ]
+      }
+    },
+    "/v1/vendors": {
+      "get": {
+        "tags": ["Vendors"],
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" },
+          { "$ref": "#/components/parameters/Public" }
+        ]
+      }
+    },
+    "/v1/vendors/{vendor_name}/incidents": {
+      "get": {
+        "tags": ["Vendors"],
+        "parameters": [
+          {
+            "name": "vendor_name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          { "$ref": "#/components/parameters/Public" }
+        ]
+      }
+    },
+    "/v1/evidence/gate": {
+      "post": {
+        "tags": ["Evidence Gate"],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EvidenceGateResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orgs": {
+      "get": { "tags": ["Organizations"], "summary": "List my organizations" },
+      "post": { "tags": ["Organizations"], "summary": "Create an additional organization" }
+    },
+    "/v1/orgs/current": {
+      "get": {
+        "tags": ["Organizations"],
+        "parameters": [{ "$ref": "#/components/parameters/OrganizationHeader" }]
+      }
+    }
+  }
+}

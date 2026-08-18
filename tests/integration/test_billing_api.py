@@ -12,7 +12,7 @@ async def test_billing_endpoints(async_client, auth_data, monkeypatch):
     org_id = auth_data["org_id"]
 
     plan_res = await async_client.get(
-        f"/v1/orgs/{org_id}/billing/plan", headers=headers
+        "/v1/billing/plan", headers=headers
     )
     assert plan_res.status_code == 200, plan_res.text
     plan_data = plan_res.json()

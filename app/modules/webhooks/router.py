@@ -20,7 +20,7 @@ from app.modules.webhooks.schemas import (
 from app.modules.webhooks.service import WebhookService, webhook_service
 
 webhooks_router = APIRouter(
-    prefix="/v1/orgs/{org_id}/webhooks",
+    prefix="/v1/webhooks",
     tags=["Webhooks"],
 )
 
@@ -36,14 +36,13 @@ def get_webhook_service() -> WebhookService:
     dependencies=[Depends(require_member)],
 )
 async def create_webhook(
-    org_id: uuid.UUID,
     request: WebhookCreateRequest,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     current_user: User = Depends(get_current_user),
     service: WebhookService = Depends(get_webhook_service),
 ) -> WebhookResponse:
-    webhook = await service.create_webhook(db, org_id, current_user.id, request)
+    webhook = await service.create_webhook(db, current_org.id, current_user.id, request)
     return service._to_response(webhook)
 
 
@@ -53,12 +52,11 @@ async def create_webhook(
     dependencies=[Depends(require_member)],
 )
 async def list_webhooks(
-    org_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: WebhookService = Depends(get_webhook_service),
 ) -> list[WebhookResponse]:
-    return await service.list_webhooks(db, org_id)
+    return await service.list_webhooks(db, current_org.id)
 
 
 @webhooks_router.delete(
@@ -67,14 +65,13 @@ async def list_webhooks(
     dependencies=[Depends(require_admin)],
 )
 async def delete_webhook(
-    org_id: uuid.UUID,
     webhook_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     current_user: User = Depends(get_current_user),
     service: WebhookService = Depends(get_webhook_service),
 ) -> None:
-    await service.delete_webhook(db, org_id, webhook_id, current_user.id)
+    await service.delete_webhook(db, current_org.id, webhook_id, current_user.id)
 
 
 @webhooks_router.patch(
@@ -83,14 +80,13 @@ async def delete_webhook(
     dependencies=[Depends(require_member)],
 )
 async def update_webhook(
-    org_id: uuid.UUID,
     webhook_id: uuid.UUID,
     request: WebhookUpdateRequest,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: WebhookService = Depends(get_webhook_service),
 ) -> WebhookResponse:
-    return await service.update_webhook(db, org_id, webhook_id, request)
+    return await service.update_webhook(db, current_org.id, webhook_id, request)
 
 
 @webhooks_router.post(
@@ -99,14 +95,13 @@ async def update_webhook(
     dependencies=[Depends(require_member)],
 )
 async def test_webhook(
-    org_id: uuid.UUID,
     webhook_id: uuid.UUID,
     request: WebhookTestRequest,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: WebhookService = Depends(get_webhook_service),
 ) -> WebhookTestResponse:
-    return await service.test_webhook(db, org_id, webhook_id, request)
+    return await service.test_webhook(db, current_org.id, webhook_id, request)
 
 
 @webhooks_router.get(
@@ -115,7 +110,6 @@ async def test_webhook(
     dependencies=[Depends(require_member)],
 )
 async def list_deliveries(
-    org_id: uuid.UUID,
     webhook_id: uuid.UUID,
     status_filter: str | None = Query(None, alias="status"),
     limit: int = Query(50, ge=1, le=100),
@@ -123,4 +117,4 @@ async def list_deliveries(
     current_org: Organization = Depends(get_current_org),
     service: WebhookService = Depends(get_webhook_service),
 ) -> list[WebhookDeliveryResponse]:
-    return await service.list_deliveries(db, org_id, webhook_id, status=status_filter, limit=limit)
+    return await service.list_deliveries(db, current_org.id, webhook_id, status=status_filter, limit=limit)

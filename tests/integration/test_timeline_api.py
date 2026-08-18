@@ -116,14 +116,8 @@ async def _create_org_and_user(async_client):
     }
     res = await async_client.post("/v1/auth/register", json=payload)
     assert res.status_code == 201, res.text
-    token_data = res.json()
-
-    orgs_res = await async_client.get(
-        "/v1/orgs",
-        headers={"Authorization": f"Bearer {token_data['access_token']}"},
-    )
-    assert orgs_res.status_code == 200, orgs_res.text
-    return token_data["access_token"], orgs_res.json()[0]["id"]
+    body = res.json()
+    return body["tokens"]["access_token"], body["organization"]["id"]
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +130,7 @@ async def test_timeline_valid_vendor_empty(async_client, db_session):
     """Timeline for a valid vendor with no observations returns empty points."""
     await _seed_vendor(db_session)
 
-    res = await async_client.get("/v1/public/vendors/stripe/timeline")
+    res = await async_client.get("/v1/vendors/stripe/timeline")
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["vendor_name"] == "stripe"
@@ -155,7 +149,7 @@ async def test_timeline_invalid_vendor(async_client, db_session):
     """Non-existent vendor returns 404."""
     await _seed_vendor(db_session)
 
-    res = await async_client.get("/v1/public/vendors/nonexistent/timeline")
+    res = await async_client.get("/v1/vendors/nonexistent/timeline")
     assert res.status_code == 404, res.text
 
 
@@ -165,7 +159,7 @@ async def test_timeline_invalid_window(async_client, db_session):
     await _seed_vendor(db_session)
 
     res = await async_client.get(
-        "/v1/public/vendors/stripe/timeline?window=10y"
+        "/v1/vendors/stripe/timeline?window=10y"
     )
     assert res.status_code == 422, res.text
 
@@ -176,7 +170,7 @@ async def test_timeline_invalid_resolution(async_client, db_session):
     await _seed_vendor(db_session)
 
     res = await async_client.get(
-        "/v1/public/vendors/stripe/timeline?resolution=10s"
+        "/v1/vendors/stripe/timeline?resolution=10s"
     )
     assert res.status_code == 422, res.text
 
@@ -200,7 +194,7 @@ async def test_timeline_with_observations(async_client, db_session):
     await db_session.commit()
 
     res = await async_client.get(
-        "/v1/public/vendors/stripe/timeline?window=1h&resolution=5m"
+        "/v1/vendors/stripe/timeline?window=1h&resolution=5m"
     )
     assert res.status_code == 200, res.text
     body = res.json()
@@ -238,7 +232,7 @@ async def test_timeline_degraded_observations(async_client, db_session):
     await db_session.commit()
 
     res = await async_client.get(
-        "/v1/public/vendors/stripe/timeline?window=1h&resolution=5m"
+        "/v1/vendors/stripe/timeline?window=1h&resolution=5m"
     )
     assert res.status_code == 200, res.text
     body = res.json()
@@ -274,7 +268,7 @@ async def test_timeline_single_region(async_client, db_session):
     await db_session.commit()
 
     res = await async_client.get(
-        "/v1/public/vendors/stripe/timeline?window=1h&resolution=5m&region=us-east-1"
+        "/v1/vendors/stripe/timeline?window=1h&resolution=5m&region=us-east-1"
     )
     assert res.status_code == 200, res.text
     body = res.json()
@@ -317,7 +311,7 @@ async def test_timeline_incident_marker(async_client, db_session):
     await db_session.commit()
 
     res = await async_client.get(
-        "/v1/public/vendors/stripe/timeline?window=1h&resolution=5m"
+        "/v1/vendors/stripe/timeline?window=1h&resolution=5m"
     )
     assert res.status_code == 200, res.text
     body = res.json()
@@ -347,7 +341,7 @@ async def test_timeline_no_private_data_leak(async_client, db_session):
     )
     await db_session.commit()
 
-    res = await async_client.get("/v1/public/vendors/stripe/timeline")
+    res = await async_client.get("/v1/vendors/stripe/timeline")
     assert res.status_code == 200, res.text
     body = res.json()
     response_str = res.text
@@ -380,7 +374,7 @@ async def test_timeline_correct_aggregation(async_client, db_session):
     await db_session.commit()
 
     res = await async_client.get(
-        "/v1/public/vendors/stripe/timeline?window=1h&resolution=5m"
+        "/v1/vendors/stripe/timeline?window=1h&resolution=5m"
     )
     assert res.status_code == 200, res.text
     body = res.json()
@@ -421,7 +415,7 @@ async def test_timeline_current_observation(async_client, db_session):
     await db_session.commit()
 
     res = await async_client.get(
-        "/v1/public/vendors/stripe/timeline?window=1h&resolution=5m"
+        "/v1/vendors/stripe/timeline?window=1h&resolution=5m"
     )
     assert res.status_code == 200, res.text
     body = res.json()
@@ -439,7 +433,7 @@ async def test_timeline_different_windows(async_client, db_session):
 
     for window in ["1h", "6h", "24h", "7d", "30d", "90d"]:
         res = await async_client.get(
-            f"/v1/public/vendors/stripe/timeline?window={window}"
+            f"/v1/vendors/stripe/timeline?window={window}"
         )
         assert res.status_code == 200, f"Failed for window={window}: {res.text}"
         body = res.json()
@@ -467,7 +461,7 @@ async def test_timeline_explicit_resolution(async_client, db_session):
     await db_session.commit()
 
     res = await async_client.get(
-        "/v1/public/vendors/stripe/timeline?window=1h&resolution=1m"
+        "/v1/vendors/stripe/timeline?window=1h&resolution=1m"
     )
     assert res.status_code == 200, res.text
     body = res.json()
@@ -480,5 +474,5 @@ async def test_timeline_rate_limited(async_client, db_session):
     await _seed_vendor(db_session)
 
     # The endpoint should work without any Authorization header
-    res = await async_client.get("/v1/public/vendors/stripe/timeline")
+    res = await async_client.get("/v1/vendors/stripe/timeline")
     assert res.status_code == 200, res.text

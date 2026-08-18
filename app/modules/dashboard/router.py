@@ -16,7 +16,7 @@ from app.modules.incidents.schemas import IncidentDetailResponse
 from app.modules.organizations.models import Organization
 from app.modules.vendors.schemas import VendorDetailResponse
 
-router = APIRouter(prefix="/v1/orgs/{org_id}/dashboard", tags=["Dashboard"])
+router = APIRouter(prefix="/v1/dashboard", tags=["Dashboard"])
 
 
 def get_dash_service() -> DashboardService:
@@ -25,17 +25,15 @@ def get_dash_service() -> DashboardService:
 
 @router.get("/summary", response_model=DashboardSummaryResponse)
 async def get_dashboard_summary(
-    org_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: DashboardService = Depends(get_dash_service),
 ) -> DashboardSummaryResponse:
-    return await service.get_summary(db, org_id)
+    return await service.get_summary(db, current_org.id)
 
 
 @router.get("/latency", response_model=list[LatencyPointResponse])
 async def get_latency_timeseries(
-    org_id: uuid.UUID,
     hours: int = Query(default=24, ge=1, le=2160),
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
@@ -45,7 +43,7 @@ async def get_latency_timeseries(
 
     since = datetime.now(timezone.utc) - timedelta(hours=hours)
     observations = await ObservationRepository.list_for_org(
-        db, org_id, since=since, limit=500
+        db, current_org.id, since=since, limit=500
     )
     return [
         LatencyPointResponse(
@@ -61,7 +59,6 @@ async def get_latency_timeseries(
 
 @router.get("/sla-degradation", response_model=SLADegradationResponse)
 async def get_sla_degradation(
-    org_id: uuid.UUID,
     period_days: int = Query(default=30, ge=1, le=365),
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
@@ -70,7 +67,7 @@ async def get_sla_degradation(
     from app.modules.observations.repository import ObservationRepository
 
     stats = await ObservationRepository.get_sla_degradation(
-        db, org_id, period_days
+        db, current_org.id, period_days
     )
     return SLADegradationResponse(
         total_degradation_pct=stats["total_degradation_pct"],
@@ -81,12 +78,11 @@ async def get_sla_degradation(
 
 @router.get("/dependency-health", response_model=list[DependencyHealthResponse])
 async def get_dependency_health(
-    org_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: DashboardService = Depends(get_dash_service),
 ) -> list[DependencyHealthResponse]:
-    return await service.get_dependency_health(db, org_id)
+    return await service.get_dependency_health(db, current_org.id)
 
 
 @router.get(
@@ -94,7 +90,6 @@ async def get_dependency_health(
     response_model=CursorPagination[IncidentDetailResponse],
 )
 async def get_incident_timeline(
-    org_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: DashboardService = Depends(get_dash_service),
@@ -105,7 +100,7 @@ async def get_incident_timeline(
 ) -> CursorPagination[IncidentDetailResponse]:
     """FIX 17: cursor-paginated incident timeline."""
     rows = await service.get_incident_timeline(
-        db, org_id, limit=limit + 1, cursor=cursor
+        db, current_org.id, limit=limit + 1, cursor=cursor
     )
     has_more = len(rows) > limit
     items = rows[:limit]
@@ -117,9 +112,8 @@ async def get_incident_timeline(
 
 @router.get("/vendor-status", response_model=list[VendorDetailResponse])
 async def get_vendor_status(
-    org_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: DashboardService = Depends(get_dash_service),
 ) -> list[VendorDetailResponse]:
-    return await service.get_vendor_status(db, org_id)
+    return await service.get_vendor_status(db, current_org.id)

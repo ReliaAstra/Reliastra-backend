@@ -7,7 +7,7 @@ async def test_checks_endpoints(async_client, auth_data):
     org_id = auth_data["org_id"]
 
     res = await async_client.get(
-        f"/v1/orgs/{org_id}/checks/recent", headers=headers
+        "/v1/checks/recent", headers=headers
     )
     assert res.status_code == 200
     assert isinstance(res.json(), list)

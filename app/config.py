@@ -252,6 +252,10 @@ class Settings(BaseSettings):
         default=15,
         description="Password reset token lifetime in minutes",
     )
+    REPORT_TOKEN_TTL_DAYS: int = Field(
+        default=7,
+        description="Evidence report_token lifetime in days",
+    )
 
     # Admin panel bootstrap
     FIRST_ADMIN_EMAIL: str | None = Field(

@@ -157,30 +157,20 @@ async def auth_data(async_client: AsyncClient) -> dict[str, Any]:
     }
     res = await async_client.post("/v1/auth/register", json=register_payload)
     assert res.status_code == 201, res.text
-    token_data = res.json()
-
-    # Get user profile
-    me_res = await async_client.get(
-        "/v1/users/me",
-        headers={"Authorization": f"Bearer {token_data['access_token']}"},
-    )
-    assert me_res.status_code == 200, me_res.text
-    user_data = me_res.json()
-
-    # Get organization
-    orgs_res = await async_client.get(
-        "/v1/orgs",
-        headers={"Authorization": f"Bearer {token_data['access_token']}"},
-    )
-    assert orgs_res.status_code == 200, orgs_res.text
-    orgs_data = orgs_res.json()
+    body = res.json()
+    token_data = body["tokens"]
+    user_data = body["user"]
+    org = body["organization"]
 
     return {
         "access_token": token_data["access_token"],
         "refresh_token": token_data["refresh_token"],
-        "headers": {"Authorization": f"Bearer {token_data['access_token']}"},
+        "headers": {
+            "Authorization": f"Bearer {token_data['access_token']}",
+            "X-Organization-ID": org["id"],
+        },
         "user_id": user_data["id"],
         "email": register_payload["email"],
-        "org_id": orgs_data[0]["id"],
-        "org_slug": orgs_data[0]["slug"],
+        "org_id": org["id"],
+        "org_slug": org["slug"],
     }

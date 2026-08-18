@@ -12,7 +12,7 @@ async def test_vendors_list_is_cursor_paginated(async_client, db_session):
     await vendor_service.seed_vendors(db_session)
     await db_session.commit()
 
-    res = await async_client.get("/v1/public/vendors", params={"limit": 3})
+    res = await async_client.get("/v1/vendors", params={"limit": 3})
     assert res.status_code == 200
     payload = res.json()
     assert set(payload.keys()) >= {"items", "next_cursor", "has_more"}
@@ -22,7 +22,7 @@ async def test_vendors_list_is_cursor_paginated(async_client, db_session):
 
     # Follow the cursor — the next page must not repeat items.
     page2 = await async_client.get(
-        "/v1/public/vendors",
+        "/v1/vendors",
         params={"limit": 3, "cursor": payload["next_cursor"]},
     )
     assert page2.status_code == 200
@@ -78,7 +78,7 @@ async def test_org_members_list_is_cursor_paginated(async_client, auth_data):
 
 @pytest.mark.asyncio
 async def test_vendors_list_respects_limit_bound(async_client):
-    res = await async_client.get("/v1/public/vendors", params={"limit": 10_000})
+    res = await async_client.get("/v1/vendors", params={"limit": 10_000})
     assert res.status_code == 422
 
 
@@ -112,7 +112,7 @@ async def test_incident_timeline_is_cursor_paginated(async_client, auth_data, db
     await db_session.commit()
 
     res = await async_client.get(
-        f"/v1/orgs/{org_id}/dashboard/incident-timeline",
+        "/v1/dashboard/incident-timeline",
         headers=auth_data["headers"],
         params={"limit": 2},
     )
@@ -123,7 +123,7 @@ async def test_incident_timeline_is_cursor_paginated(async_client, auth_data, db
     assert payload["has_more"] is True
 
     page2 = await async_client.get(
-        f"/v1/orgs/{org_id}/dashboard/incident-timeline",
+        "/v1/dashboard/incident-timeline",
         headers=auth_data["headers"],
         params={"limit": 2, "cursor": payload["next_cursor"]},
     )

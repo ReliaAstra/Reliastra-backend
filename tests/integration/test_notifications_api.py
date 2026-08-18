@@ -12,7 +12,7 @@ async def test_notifications_endpoints(async_client, auth_data, mocker):
 
     # POST /v1/orgs/{org_id}/notifications/configs
     create_res = await async_client.post(
-        f"/v1/orgs/{org_id}/notifications/configs",
+        "/v1/notifications/configs",
         headers=headers,
         json={
             "channel_type": "email",
@@ -27,20 +27,20 @@ async def test_notifications_endpoints(async_client, auth_data, mocker):
 
     # GET /v1/orgs/{org_id}/notifications/configs
     list_res = await async_client.get(
-        f"/v1/orgs/{org_id}/notifications/configs", headers=headers
+        "/v1/notifications/configs", headers=headers
     )
     assert list_res.status_code == 200
     assert len(list_res.json()) == 1
 
     # GET /v1/orgs/{org_id}/notifications/configs/{config_id}
     get_res = await async_client.get(
-        f"/v1/orgs/{org_id}/notifications/configs/{cfg_id}", headers=headers
+        f"/v1/notifications/configs/{cfg_id}", headers=headers
     )
     assert get_res.status_code == 200
 
     # PATCH /v1/orgs/{org_id}/notifications/configs/{config_id}
     patch_res = await async_client.patch(
-        f"/v1/orgs/{org_id}/notifications/configs/{cfg_id}",
+        f"/v1/notifications/configs/{cfg_id}",
         headers=headers,
         json={"is_active": False},
     )
@@ -49,7 +49,7 @@ async def test_notifications_endpoints(async_client, auth_data, mocker):
 
     # POST /v1/orgs/{org_id}/notifications/test
     test_res = await async_client.post(
-        f"/v1/orgs/{org_id}/notifications/test",
+        "/v1/notifications/test",
         headers=headers,
         json={"config_id": cfg_id},
     )
@@ -58,6 +58,6 @@ async def test_notifications_endpoints(async_client, auth_data, mocker):
 
     # DELETE /v1/orgs/{org_id}/notifications/configs/{config_id}
     del_res = await async_client.delete(
-        f"/v1/orgs/{org_id}/notifications/configs/{cfg_id}", headers=headers
+        f"/v1/notifications/configs/{cfg_id}", headers=headers
     )
     assert del_res.status_code == 204

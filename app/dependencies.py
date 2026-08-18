@@ -151,20 +151,15 @@ async def get_current_org(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Organization:
+    from app.core.tenant import extract_organization_id
     from app.modules.organizations.repository import OrganizationRepository
 
-    org_id_val: uuid.UUID | None = None
-
-    if "org_id" in request.path_params:
+    org_id_val: uuid.UUID | None = getattr(request.state, "organization_id", None)
+    if org_id_val is None:
         try:
-            org_id_val = uuid.UUID(str(request.path_params["org_id"]))
+            org_id_val = extract_organization_id(request)
         except ValueError as exc:
-            raise ResourceNotFoundException("Invalid organization ID format") from exc
-    elif request.headers.get("x-organization-id"):
-        try:
-            org_id_val = uuid.UUID(request.headers["x-organization-id"])
-        except ValueError as exc:
-            raise ResourceNotFoundException("Invalid X-Organization-ID header") from exc
+            raise ResourceNotFoundException("Invalid organization header") from exc
 
     org_repo = OrganizationRepository()
 
@@ -180,22 +175,18 @@ async def get_current_org(
         request.state.current_role = Role.ADMIN.value
         return org
 
-    if org_id_val:
-        member = await org_repo.get_member(db, org_id_val, current_user.id)
-        if not member:
-            raise ForbiddenException("User is not a member of this organization")
-        org = await org_repo.get_by_id(db, org_id_val)
-        if not org:
-            raise ResourceNotFoundException("Organization not found")
-        request.state.current_role = member.role
-        return org
+    if not org_id_val:
+        raise ForbiddenException(
+            "Organization context required. Send X-Organization-ID or Reliastra-Organization."
+        )
 
-    orgs = await org_repo.list_for_user(db, current_user.id)
-    if not orgs:
-        raise ResourceNotFoundException("User does not belong to any organization")
-    org = orgs[0]
-    member = await org_repo.get_member(db, org.id, current_user.id)
-    request.state.current_role = member.role if member else Role.VIEWER.value
+    member = await org_repo.get_member(db, org_id_val, current_user.id)
+    if not member:
+        raise ForbiddenException("User is not a member of this organization")
+    org = await org_repo.get_by_id(db, org_id_val)
+    if not org:
+        raise ResourceNotFoundException("Organization not found")
+    request.state.current_role = member.role
     return org
 
 

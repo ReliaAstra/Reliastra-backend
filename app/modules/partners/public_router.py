@@ -49,7 +49,7 @@ from app.modules.partners.tracking import tracking_service
 
 logger = logging.getLogger(__name__)
 
-public_partners_router = APIRouter(prefix="/v1/public", tags=["Partners — Public"])
+public_partners_router = APIRouter(prefix="/v1", tags=["Partners — Public"])
 
 #: Link resolution: deliberately high. A viral post or an email blast from a
 #: single corporate NAT must not start 429-ing real visitors.
