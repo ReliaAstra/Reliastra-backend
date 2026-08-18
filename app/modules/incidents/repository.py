@@ -93,12 +93,20 @@ class IncidentRepository:
         result = await session.execute(query)
         return list(result.scalars().all())
 
+    # Allowed update fields for Incident — any key not in this set is silently
+    # ignored so callers (even internal ones) cannot overwrite protected columns
+    # like `org_id`, `dependency_id`, `created_at` via setattr.
+    _UPDATABLE_FIELDS = {
+        "status", "severity", "description", "root_cause",
+        "resolved_at", "evidence_report_id",
+    }
+
     @staticmethod
     async def update(
         session: AsyncSession, incident: Incident, **kwargs: Any
     ) -> Incident:
         for key, value in kwargs.items():
-            if value is not None and hasattr(incident, key):
+            if key in IncidentRepository._UPDATABLE_FIELDS and value is not None:
                 setattr(incident, key, value)
         session.add(incident)
         await session.flush()

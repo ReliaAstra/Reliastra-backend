@@ -115,12 +115,18 @@ class DependencyRepository:
         await session.flush()
         return dep
 
+    _UPDATABLE_FIELDS = {
+        "name", "endpoint_url", "method", "headers", "expected_status_codes",
+        "timeout_seconds", "check_interval_seconds", "regions", "is_active",
+        "is_deleted", "next_check_at",
+    }
+
     @staticmethod
     async def update(
         session: AsyncSession, dep: Dependency, **kwargs: Any
     ) -> Dependency:
         for key, value in kwargs.items():
-            if value is not None and hasattr(dep, key):
+            if key in DependencyRepository._UPDATABLE_FIELDS and value is not None:
                 setattr(dep, key, value)
         session.add(dep)
         await session.flush()

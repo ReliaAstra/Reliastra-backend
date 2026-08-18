@@ -6,7 +6,7 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from starlette.concurrency import iterate_in_threadpool
@@ -15,17 +15,18 @@ from app.config import settings
 from app.core.exceptions import setup_exception_handlers
 from app.core.request_context import request_id_var, set_request_id
 from app.db.session import get_engine
-from app.infrastructure.scheduler import start_scheduler, stop_scheduler
 from app.infrastructure.redis_client import (
     close_redis,
     safe_redis_get,
     safe_redis_ping,
+    safe_redis_set_nx,
     safe_redis_setex,
 )
 from app.modules.agencies.router import router as agencies_router
 from app.modules.ai_integration.router import router as ai_providers_router
 from app.modules.api_keys.router import router as api_keys_router
 from app.modules.auth.router import router as auth_router
+from app.modules.auth.supabase import router as supabase_auth_router
 from app.modules.billing.router import router as billing_router
 from app.modules.checks.router import router as checks_router
 from app.modules.dashboard.router import router as dashboard_router
@@ -147,7 +148,32 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     headers=data.get("headers", {}),
                 )
 
-            response = await call_next(request)
+            # Single-flight lock: only the first concurrent request with this
+            # idempotency key executes the handler.  Subsequent concurrent
+            # requests get a 409 Conflict instead of both executing and
+            # causing duplicate side effects (e.g. two orgs created).
+            lock_key = f"{cache_key}:lock"
+            acquired = await safe_redis_set_nx(lock_key, "1", ex=60)
+            if not acquired:
+                return Response(
+                    status_code=status.HTTP_409_CONFLICT,
+                    media_type="application/json",
+                    content='{"error":{"code":"IDEMPOTENT_REQUEST_IN_FLIGHT",'
+                            '"message":"A request with this idempotency key is '
+                            'already being processed"}}',
+                )
+
+            try:
+                response = await call_next(request)
+            finally:
+                # Best-effort lock release; TTL handles crashes.
+                try:
+                    from app.infrastructure.redis_client import get_redis
+                    redis = get_redis()
+                    await redis.delete(lock_key)
+                except Exception:
+                    pass
+
             if self._is_cacheable_status(response.status_code):
                 body = [section async for section in response.body_iterator]
                 response.body_iterator = iterate_in_threadpool(iter(body))  # type: ignore
@@ -187,23 +213,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Reliastra backend starting up...")
     get_engine()
-    # FIX 14 + PaaS support: the old in-process APScheduler (which duplicated
-    # Celery Beat and ran HTTP inside the scan) is gone. When
-    # RUN_IN_PROCESS_SCHEDULER is enabled (single-container PaaS with no
-    # worker fleet), the API process runs the Redis ZSET scheduler in
-    # consume-inline mode — each check executes in its own short
-    # transaction. Atomic ZSET claims make this safe even if a standalone
-    # scheduler or Celery Beat is ALSO running (no double probes).
-    if settings.RUN_IN_PROCESS_SCHEDULER:
-        logger.info(
-            "Starting in-process check scheduler (RUN_IN_PROCESS_SCHEDULER=true)"
-        )
-        start_scheduler(consume_inline=True)
+    # Scheduling is handled entirely by Celery Beat → `schedule_checks` →
+    # `execute_check.delay()`.  No custom scheduler loop, no APScheduler.
+    # The Celery worker container executes the actual probes.
     await seed_first_admin()
     yield
     logger.info("Reliastra backend shutting down...")
-    if settings.RUN_IN_PROCESS_SCHEDULER:
-        stop_scheduler()
     try:
         from app.core.ssrf_protection import close_pinned_transports
         await close_pinned_transports()
@@ -258,6 +273,7 @@ def create_app() -> FastAPI:
     app.add_middleware(IdempotencyMiddleware)
 
     app.include_router(auth_router)
+    app.include_router(supabase_auth_router)
     app.include_router(users_router)
     app.include_router(organizations_router)
     app.include_router(dependencies_router)

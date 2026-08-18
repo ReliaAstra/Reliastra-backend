@@ -93,8 +93,8 @@ class OrganizationService:
         update_kwargs = {}
         if request.name is not None:
             update_kwargs["name"] = request.name
-        if request.plan is not None:
-            update_kwargs["plan"] = request.plan.value
+        # Plan changes are not allowed via this endpoint (P0-2 security fix).
+        # Upgrades/downgrades must go through the billing service.
 
         updated = await self.org_repository.update(session, org, **update_kwargs)
         return OrganizationResponse.model_validate(updated)

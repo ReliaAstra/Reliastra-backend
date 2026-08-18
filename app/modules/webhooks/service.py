@@ -76,19 +76,77 @@ class WebhookService:
         return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
     @staticmethod
-    def _hash_secret(secret: str) -> str:
-        """SHA-256 hash of the signing secret for storage."""
-        return hashlib.sha256(secret.encode()).hexdigest()
+    def _encrypt_secret(secret: str) -> str:
+        """Encrypt the signing secret with Fernet for at-rest storage.
+
+        Unlike ``_hash_secret`` (which was irreversible and made it
+        impossible for consumers to verify signatures), Fernet encryption
+        is reversible so that the original plaintext secret can be recovered
+        at delivery time and used as the HMAC key that the consumer expects.
+        """
+        from app.core.security import get_fernet
+        fernet = get_fernet()
+        return fernet.encrypt(secret.encode()).decode()
+
+    @staticmethod
+    def _decrypt_secret(encrypted: str) -> str:
+        """Recover the plaintext signing secret from its Fernet-encrypted form."""
+        from app.core.security import get_fernet
+        fernet = get_fernet()
+        return fernet.decrypt(encrypted.encode()).decode()
+
+    def _recover_signing_secret(self, webhook: Webhook) -> str | None:
+        """Return the plaintext signing secret for *webhook*.
+
+        Supports both the new Fernet-encrypted format (``encrypted_secret``)
+        and legacy SHA-256 hashes (``secret_hash``) for backward
+        compatibility.  Legacy rows are logged so operators know to
+        re-save the webhook.
+        """
+        if not webhook.secret_hash:
+            return None
+        if webhook.secret_hash.startswith("gAAAAA"):  # Fernet-encrypted
+            return self._decrypt_secret(webhook.secret_hash)
+        # Legacy SHA-256 hashed secret — log a warning and use the hash
+        # itself (the old broken behaviour).  Consumers who configured a
+        # webhook before this fix will need to re-enter their secret.
+        logger.warning(
+            "Webhook %s has a legacy SHA-256 hashed secret. "
+            "The signing key is the hash itself, not the original secret. "
+            "Re-save the webhook to upgrade to Fernet encryption.",
+            webhook.id,
+        )
+        return webhook.secret_hash
 
     def _to_response(self, webhook: Webhook) -> WebhookResponse:
         """Convert a Webhook ORM object to a WebhookResponse schema."""
+        secret_preview = _secret_preview(webhook.secret_hash)
+        # Derive secret preview
+        if webhook.secret_hash:
+            if webhook.secret_hash.startswith("gAAAAA"):  # Fernet-encrypted
+                secret_preview = "sk_..." + webhook.secret_hash[-4:]
+            else:
+                secret_preview = _secret_preview(webhook.secret_hash)
+        else:
+            secret_preview = None
         return WebhookResponse(
             id=webhook.id,
             name=webhook.name,
             url_masked=_mask_url(webhook.url),
             events=list(webhook.events or []),
             is_active=webhook.is_active,
-            secret_preview=_secret_preview(webhook.secret_hash),
+            secret_preview=secret_preview,
+            failure_count=webhook.failure_count or 0,
+            last_delivery_at=webhook.last_delivery_at,
+            created_at=webhook.created_at,
+        )
+        return WebhookResponse(
+            id=webhook.id,
+            name=webhook.name,
+            url_masked=_mask_url(webhook.url),
+            events=list(webhook.events or []),
+            is_active=webhook.is_active,
+            secret_preview=secret_preview,
             failure_count=webhook.failure_count or 0,
             last_delivery_at=webhook.last_delivery_at,
             created_at=webhook.created_at,
@@ -109,11 +167,11 @@ class WebhookService:
         validate_outbound_url(url_str)
 
         if request.secret:
-            secret_hash = self._hash_secret(request.secret)
+            encrypted_secret = self._encrypt_secret(request.secret)
         else:
             # Auto-generate a secret so every webhook is signable
             generated = secrets.token_urlsafe(32)
-            secret_hash = self._hash_secret(generated)
+            encrypted_secret = self._encrypt_secret(generated)
 
         events = [e.value for e in request.events]
 
@@ -123,7 +181,7 @@ class WebhookService:
             name=request.name,
             url=url_str,
             events=events,
-            secret_hash=secret_hash,
+            secret_hash=encrypted_secret,
             custom_headers=request.headers,
             is_active=request.is_active,
             created_by=user_id,
@@ -173,7 +231,7 @@ class WebhookService:
         if request.headers is not None:
             update_kwargs["custom_headers"] = request.headers
         if request.secret is not None:
-            update_kwargs["secret_hash"] = self._hash_secret(request.secret)
+            update_kwargs["secret_hash"] = self._encrypt_secret(request.secret)
         if request.is_active is not None:
             update_kwargs["is_active"] = request.is_active
 
@@ -214,18 +272,13 @@ class WebhookService:
             "X-Reliastra-Delivery": str(uuid.uuid4()),
         }
 
-        # Load the plaintext secret for signing from the stored hash is not
-        # possible (we only store the hash).  For the test endpoint we sign
-        # with a placeholder so the user can verify the header is present.
-        # In production delivery the secret is recovered from the hash (see
-        # note in deliver_webhook).  Since we cannot reverse the hash, we
-        # skip the signature header on test – the user should test by
-        # triggering a real event or we sign with the hash itself as a
-        # verification token.
-        #
-        # We sign using the hash as a verifiable value for test purposes.
-        if webhook.secret_hash:
-            sig = self._sign_payload(webhook.secret_hash, body_bytes)
+        # Deliver the signature using the original plaintext secret so that
+        # consumers can verify it with the secret they provided.  Fernet-
+        # encrypted secrets (new format) are decrypted; legacy SHA-256
+        # hashed secrets (pre-fix rows) use the hash itself as the key.
+        signing_secret = self._recover_signing_secret(webhook)
+        if signing_secret:
+            sig = self._sign_payload(signing_secret, body_bytes)
             headers["X-Reliastra-Signature"] = f"sha256={sig}"
 
         # Merge custom headers
@@ -316,8 +369,9 @@ class WebhookService:
             "X-Reliastra-Event": event_type,
             "X-Reliastra-Delivery": str(delivery.id),
         }
-        if webhook.secret_hash:
-            sig = self._sign_payload(webhook.secret_hash, body_bytes)
+        signing_secret = self._recover_signing_secret(webhook)
+        if signing_secret:
+            sig = self._sign_payload(signing_secret, body_bytes)
             headers["X-Reliastra-Signature"] = f"sha256={sig}"
 
         if webhook.custom_headers:
@@ -415,8 +469,9 @@ class WebhookService:
                 "X-Reliastra-Event": delivery.event_type,
                 "X-Reliastra-Delivery": str(delivery.id),
             }
-            if webhook.secret_hash:
-                sig = self._sign_payload(webhook.secret_hash, body_bytes)
+            signing_secret = self._recover_signing_secret(webhook)
+            if signing_secret:
+                sig = self._sign_payload(signing_secret, body_bytes)
                 headers["X-Reliastra-Signature"] = f"sha256={sig}"
             if webhook.custom_headers:
                 for k, v in webhook.custom_headers.items():

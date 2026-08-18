@@ -2,7 +2,7 @@ import time
 import logging
 import urllib.parse
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -135,32 +135,30 @@ class CheckService:
         return [CheckResultResponse.model_validate(r) for r in results]
 
     async def schedule_due_checks(self, session: AsyncSession) -> int:
-        """FIX 1/4: enqueue due dependencies into the Redis ZSET queue.
+        """Celery Beat-driven scheduling: dispatch one Celery task per check.
 
-        This method NEVER performs HTTP requests and NEVER updates rows in
-        the database: it reads at most 500 due dependencies and adds a
-        ``(next_check_timestamp, dependency_id, region)`` entry per region to
-        ``reliastra:check_queue``. The scheduler poller fires
-        ``execute_check.delay(...)`` when an entry becomes due, and advances
-        ``next_check_at`` afterwards in its own fast transaction.
+        Reads at most 500 due dependencies, advances ``next_check_at`` in a
+        single flush, and fires ``execute_check.delay()`` for each
+        dep/region pair.  Each check runs in its own Celery worker, so a
+        slow endpoint never blocks other probes.
         """
-        from app.infrastructure.scheduler import enqueue_check
-
+        now = datetime.now(timezone.utc)
         due_deps = await self.dep_repository.get_due_dependencies(session, limit=500)
-        enqueued = 0
+        dispatched = 0
         for dep in due_deps:
+            dep.next_check_at = now + timedelta(seconds=dep.check_interval_seconds)
             regions = dep.regions or ["us-east", "eu-west"]
-            due_at = dep.next_check_at or datetime.now(timezone.utc)
             for region in regions:
-                if await enqueue_check(str(dep.id), region, due_at):
-                    enqueued += 1
+                from app.modules.checks.tasks import execute_check as execute_check_task
+                execute_check_task.delay(str(dep.id), region)
+                dispatched += 1
+        await session.flush()
 
         logger.info(
-            "Enqueued %s checks across %s due dependencies",
-            enqueued,
-            len(due_deps),
+            "Dispatched %s checks across %s due dependencies",
+            dispatched, len(due_deps),
         )
-        return enqueued
+        return dispatched
 
     async def _record_blocked_result(
         self,
@@ -192,11 +190,13 @@ class CheckService:
         dependency_id: uuid.UUID,
         region: str,
     ) -> CheckResult | None:
-        dep_dto = await dependency_service.get_dependency_config_internal(
-            session, dependency_id
-        )
-        if not dep_dto or not dep_dto.is_active:
+        dep = await self.dep_repository.get_by_id(session, dependency_id)
+        if not dep or not dep.is_active:
             return None
+        org_id = dep.org_id
+        dep_dto = await dependency_service.get_dependency_config_internal(
+            session, dependency_id, org_id=org_id
+        )
 
         method = dep_dto.method
         url = dep_dto.endpoint_url
@@ -221,7 +221,7 @@ class CheckService:
         except ValueError as exc:
             logger.warning("SSRF check blocked URL for dep %s: %s", dependency_id, exc)
             result = await self._record_blocked_result(
-                session, dependency_id, dep_dto.org_id, region, url, method, str(exc)
+                session, dependency_id, org_id, region, url, method, str(exc)
             )
             checks_total.labels(region=region, status="blocked").inc()
             await circuit_breaker.record_failure(dependency_id)
@@ -287,7 +287,7 @@ class CheckService:
         result = await self.repository.create(
             session=session,
             dependency_id=dependency_id,
-            org_id=dep_dto.org_id,
+            org_id=org_id,
             region=region,
             latency_ms=latency_ms,
             is_up=is_up,
@@ -327,7 +327,7 @@ class CheckService:
 
                 await incident_service.check_and_create_incident(
                     session=session,
-                    org_id=dep_dto.org_id,
+                    org_id=org_id,
                     dependency_id=dependency_id,
                     error_message=error_message or "Quorum confirmed failure",
                 )

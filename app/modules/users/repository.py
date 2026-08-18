@@ -31,6 +31,14 @@ class UserRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_external_auth_id(
+        session: AsyncSession, external_auth_id: str
+    ) -> User | None:
+        query = select(User).where(User.external_auth_id == external_auth_id)
+        result = await session.execute(query)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def create(
         session: AsyncSession,
         email: str,
@@ -42,6 +50,8 @@ class UserRepository:
         github_id: str | None = None,
         avatar_url: str | None = None,
         auth_provider: str | None = None,
+        external_auth_id: str | None = None,
+        is_active: bool = True,
     ) -> User:
         user = User(
             email=email.lower(),
@@ -53,15 +63,25 @@ class UserRepository:
             github_id=github_id,
             avatar_url=avatar_url,
             auth_provider=auth_provider,
+            external_auth_id=external_auth_id,
+            is_active=is_active,
         )
         session.add(user)
         await session.flush()
         return user
 
+    _UPDATABLE_FIELDS = {
+        "email", "full_name", "password_hash", "is_active",
+        "is_email_verified", "is_superuser", "is_system_admin",
+        "google_id", "github_id", "avatar_url", "auth_provider",
+        "external_auth_id", "admin_note", "source",
+        "last_login_at", "last_activity_at", "login_count",
+    }
+
     @staticmethod
     async def update(session: AsyncSession, user: User, **kwargs: Any) -> User:
         for key, value in kwargs.items():
-            if value is not None and hasattr(user, key):
+            if key in UserRepository._UPDATABLE_FIELDS and value is not None:
                 if key == "email" and isinstance(value, str):
                     setattr(user, key, value.lower())
                 else:

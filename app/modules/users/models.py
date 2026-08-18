@@ -29,6 +29,10 @@ class User(UUIDMixin, TimestampMixin, Base):
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     auth_provider: Mapped[str | None] = mapped_column(
         String(50), nullable=True
+    )
+    external_auth_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True,
+        comment="External auth provider user ID, e.g. 'supabase:<uuid>'",
     )  # "google", "github", "email", None
     # Admin panel fields
     is_system_admin: Mapped[bool] = mapped_column(

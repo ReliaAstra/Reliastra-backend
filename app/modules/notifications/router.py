@@ -1,7 +1,7 @@
 import uuid
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.dependencies import get_current_org, require_member
+from app.dependencies import get_current_org, require_admin
 from app.db.session import get_db
 from app.modules.notifications.schemas import (
     AlertConfigCreateRequest,
