@@ -10,7 +10,10 @@ class ApiKeyRepository:
     async def get_by_id(
         session: AsyncSession, key_id: uuid.UUID
     ) -> ApiKey | None:
-        query = select(ApiKey).where(ApiKey.id == key_id)
+        query = select(ApiKey).where(
+            ApiKey.id == key_id,
+            ApiKey.is_deleted == False,  # noqa: E712
+        )
         result = await session.execute(query)
         return result.scalar_one_or_none()
 
@@ -20,7 +23,10 @@ class ApiKeyRepository:
     ) -> ApiKey | None:
         """Exact-match lookup — only valid for deterministic hashes (legacy
         SHA-256). bcrypt hashes must be located via ``list_by_prefix``."""
-        query = select(ApiKey).where(ApiKey.hashed_key == hashed_key)
+        query = select(ApiKey).where(
+            ApiKey.hashed_key == hashed_key,
+            ApiKey.is_deleted == False,  # noqa: E712
+        )
         result = await session.execute(query)
         return result.scalar_one_or_none()
 
@@ -30,7 +36,10 @@ class ApiKeyRepository:
     ) -> list[ApiKey]:
         query = (
             select(ApiKey)
-            .where(ApiKey.prefix == prefix)
+            .where(
+                ApiKey.prefix == prefix,
+                ApiKey.is_deleted == False,  # noqa: E712
+            )
             .order_by(ApiKey.created_at.desc())
         )
         result = await session.execute(query)
@@ -42,7 +51,10 @@ class ApiKeyRepository:
     ) -> list[ApiKey]:
         query = (
             select(ApiKey)
-            .where(ApiKey.org_id == org_id)
+            .where(
+                ApiKey.org_id == org_id,
+                ApiKey.is_deleted == False,  # noqa: E712
+            )
             .order_by(ApiKey.created_at.desc())
         )
         result = await session.execute(query)
@@ -72,7 +84,9 @@ class ApiKeyRepository:
 
     @staticmethod
     async def delete(session: AsyncSession, api_key: ApiKey) -> None:
-        await session.delete(api_key)
+        api_key.is_deleted = True
+        api_key.deleted_at = datetime.now(timezone.utc)
+        session.add(api_key)
         await session.flush()
 
     @staticmethod

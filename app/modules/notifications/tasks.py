@@ -6,7 +6,13 @@ from app.infrastructure.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(name="app.modules.notifications.tasks.dispatch_notification")
+@celery_app.task(
+    name="app.modules.notifications.tasks.dispatch_notification",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=3,
+)
 def dispatch_notification(
     alert_dict: dict[str, Any], request_id: str | None = None
 ) -> int:

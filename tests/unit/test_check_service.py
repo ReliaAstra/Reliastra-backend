@@ -26,6 +26,21 @@ def _fake_dto(dep_id: uuid.UUID, org_id: uuid.UUID) -> DependencyInternalDTO:
     )
 
 
+def _fake_dep(dep_id: uuid.UUID, org_id: uuid.UUID) -> MagicMock:
+    return MagicMock(id=dep_id, org_id=org_id, is_active=True)
+
+
+def _wired_repos(dep_id: uuid.UUID, org_id: uuid.UUID, *, is_up: bool = True):
+    chk_repo = MagicMock()
+    dep_repo = MagicMock()
+    fake_result = _fake_result(dep_id, org_id)
+    fake_result.is_up = is_up
+    dep_repo.get_by_id = AsyncMock(return_value=_fake_dep(dep_id, org_id))
+    chk_repo.create = AsyncMock(return_value=fake_result)
+    chk_repo.list_recent_for_dependency = AsyncMock(return_value=[fake_result])
+    return chk_repo, dep_repo, fake_result
+
+
 def _fake_result(dep_id: uuid.UUID, org_id: uuid.UUID) -> MagicMock:
     return MagicMock(
         id=uuid.uuid4(),
@@ -60,15 +75,10 @@ class _FakePinnedTransport(httpx.AsyncBaseTransport):
 
 @pytest.mark.asyncio
 async def test_execute_check_success(mocker):
-    chk_repo = MagicMock()
-    dep_repo = MagicMock()
     dep_id = uuid.uuid4()
     org_id = uuid.uuid4()
-
     fake_dto = _fake_dto(dep_id, org_id)
-    fake_result = _fake_result(dep_id, org_id)
-    chk_repo.create = AsyncMock(return_value=fake_result)
-    chk_repo.list_recent_for_dependency = AsyncMock(return_value=[fake_result])
+    chk_repo, dep_repo, fake_result = _wired_repos(dep_id, org_id)
 
     service = CheckService(repository=chk_repo, dep_repository=dep_repo)
     session = AsyncMock()
@@ -101,15 +111,10 @@ async def test_execute_check_success(mocker):
 @pytest.mark.asyncio
 async def test_execute_check_locks_dependency_row_for_update(mocker):
     """FIX 3: quorum evaluation must run under SELECT ... FOR UPDATE."""
-    chk_repo = MagicMock()
-    dep_repo = MagicMock()
     dep_id = uuid.uuid4()
     org_id = uuid.uuid4()
-
     fake_dto = _fake_dto(dep_id, org_id)
-    fake_result = _fake_result(dep_id, org_id)
-    chk_repo.create = AsyncMock(return_value=fake_result)
-    chk_repo.list_recent_for_dependency = AsyncMock(return_value=[fake_result])
+    chk_repo, dep_repo, fake_result = _wired_repos(dep_id, org_id)
 
     service = CheckService(repository=chk_repo, dep_repository=dep_repo)
     session = AsyncMock()
@@ -153,15 +158,10 @@ async def test_execute_check_locks_dependency_row_for_update(mocker):
 @pytest.mark.asyncio
 async def test_execute_check_blocked_url_records_failure_without_http():
     """FIX 26: unsafe URLs never reach an HTTP client."""
-    chk_repo = MagicMock()
-    dep_repo = MagicMock()
     dep_id = uuid.uuid4()
     org_id = uuid.uuid4()
-
     fake_dto = _fake_dto(dep_id, org_id)
-    fake_result = _fake_result(dep_id, org_id)
-    fake_result.is_up = False
-    chk_repo.create = AsyncMock(return_value=fake_result)
+    chk_repo, dep_repo, fake_result = _wired_repos(dep_id, org_id, is_up=False)
 
     service = CheckService(repository=chk_repo, dep_repository=dep_repo)
     session = AsyncMock()
@@ -201,15 +201,10 @@ async def test_http_client_is_module_level_pool(mocker):
 @pytest.mark.asyncio
 async def test_execute_check_records_circuit_breaker(mocker):
     """FIX 8: outcomes feed the circuit breaker."""
-    chk_repo = MagicMock()
-    dep_repo = MagicMock()
     dep_id = uuid.uuid4()
     org_id = uuid.uuid4()
-
     fake_dto = _fake_dto(dep_id, org_id)
-    fake_result = _fake_result(dep_id, org_id)
-    chk_repo.create = AsyncMock(return_value=fake_result)
-    chk_repo.list_recent_for_dependency = AsyncMock(return_value=[fake_result])
+    chk_repo, dep_repo, fake_result = _wired_repos(dep_id, org_id)
 
     service = CheckService(repository=chk_repo, dep_repository=dep_repo)
     session = AsyncMock()
@@ -274,28 +269,28 @@ async def test_execute_check_writes_observation_outbox(db_session):
 @pytest.mark.asyncio
 async def test_schedule_due_checks_never_runs_http(db_session, monkeypatch):
     """FIX 4: schedule_due_checks only reads due deps and enqueues."""
-    from app.infrastructure import scheduler as scheduler_module
-
     dep_repo = MagicMock()
     dep = MagicMock()
     dep.id = uuid.uuid4()
     dep.regions = ["us-east", "eu-west"]
     dep.next_check_at = datetime.now(timezone.utc)
+    dep.check_interval_seconds = 60
     dep_repo.get_due_dependencies = AsyncMock(return_value=[dep])
 
     service = CheckService(repository=MagicMock(), dep_repository=dep_repo)
     service.execute_check = AsyncMock()
 
-    enqueued_members = []
-    async def fake_enqueue(dep_id, region, due_at):
-        enqueued_members.append((dep_id, region))
-        return True
+    delayed: list[tuple[str, str]] = []
 
-    monkeypatch.setattr(scheduler_module, "enqueue_check", fake_enqueue)
+    class _FakeTask:
+        @staticmethod
+        def delay(dep_id, region, request_id=None):
+            delayed.append((dep_id, region))
 
-    count = await service.schedule_due_checks(AsyncMock())
+    with patch("app.modules.checks.tasks.execute_check", _FakeTask):
+        count = await service.schedule_due_checks(AsyncMock())
     assert count == 2
-    assert enqueued_members == [(str(dep.id), "us-east"), (str(dep.id), "eu-west")]
+    assert delayed == [(str(dep.id), "us-east"), (str(dep.id), "eu-west")]
     service.execute_check.assert_not_awaited()
 
 
@@ -305,15 +300,10 @@ async def test_execute_check_follows_redirects_with_revalidation(mocker):
     is re-validated against the SSRF policy before connecting."""
     from app.core.ssrf_protection import PinnedTarget
 
-    chk_repo = MagicMock()
-    dep_repo = MagicMock()
     dep_id = uuid.uuid4()
     org_id = uuid.uuid4()
-
     fake_dto = _fake_dto(dep_id, org_id)
-    fake_result = _fake_result(dep_id, org_id)
-    chk_repo.create = AsyncMock(return_value=fake_result)
-    chk_repo.list_recent_for_dependency = AsyncMock(return_value=[fake_result])
+    chk_repo, dep_repo, fake_result = _wired_repos(dep_id, org_id)
 
     service = CheckService(repository=chk_repo, dep_repository=dep_repo)
     session = AsyncMock()
@@ -359,16 +349,10 @@ async def test_execute_check_blocks_redirect_to_private_target():
     """A redirect hop to a blocked target fails the check without a request."""
     from app.core.ssrf_protection import PinnedTarget
 
-    chk_repo = MagicMock()
-    dep_repo = MagicMock()
     dep_id = uuid.uuid4()
     org_id = uuid.uuid4()
-
     fake_dto = _fake_dto(dep_id, org_id)
-    fake_result = _fake_result(dep_id, org_id)
-    fake_result.is_up = False
-    chk_repo.create = AsyncMock(return_value=fake_result)
-    chk_repo.list_recent_for_dependency = AsyncMock(return_value=[fake_result])
+    chk_repo, dep_repo, fake_result = _wired_repos(dep_id, org_id, is_up=False)
 
     service = CheckService(repository=chk_repo, dep_repository=dep_repo)
     session = AsyncMock()
