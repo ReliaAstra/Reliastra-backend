@@ -101,6 +101,32 @@ class AuthService:
                 new_user_org_id=org.id,
             )
 
+        # Bind partner attribution. This runs alongside — never instead of —
+        # the PLG referral flow above: the two systems answer different
+        # questions (peer rewards vs. commissionable partner ownership) and a
+        # user can legitimately arrive through both.
+        #
+        # Attribution must never be able to fail a registration, so any
+        # error here is logged and swallowed.
+        if request.partner_visitor_id or request.partner_code:
+            try:
+                from app.modules.partners.tracking import tracking_service
+
+                await tracking_service.bind_signup(
+                    session,
+                    user_id=user.id,
+                    organization_id=org.id,
+                    visitor_id=request.partner_visitor_id,
+                    partner_code=request.partner_code,
+                    campaign_code=request.partner_campaign_code,
+                    email=request.email,
+                )
+            except Exception:
+                logger.exception(
+                    "Partner attribution failed during registration for user %s",
+                    user.id,
+                )
+
         tokens = self._generate_token_pair(user.id)
         expires_at = datetime.now(timezone.utc) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS

@@ -70,3 +70,4 @@ def import_all_models() -> None:
     import app.modules.vendor_submissions.models  # noqa: F401
     import app.modules.status_pages.models  # noqa: F401
     import app.modules.admin.models  # noqa: F401
+    import app.modules.partners.models  # noqa: F401
