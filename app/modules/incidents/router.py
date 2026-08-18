@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query, status
 from app.modules.evidence.schemas import EvidenceReportResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.dependencies import get_current_org, require_member
+from app.dependencies import get_current_org, require_admin
 from app.db.session import get_db
 from app.modules.incidents.constants import IncidentSeverity, IncidentStatus
 from app.modules.incidents.schemas import (
@@ -52,7 +52,7 @@ async def get_incident(
 @router.patch(
     "/{inc_id}",
     response_model=IncidentResponse,
-    dependencies=[Depends(require_member)],
+    dependencies=[Depends(require_admin)],
 )
 async def update_incident(
     org_id: uuid.UUID,
@@ -69,7 +69,7 @@ async def update_incident(
     "/{inc_id}/correlate",
     response_model=IncidentCorrelationResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_member)],
+    dependencies=[Depends(require_admin)],
 )
 async def correlate_incident(
     org_id: uuid.UUID,

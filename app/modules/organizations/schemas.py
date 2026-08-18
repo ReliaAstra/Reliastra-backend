@@ -14,7 +14,10 @@ class OrganizationCreateRequest(BaseModel):
 
 class OrganizationUpdateRequest(BaseModel):
     name: str | None = None
-    plan: Plan | None = None
+    # NOTE: Plan changes are NOT allowed here. Plan upgrades/downgrades
+    # must go through the billing service (verify_transaction / webhook).
+    # An org admin setting ``plan: \"professional\"`` via PATCH would bypass
+    # payment entirely — see P0-2 security audit finding.
 
 
 class OrganizationResponse(BaseModel):

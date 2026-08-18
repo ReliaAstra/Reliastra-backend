@@ -1,7 +1,7 @@
 import uuid
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.dependencies import get_current_org, require_member
+from app.dependencies import get_current_org, require_admin
 from app.db.session import get_db
 from app.modules.checks.schemas import CheckResultResponse
 from app.modules.dependencies.schemas import (
@@ -35,7 +35,7 @@ async def list_dependencies(
     "",
     response_model=DependencyResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_member)],
+    dependencies=[Depends(require_admin)],
 )
 async def create_dependency(
     org_id: uuid.UUID,
@@ -61,7 +61,7 @@ async def get_dependency(
 @router.patch(
     "/{dep_id}",
     response_model=DependencyResponse,
-    dependencies=[Depends(require_member)],
+    dependencies=[Depends(require_admin)],
 )
 async def update_dependency(
     org_id: uuid.UUID,
@@ -77,7 +77,7 @@ async def update_dependency(
 @router.delete(
     "/{dep_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_member)],
+    dependencies=[Depends(require_admin)],
 )
 async def delete_dependency(
     org_id: uuid.UUID,

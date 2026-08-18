@@ -125,15 +125,18 @@ class Settings(BaseSettings):
         description="Number of trusted reverse-proxy hops used when parsing "
                     "X-Forwarded-For for rate limiting",
     )
-    RUN_IN_PROCESS_SCHEDULER: bool = Field(
-        default=True,
-        description=(
-            "Run the Redis ZSET check scheduler inside the API process.  "
-            "Required on single-container PaaS where no separate scheduler "
-            "process (or Celery Beat) can run; disabled in docker-compose "
-            "where the dedicated scheduler service owns the queue.  The ZSET "
-            "design makes multiple pollers safe (atomic claim per entry)."
-        ),
+    # ── Supabase Authentication ──────────────────────────────────────────
+    SUPABASE_URL: str = Field(
+        default="",
+        description="Supabase project URL (e.g. https://xyz.supabase.co). "
+                    "When set, the API accepts Supabase JWTs in addition to "
+                    "native Reliastra tokens.",
+    )
+    SUPABASE_JWT_SECRET: str = Field(
+        default="",
+        description="Supabase JWT secret (the `SUPABASE_JWT_SECRET` from "
+                    "project settings -> API -> JWT Settings). Used to verify "
+                    "RS256 JWTs issued by Supabase Auth.",
     )
 
     @property

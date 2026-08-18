@@ -42,18 +42,44 @@ def execute_check(
     return async_task_body(_run)
 
 
+@celery_app.task(name="app.modules.checks.tasks.schedule_checks")
+def schedule_checks(request_id: str | None = None) -> int:
+    """Celery Beat task: scan and dispatch due dependency checks.
+
+    Runs every 30s (configured in ``celery_app.conf.beat_schedule``).
+    Delegates to ``CheckService.schedule_due_checks`` which reads at most
+    500 due dependencies and fires one ``execute_check`` Celery task per
+    dep/region pair — no Redis ZSET queue, no custom scheduler loop.
+    """
+    async def _run(session) -> int:
+        from app.modules.checks.service import check_service
+        return await check_service.schedule_due_checks(session)
+
+    return async_task_body(_run)
+
+
 @celery_app.task(name="app.modules.checks.tasks.ensure_check_result_partitions")
 def ensure_check_result_partitions(months_ahead: int = 12) -> int:
     """Create monthly partitions for the next *months_ahead* months.
 
     Scheduled monthly by Celery beat; also runs once in migration
     ``0015_production_hardening``.
+
+    Now also creates observation partitions to fix the gap where
+    ``observations`` had no partition management (P0-3 finding).
     """
 
     async def _run(session) -> int:
-        from app.modules.checks.partition_manager import ensure_partitions
+        from app.modules.checks.partition_manager import (
+            ensure_partitions,
+            ensure_observation_partitions,
+        )
 
+        created = 0
         names = await ensure_partitions(session, months_ahead)
-        return len(names)
+        created += len(names)
+        obs_names = await ensure_observation_partitions(session, months_ahead)
+        created += len(obs_names)
+        return created
 
     return async_task_body(_run)

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -28,6 +29,7 @@ class EmailClient:
         body: str,
         html_body: str | None = None,
     ) -> bool:
+        """SYNC — call via ``asyncio.to_thread`` from async code."""
         logger.info("Sending email to '%s': Subject='%s'", to_email, subject)
         message = MIMEMultipart("alternative")
         message["Subject"] = subject
@@ -67,6 +69,19 @@ class EmailClient:
                     server.quit()
                 except Exception:
                     pass
+
+
+async def send_async(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        html_body: str | None = None,
+    ) -> bool:
+        """Async wrapper — runs the blocking SMTP call in a thread pool."""
+        return await asyncio.to_thread(
+            self.send, to_email, subject, body, html_body,
+        )
 
 
 email_client = EmailClient()

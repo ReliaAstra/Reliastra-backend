@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.exceptions import ResourceNotFoundException
 from app.core.rate_limit import ip_limiter, enforce_rate_limit
 from app.db.session import get_db
 from app.modules.auth.schemas import (
@@ -149,6 +150,8 @@ async def google_auth_callback(
     payload = decode_token(tokens.access_token)
     user_id = uuid_mod.UUID(payload["sub"])
     user = await UserRepository.get_by_id(db, user_id)
+    if not user:
+        raise ResourceNotFoundException("User not found — account may have been deleted")
 
     return GoogleAuthResponse(
         access_token=tokens.access_token,
@@ -209,6 +212,8 @@ async def github_auth_callback(
     payload = decode_token(tokens.access_token)
     user_id = uuid_mod.UUID(payload["sub"])
     user = await UserRepository.get_by_id(db, user_id)
+    if not user:
+        raise ResourceNotFoundException("User not found — account may have been deleted")
 
     return GitHubAuthResponse(
         access_token=tokens.access_token,

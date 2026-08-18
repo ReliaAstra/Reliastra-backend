@@ -14,6 +14,7 @@ class Observation(Base):
     __table_args__ = (
         Index("ix_observations_source_timestamp", "source_id", "timestamp"),
         Index("ix_observations_org_timestamp", "org_id", "timestamp"),
+        Index("ix_observations_endpoint_url", "endpoint_url"),
         {"postgresql_partition_by": "RANGE (timestamp)"},
     )
 

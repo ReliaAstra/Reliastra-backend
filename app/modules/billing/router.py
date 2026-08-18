@@ -17,9 +17,9 @@ from app.core.permissions import (
     FOUNDING_DISCOUNT_PCT,
     FOUNDING_MAX_SPOTS,
     PLAN_DEPENDENCY_LIMITS,
+    PLAN_DESCRIPTIONS,
     PLAN_FEATURES,
     PLAN_PRICES_USD,
-    PLAN_DESCRIPTIONS,
     PLAN_RETENTION_DAYS,
     PLAN_TAGS,
     Plan,
@@ -27,8 +27,8 @@ from app.core.permissions import (
     get_min_check_interval,
     get_plan_price_usd,
 )
+from app.dependencies import get_current_org, require_admin, require_member
 from app.db.session import get_db
-from app.dependencies import get_current_org, require_admin
 from app.modules.billing.schemas import (
     InitializePaymentRequest,
     InitializePaymentResponse,
@@ -191,7 +191,14 @@ async def claim_founding_spot(
             founding_discount_pct=FOUNDING_DISCOUNT_PCT,
         )
 
-    # Check spots remaining
+    # Lock the current org row to serialize concurrent claim attempts
+    await db.execute(
+        select(Organization).where(Organization.id == org_id).with_for_update()
+    )
+
+    # Re-check spots remaining inside the lock — this prevents the
+    # TOCTOU race where two concurrent requests both read 24 and both
+    # try to claim spot 25.
     try:
         result = await db.execute(
             select(func.count()).select_from(Organization).where(
@@ -213,7 +220,8 @@ async def claim_founding_spot(
             },
         )
 
-    # Claim the spot
+    # Claim the spot — still inside the lock, so no other request can
+    # read a stale count.
     from app.modules.organizations.repository import OrganizationRepository
 
     await OrganizationRepository.update(
@@ -264,10 +272,16 @@ async def initialize_payment(
     return await service.initialize_payment(db, org_id, request)
 
 
-@router.post("/billing/verify", response_model=VerifyTransactionResponse)
+@router.post(
+    "/orgs/{org_id}/billing/verify",
+    response_model=VerifyTransactionResponse,
+    dependencies=[Depends(require_member)],
+)
 async def verify_transaction(
+    org_id: uuid.UUID,
     reference: str = Query(min_length=1, max_length=200),
     db: AsyncSession = Depends(get_db),
+    current_org: Organization = Depends(get_current_org),
     service: BillingService = Depends(get_bill_service),
 ) -> VerifyTransactionResponse:
     try:

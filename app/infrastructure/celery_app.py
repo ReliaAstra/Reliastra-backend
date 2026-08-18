@@ -91,10 +91,15 @@ celery_app.conf.update(
     task_track_started=True,
     task_always_eager=False,  # Can be set to True in tests
     beat_schedule={
-        # Check scheduling no longer lives in Celery beat. The Redis ZSET
-        # queue (app.infrastructure.scheduler) is the single scheduling path:
-        # it polls `reliastra:check_queue` every 5s and fires
-        # `execute_check` when entries become due.
+        # Dependency-check scheduling: a simple Celery Beat tick every 30s
+        # triggers `schedule_checks`, which reads due dependencies from the
+        # DB and dispatches one `execute_check` Celery task per dep/region.
+        # No custom scheduler loop, no APScheduler, no Redis ZSET queue.
+        "schedule-checks-periodic": {
+            "task": "app.modules.checks.tasks.schedule_checks",
+            "schedule": 30.0,
+            "options": {"expires": 60},
+        },
         "observation-outbox-process": {
             "task": "app.modules.observations.tasks.process_outbox",
             "schedule": 10.0,

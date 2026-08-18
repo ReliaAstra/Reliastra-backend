@@ -164,7 +164,9 @@ class AuthService:
         stored_rt = await self.auth_repository.get_refresh_token(
             session, refresh_token_str
         )
-        if stored_rt and stored_rt.is_revoked:
+        if not stored_rt:
+            raise UnauthorizedException("Refresh token not found or invalid")
+        if stored_rt.is_revoked:
             raise UnauthorizedException("Refresh token has been revoked")
 
         user_id_str = payload.get("sub")

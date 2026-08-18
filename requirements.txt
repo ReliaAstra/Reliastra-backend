@@ -21,4 +21,3 @@ email-validator>=2.1.0
 python-multipart>=0.0.9
 # PyPI currently publishes paystack through 1.5.0; API calls use httpx directly.
 paystack>=1.5.0,<2
-apscheduler>=3.10.0

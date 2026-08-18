@@ -215,10 +215,13 @@ class DependencyService:
         )
 
     async def get_dependency_config_internal(
-        self, session: AsyncSession, dep_id: uuid.UUID
+        self, session: AsyncSession, dep_id: uuid.UUID, org_id: uuid.UUID | None = None
     ) -> DependencyInternalDTO | None:
         dep = await self.repository.get_by_id(session, dep_id)
         if not dep:
+            return None
+        if org_id is not None and dep.org_id != org_id:
+            logger.warning("Cross-tenant config access attempt dep=%s caller_org=%s", dep_id, org_id)
             return None
         dto_dict = DependencyInternalDTO.model_validate(dep).model_dump()
         dto_dict["headers"] = self._decode_headers(dep.headers)

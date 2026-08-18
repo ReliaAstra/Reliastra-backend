@@ -274,16 +274,8 @@ class EvidenceService:
             "report_checksum": report_checksum,
             "generated_at": generated_at.isoformat(),
         }
-        storage_client.upload_bytes(pdf_bytes, report_path, "application/pdf")
-        storage_client.upload_bytes(
-            json.dumps(
-                json_document, sort_keys=True, separators=(",", ":")
-            ).encode("utf-8"),
-            json_path,
-            "application/json",
-        )
-
-        # Every generation creates new rows. Existing evidence is never updated.
+        # Create the DB record FIRST so that a failed S3 upload leaves a
+        # record that can be regenerated (P2-6 fix — dual-write compensation).
         report = await self.repository.create(
             session=session,
             org_id=incident.org_id,
@@ -291,6 +283,14 @@ class EvidenceService:
             file_path=report_path,
             file_size_bytes=len(pdf_bytes),
             checksum=report_checksum,
+        )
+        storage_client.upload_bytes(pdf_bytes, report_path, "application/pdf")
+        storage_client.upload_bytes(
+            json.dumps(
+                json_document, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8"),
+            json_path,
+            "application/json",
         )
         snapshot = await self.snapshot_repository.create(
             session,

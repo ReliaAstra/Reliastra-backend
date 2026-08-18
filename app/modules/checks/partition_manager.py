@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 PARENT_TABLE = "check_results"
+OBSERVATIONS_PARENT_TABLE = "observations"
 MONTHS_AHEAD = 12
 
 
@@ -86,4 +87,56 @@ async def ensure_partitions(
             raise
     await session.commit()
     logger.info("Ensured %s check_results monthly partitions", len(names))
+    return names
+
+
+# ── Observations partition management ─────────────────────────────────
+
+
+def observation_partition_name_for(month: datetime) -> str:
+    """Return the partition table name for *month*."""
+    return f"{OBSERVATIONS_PARENT_TABLE}_{month:%Y_%m}"
+
+
+def create_observation_partition_ddl(month: datetime) -> str:
+    """Return a ``CREATE TABLE ... PARTITION OF observations`` statement."""
+    start, end = _month_bounds(month)
+    name = observation_partition_name_for(month)
+    return (
+        f"CREATE TABLE IF NOT EXISTS {name} "
+        f"PARTITION OF {OBSERVATIONS_PARENT_TABLE} "
+        f"FOR VALUES FROM ('{start.isoformat()}') TO ('{end.isoformat()}')"
+    )
+
+
+def drop_observation_partition_ddl(month: datetime) -> str:
+    """Return a ``DROP TABLE`` statement for a single observation partition."""
+    return f"DROP TABLE IF EXISTS {observation_partition_name_for(month)}"
+
+
+async def ensure_observation_partitions(
+    session: AsyncSession,
+    months_ahead_count: int = MONTHS_AHEAD,
+) -> list[str]:
+    """Create observation monthly partitions for the next *months_ahead_count* months.
+
+    Observations are partitioned by ``RANGE (timestamp)`` (defined in
+    migration ``0003_add_observations.py``), but only a DEFAULT partition
+    exists.  This function creates the real monthly partitions that enable
+    partition pruning and fast ``DROP PARTITION``-based retention.
+
+    Should be run monthly (via ``ensure_check_result_partitions`` beat task).
+    """
+    now = datetime.now(timezone.utc)
+    names: list[str] = []
+    for month in months_ahead(now, months_ahead_count):
+        ddl = create_observation_partition_ddl(month)
+        try:
+            await session.execute(text(ddl))
+            names.append(observation_partition_name_for(month))
+        except Exception:
+            logger.exception("Failed to create observation partition for %s", month)
+            raise
+    await session.commit()
+    logger.info("Ensured %s observations monthly partitions", len(names))
     return names
