@@ -188,8 +188,10 @@ class EvidenceGateService:
         raw_token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
-        # 5. Set expires_at = now + 1 hour
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        # 5. Token TTL is 7 days (settings.REPORT_TOKEN_TTL_DAYS).
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            days=settings.REPORT_TOKEN_TTL_DAYS
+        )
 
         # 6. Create EvidenceGateToken record
         await self.token_repo.create(
@@ -229,6 +231,7 @@ class EvidenceGateService:
         return EvidenceGateResponse(
             download_url=download_url,
             report_id=pub_report.id,
+            report_token=raw_token,
             expires_at=expires_at,
             account_created=account_created,
             login_url=login_url,

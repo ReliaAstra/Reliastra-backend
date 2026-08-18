@@ -66,7 +66,7 @@ class PricingPlansResponse(BaseModel):
     plans: list[PricingPlanResponse]
 
 
-@router.get("/public/pricing", response_model=PricingPlansResponse)
+@router.get("/pricing", response_model=PricingPlansResponse)
 async def get_pricing_plans() -> PricingPlansResponse:
     """Public endpoint returning all plan details for the pricing page.
 
@@ -102,11 +102,10 @@ class FoundingSpotsResponse(BaseModel):
 
 
 @router.get(
-    "/orgs/{org_id}/billing/founding-spots",
+    "/billing/founding-spots",
     response_model=FoundingSpotsResponse,
 )
 async def get_founding_spots(
-    org_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
 ) -> FoundingSpotsResponse:
@@ -164,12 +163,11 @@ class ClaimFoundingSpotResponse(BaseModel):
 
 
 @router.post(
-    "/orgs/{org_id}/billing/founding-spot/claim",
+    "/billing/founding-spot/claim",
     response_model=ClaimFoundingSpotResponse,
     dependencies=[Depends(require_admin)],
 )
 async def claim_founding_spot(
-    org_id: uuid.UUID,
     body: ClaimFoundingSpotRequest | None = None,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
@@ -193,7 +191,7 @@ async def claim_founding_spot(
 
     # Lock the current org row to serialize concurrent claim attempts
     await db.execute(
-        select(Organization).where(Organization.id == org_id).with_for_update()
+        select(Organization).where(Organization.id == current_org.id).with_for_update()
     )
 
     # Re-check spots remaining inside the lock — this prevents the
@@ -247,23 +245,21 @@ async def claim_founding_spot(
 # ── Authenticated Endpoints ──────────────────────────────────────────────────────
 
 
-@router.get("/orgs/{org_id}/billing/plan", response_model=PlanDetailsResponse)
+@router.get("/billing/plan", response_model=PlanDetailsResponse)
 async def get_organization_plan(
-    org_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: BillingService = Depends(get_bill_service),
 ) -> PlanDetailsResponse:
-    return await service.get_plan_details(db, org_id)
+    return await service.get_plan_details(db, current_org.id)
 
 
 @router.post(
-    "/orgs/{org_id}/billing/initialize",
+    "/billing/initialize",
     response_model=InitializePaymentResponse,
     dependencies=[Depends(require_admin)],
 )
 async def initialize_payment(
-    org_id: uuid.UUID,
     request: InitializePaymentRequest,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
@@ -273,12 +269,11 @@ async def initialize_payment(
 
 
 @router.post(
-    "/orgs/{org_id}/billing/verify",
+    "/billing/verify",
     response_model=VerifyTransactionResponse,
     dependencies=[Depends(require_member)],
 )
 async def verify_transaction(
-    org_id: uuid.UUID,
     reference: str = Query(min_length=1, max_length=200),
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),

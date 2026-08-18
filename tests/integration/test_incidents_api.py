@@ -23,7 +23,7 @@ async def test_incidents_endpoints(async_client, auth_data, db_session, mocker):
 
     # Create two dependencies
     dep1_res = await async_client.post(
-        f"/v1/orgs/{org_id}/dependencies",
+        "/v1/dependencies",
         headers=headers,
         json={
             "name": "Dep 1",
@@ -34,7 +34,7 @@ async def test_incidents_endpoints(async_client, auth_data, db_session, mocker):
     dep1_id = dep1_res.json()["id"]
 
     dep2_res = await async_client.post(
-        f"/v1/orgs/{org_id}/dependencies",
+        "/v1/dependencies",
         headers=headers,
         json={
             "name": "Dep 2",
@@ -57,23 +57,23 @@ async def test_incidents_endpoints(async_client, auth_data, db_session, mocker):
 
     # GET /v1/orgs/{org_id}/incidents
     list_res = await async_client.get(
-        f"/v1/orgs/{org_id}/incidents", headers=headers
+        "/v1/incidents", headers=headers
     )
     assert list_res.status_code == 200
-    inc_list = list_res.json()
+    inc_list = list_res.json()["data"]
     assert len(inc_list) == 1
     inc_id = inc_list[0]["id"]
 
     # GET /v1/orgs/{org_id}/incidents/{inc_id}
     get_res = await async_client.get(
-        f"/v1/orgs/{org_id}/incidents/{inc_id}", headers=headers
+        f"/v1/incidents/{inc_id}", headers=headers
     )
     assert get_res.status_code == 200
     assert "correlations" in get_res.json()
 
     # PATCH /v1/orgs/{org_id}/incidents/{inc_id}
     patch_res = await async_client.patch(
-        f"/v1/orgs/{org_id}/incidents/{inc_id}",
+        f"/v1/incidents/{inc_id}",
         headers=headers,
         json={"description": "Updated incident text"},
     )
@@ -82,7 +82,7 @@ async def test_incidents_endpoints(async_client, auth_data, db_session, mocker):
 
     # POST /v1/orgs/{org_id}/incidents/{inc_id}/correlate
     corr_res = await async_client.post(
-        f"/v1/orgs/{org_id}/incidents/{inc_id}/correlate",
+        f"/v1/incidents/{inc_id}/correlate",
         headers=headers,
         json={
             "correlated_dependency_id": dep2_id,
@@ -95,7 +95,7 @@ async def test_incidents_endpoints(async_client, auth_data, db_session, mocker):
 
     # GET /v1/orgs/{org_id}/incidents/{inc_id}/evidence
     evid_res = await async_client.get(
-        f"/v1/orgs/{org_id}/incidents/{inc_id}/evidence", headers=headers
+        f"/v1/incidents/{inc_id}/evidence", headers=headers
     )
     assert evid_res.status_code == 200, evid_res.text
     assert "checksum" in evid_res.json()

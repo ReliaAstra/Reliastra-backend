@@ -54,9 +54,15 @@ class DependencyService:
         return DependencyResponse.model_validate(response_dict)
 
     async def list_dependencies(
-        self, session: AsyncSession, org_id: uuid.UUID, limit: int = 50
+        self,
+        session: AsyncSession,
+        org_id: uuid.UUID,
+        limit: int = 50,
+        cursor: uuid.UUID | None = None,
     ) -> list[DependencyResponse]:
-        deps = await self.repository.list_for_org(session, org_id, limit=limit)
+        deps = await self.repository.list_for_org(
+            session, org_id, limit=limit, cursor=cursor
+        )
         return [self._to_response(dep) for dep in deps]
 
     async def create_dependency(

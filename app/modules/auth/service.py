@@ -15,8 +15,11 @@ from app.modules.auth.constants import TOKEN_CLAIM_TYPE_REFRESH, TOKEN_TYPE_BEAR
 from app.modules.auth.repository import AuthRepository
 from app.modules.auth.schemas import (
     LoginRequest,
+    OrganizationLite,
     RegisterRequest,
+    RegisterResponse,
     TokenResponse,
+    UserResponseLite,
 )
 from app.modules.organizations.repository import OrganizationRepository
 from app.modules.users.repository import UserRepository
@@ -47,7 +50,7 @@ class AuthService:
 
     async def register(
         self, session: AsyncSession, request: RegisterRequest
-    ) -> TokenResponse:
+    ) -> RegisterResponse:
         existing = await self.user_repository.get_by_email(session, request.email)
         if existing:
             raise ConflictException("Email is already registered")
@@ -134,7 +137,21 @@ class AuthService:
         await self.auth_repository.create_refresh_token(
             session, user.id, tokens.refresh_token, expires_at
         )
-        return tokens
+        return RegisterResponse(
+            user=UserResponseLite(
+                id=user.id,
+                email=user.email,
+                full_name=user.full_name,
+                is_active=user.is_active,
+            ),
+            organization=OrganizationLite(
+                id=org.id,
+                name=org.name,
+                slug=org.slug,
+                plan=org.plan,
+            ),
+            tokens=tokens,
+        )
 
     async def login(
         self, session: AsyncSession, request: LoginRequest

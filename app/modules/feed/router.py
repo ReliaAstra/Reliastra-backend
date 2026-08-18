@@ -11,7 +11,7 @@ from app.modules.feed.service import feed_service
 
 logger = logging.getLogger(__name__)
 
-feed_router = APIRouter(prefix="/v1/public/feed", tags=["RSS Feed"])
+feed_router = APIRouter(prefix="/v1/feed", tags=["RSS Feed"])
 
 _feed_limiter = SlidingWindowRateLimiter(
     limit=30, window_seconds=60, key_prefix="rl_feed"

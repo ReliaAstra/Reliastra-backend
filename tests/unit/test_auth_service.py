@@ -14,11 +14,15 @@ async def test_register_success(mocker):
 
     user_repo.get_by_email = AsyncMock(return_value=None)
     fake_user = MagicMock(
-        id=uuid.uuid4(), email="new@reliastra.com", password_hash="hash", is_active=True
+        id=uuid.uuid4(),
+        email="new@reliastra.com",
+        password_hash="hash",
+        is_active=True,
+        full_name="New User",
     )
     user_repo.create = AsyncMock(return_value=fake_user)
 
-    fake_org = MagicMock(id=uuid.uuid4(), name="My Org", slug="my-org")
+    fake_org = MagicMock(id=uuid.uuid4(), name="My Org", slug="my-org", plan="free")
     org_repo.get_by_slug = AsyncMock(return_value=None)
     org_repo.create = AsyncMock(return_value=fake_org)
     org_repo.add_member = AsyncMock()
@@ -41,9 +45,11 @@ async def test_register_success(mocker):
     session = AsyncMock()
     result = await service.register(session, req)
 
-    assert result.access_token is not None
-    assert result.refresh_token is not None
-    assert result.token_type == "bearer"
+    assert result.tokens.access_token is not None
+    assert result.tokens.refresh_token is not None
+    assert result.tokens.token_type == "bearer"
+    assert result.organization.id == fake_org.id
+    assert result.user.email == "new@reliastra.com"
     user_repo.create.assert_called_once()
     org_repo.create.assert_called_once()
 

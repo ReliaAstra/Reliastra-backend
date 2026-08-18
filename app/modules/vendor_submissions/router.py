@@ -46,7 +46,7 @@ submission_email_limiter = SlidingWindowRateLimiter(
 # ---------------------------------------------------------------------------
 
 submission_router = APIRouter(
-    prefix="/v1/public/vendors",
+    prefix="/v1/vendors",
     tags=["Vendor Submissions"],
 )
 
@@ -90,7 +90,7 @@ async def submit_vendor(
 # ---------------------------------------------------------------------------
 
 submission_admin_router = APIRouter(
-    prefix="/v1/public/vendors/submissions",
+    prefix="/v1/vendors/submissions",
     tags=["Vendor Submissions Admin"],
     dependencies=[Depends(require_admin)],
 )

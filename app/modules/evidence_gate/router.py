@@ -45,7 +45,7 @@ def get_evidence_gate_service() -> EvidenceGateService:
 
 
 @router.get(
-    "/v1/public/vendors/{vendor_name}/incidents/public",
+    "/v1/vendors/{vendor_name}/incidents/public",
     response_model=list[PublicIncidentResponse],
 )
 async def list_public_incidents(
@@ -58,7 +58,7 @@ async def list_public_incidents(
 
 
 @router.post(
-    "/v1/public/evidence/gate",
+    "/v1/evidence/gate",
     response_model=EvidenceGateResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -82,7 +82,7 @@ async def process_evidence_gate(
 
 
 @router.get(
-    "/v1/public/evidence/{report_token}/download",
+    "/v1/evidence/{report_token}/download",
     status_code=status.HTTP_200_OK,
 )
 async def download_public_evidence(
@@ -116,12 +116,11 @@ async def download_public_evidence(
 
 
 @router.post(
-    "/v1/orgs/{org_id}/evidence/publicize",
+    "/v1/evidence/publicize",
     response_model=PublicizeResponse,
     dependencies=[Depends(require_admin)],
 )
 async def publicize_evidence(
-    org_id: uuid.UUID,
     body: PublicizeEvidenceRequest,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
@@ -135,7 +134,7 @@ async def publicize_evidence(
 
 
 @router.get(
-    "/v1/public/evidence/stats",
+    "/v1/evidence/stats",
     response_model=EvidenceGateStats,
     dependencies=[Depends(require_admin)],
 )

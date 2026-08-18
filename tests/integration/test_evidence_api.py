@@ -19,7 +19,7 @@ async def test_evidence_endpoints(async_client, auth_data, db_session, mocker):
 
     # Create dep + incident + evidence
     dep_res = await async_client.post(
-        f"/v1/orgs/{org_id}/dependencies",
+        "/v1/dependencies",
         headers=headers,
         json={"name": "Dep Evid", "endpoint_url": "https://dep.com"},
     )
@@ -36,28 +36,28 @@ async def test_evidence_endpoints(async_client, auth_data, db_session, mocker):
     await db_session.commit()
 
     evid_trigger = await async_client.get(
-        f"/v1/orgs/{org_id}/incidents/{inc.id}/evidence", headers=headers
+        f"/v1/incidents/{inc.id}/evidence", headers=headers
     )
     assert evid_trigger.status_code == 200
     report_id = evid_trigger.json()["id"]
 
     # GET /v1/orgs/{org_id}/evidence
     list_res = await async_client.get(
-        f"/v1/orgs/{org_id}/evidence", headers=headers
+        "/v1/evidence", headers=headers
     )
     assert list_res.status_code == 200
     assert len(list_res.json()) == 1
 
     # GET /v1/orgs/{org_id}/evidence/{report_id}
     get_res = await async_client.get(
-        f"/v1/orgs/{org_id}/evidence/{report_id}", headers=headers
+        f"/v1/evidence/{report_id}", headers=headers
     )
     assert get_res.status_code == 200
     assert "download_url" in get_res.json()
 
     # POST /v1/orgs/{org_id}/evidence/{report_id}/regenerate
     regen_res = await async_client.post(
-        f"/v1/orgs/{org_id}/evidence/{report_id}/regenerate", headers=headers
+        f"/v1/evidence/{report_id}/regenerate", headers=headers
     )
     assert regen_res.status_code == 201
     assert "checksum" in regen_res.json()

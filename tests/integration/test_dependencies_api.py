@@ -8,7 +8,7 @@ async def test_dependencies_endpoints(async_client, auth_data):
 
     # POST /v1/orgs/{org_id}/dependencies
     create_res = await async_client.post(
-        f"/v1/orgs/{org_id}/dependencies",
+        "/v1/dependencies",
         headers=headers,
         json={
             "name": "Stripe API",
@@ -28,21 +28,21 @@ async def test_dependencies_endpoints(async_client, auth_data):
 
     # GET /v1/orgs/{org_id}/dependencies
     list_res = await async_client.get(
-        f"/v1/orgs/{org_id}/dependencies", headers=headers
+        "/v1/dependencies", headers=headers
     )
     assert list_res.status_code == 200
-    deps = list_res.json()
+    deps = list_res.json()["data"]
     assert len(deps) == 1
 
     # GET /v1/orgs/{org_id}/dependencies/{dep_id}
     get_res = await async_client.get(
-        f"/v1/orgs/{org_id}/dependencies/{dep_id}", headers=headers
+        f"/v1/dependencies/{dep_id}", headers=headers
     )
     assert get_res.status_code == 200
 
     # PATCH /v1/orgs/{org_id}/dependencies/{dep_id}
     patch_res = await async_client.patch(
-        f"/v1/orgs/{org_id}/dependencies/{dep_id}",
+        f"/v1/dependencies/{dep_id}",
         headers=headers,
         json={"name": "Stripe Payment API"},
     )
@@ -51,19 +51,19 @@ async def test_dependencies_endpoints(async_client, auth_data):
 
     # GET /v1/orgs/{org_id}/dependencies/{dep_id}/results
     res_res = await async_client.get(
-        f"/v1/orgs/{org_id}/dependencies/{dep_id}/results", headers=headers
+        f"/v1/dependencies/{dep_id}/results", headers=headers
     )
     assert res_res.status_code == 200
 
     # GET /v1/orgs/{org_id}/dependencies/{dep_id}/history
     hist_res = await async_client.get(
-        f"/v1/orgs/{org_id}/dependencies/{dep_id}/history", headers=headers
+        f"/v1/dependencies/{dep_id}/history", headers=headers
     )
     assert hist_res.status_code == 200
     assert "uptime_percentage" in hist_res.json()
 
     # DELETE /v1/orgs/{org_id}/dependencies/{dep_id}
     del_res = await async_client.delete(
-        f"/v1/orgs/{org_id}/dependencies/{dep_id}", headers=headers
+        f"/v1/dependencies/{dep_id}", headers=headers
     )
     assert del_res.status_code == 204

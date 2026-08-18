@@ -14,7 +14,7 @@ from app.modules.agencies.schemas import (
 from app.modules.agencies.service import AgencyService, agency_service
 from app.modules.organizations.models import Organization
 
-router = APIRouter(prefix="/v1/orgs/{org_id}", tags=["Agency"])
+router = APIRouter(prefix="/v1", tags=["Agency"])
 
 
 def get_agency_service() -> AgencyService:
@@ -23,12 +23,11 @@ def get_agency_service() -> AgencyService:
 
 @router.get("/clients", response_model=list[ClientResponse])
 async def list_clients(
-    org_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: AgencyService = Depends(get_agency_service),
 ) -> list[ClientResponse]:
-    return await service.list_clients(db, org_id)
+    return await service.list_clients(db, current_org.id)
 
 
 @router.post(
@@ -38,13 +37,12 @@ async def list_clients(
     dependencies=[Depends(require_admin)],
 )
 async def create_client(
-    org_id: uuid.UUID,
     request: ClientCreateRequest,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: AgencyService = Depends(get_agency_service),
 ) -> ClientResponse:
-    return await service.create_client(db, org_id, request)
+    return await service.create_client(db, current_org.id, request)
 
 
 @router.get(
@@ -52,13 +50,12 @@ async def create_client(
     response_model=list[ApplicationResponse],
 )
 async def list_applications(
-    org_id: uuid.UUID,
     client_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: AgencyService = Depends(get_agency_service),
 ) -> list[ApplicationResponse]:
-    return await service.list_applications(db, org_id, client_id)
+    return await service.list_applications(db, current_org.id, client_id)
 
 
 @router.post(
@@ -68,11 +65,10 @@ async def list_applications(
     dependencies=[Depends(require_admin)],
 )
 async def create_application(
-    org_id: uuid.UUID,
     client_id: uuid.UUID,
     request: ApplicationCreateRequest,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: AgencyService = Depends(get_agency_service),
 ) -> ApplicationResponse:
-    return await service.create_application(db, org_id, client_id, request)
+    return await service.create_application(db, current_org.id, client_id, request)

@@ -1,9 +1,12 @@
 import logging
 from typing import Any
+
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from app.core.request_context import get_request_id
 
 logger = logging.getLogger(__name__)
 
@@ -14,20 +17,20 @@ class AppException(Exception):
         message: str,
         status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
         code: str = "INTERNAL_SERVER_ERROR",
-        details: dict[str, Any] | None = None,
+        details: dict[str, Any] | list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
         self.status_code = status_code
         self.code = code
-        self.details = details or {}
+        self.details = details if details is not None else []
 
 
 class ResourceNotFoundException(AppException):
     def __init__(
         self,
         message: str = "Resource not found",
-        details: dict[str, Any] | None = None,
+        details: dict[str, Any] | list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(
             message=message,
@@ -41,7 +44,7 @@ class ForbiddenException(AppException):
     def __init__(
         self,
         message: str = "Forbidden",
-        details: dict[str, Any] | None = None,
+        details: dict[str, Any] | list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(
             message=message,
@@ -55,7 +58,7 @@ class UnauthorizedException(AppException):
     def __init__(
         self,
         message: str = "Unauthorized",
-        details: dict[str, Any] | None = None,
+        details: dict[str, Any] | list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(
             message=message,
@@ -69,7 +72,7 @@ class ConflictException(AppException):
     def __init__(
         self,
         message: str = "Resource conflict",
-        details: dict[str, Any] | None = None,
+        details: dict[str, Any] | list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(
             message=message,
@@ -83,7 +86,7 @@ class RateLimitExceededException(AppException):
     def __init__(
         self,
         message: str = "Rate limit exceeded",
-        details: dict[str, Any] | None = None,
+        details: dict[str, Any] | list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(
             message=message,
@@ -97,7 +100,7 @@ class ValidationException(AppException):
     def __init__(
         self,
         message: str = "Validation error",
-        details: dict[str, Any] | None = None,
+        details: dict[str, Any] | list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(
             message=message,
@@ -107,49 +110,87 @@ class ValidationException(AppException):
         )
 
 
+def _normalize_details(
+    details: dict[str, Any] | list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    if details is None:
+        return []
+    if isinstance(details, list):
+        return details
+    if "errors" in details and isinstance(details["errors"], list):
+        return [
+            {
+                "field": ".".join(str(p) for p in err.get("loc", []) if p != "body"),
+                "issue": err.get("msg", "invalid"),
+            }
+            for err in details["errors"]
+            if isinstance(err, dict)
+        ]
+    return [{"field": key, "issue": str(value)} for key, value in details.items()]
+
+
+def error_payload(
+    *,
+    code: str,
+    message: str,
+    details: dict[str, Any] | list[dict[str, Any]] | None = None,
+    request_id: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "error": {
+            "code": code,
+            "message": message,
+            "details": _normalize_details(details),
+            "request_id": request_id or get_request_id() or "unknown",
+        }
+    }
+
+
 def setup_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppException)
     async def app_exception_handler(
         request: Request, exc: AppException
     ) -> JSONResponse:
+        request_id = getattr(request.state, "request_id", None) or get_request_id()
         return JSONResponse(
             status_code=exc.status_code,
-            content={
-                "error": {
-                    "code": exc.code,
-                    "message": exc.message,
-                    "details": exc.details,
-                }
-            },
+            content=error_payload(
+                code=exc.code,
+                message=exc.message,
+                details=exc.details,
+                request_id=request_id,
+            ),
         )
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
-        # Sanitize errors: strip non-serializable objects from ctx
-        safe_errors = []
+        request_id = getattr(request.state, "request_id", None) or get_request_id()
+        details = []
         for err in exc.errors():
-            safe_err = {"loc": err.get("loc"), "msg": err.get("msg"), "type": err.get("type")}
-            if "input" in err:
-                safe_err["input"] = str(err["input"])
-            safe_errors.append(safe_err)
-
+            loc = [p for p in err.get("loc", []) if p not in {"body", "query", "path", "header"}]
+            details.append(
+                {
+                    "field": ".".join(str(p) for p in loc) or str(err.get("loc", ["request"])[-1]),
+                    "issue": err.get("msg", "invalid"),
+                }
+            )
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={
-                "error": {
-                    "code": "VALIDATION_ERROR",
-                    "message": "Request validation failed",
-                    "details": {"errors": safe_errors},
-                }
-            },
+            content=error_payload(
+                code="VALIDATION_ERROR",
+                message="Request validation failed",
+                details=details,
+                request_id=request_id,
+            ),
         )
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(
         request: Request, exc: StarletteHTTPException
     ) -> JSONResponse:
+        request_id = getattr(request.state, "request_id", None) or get_request_id()
         code_map = {
             400: "BAD_REQUEST",
             401: "UNAUTHORIZED",
@@ -163,13 +204,12 @@ def setup_exception_handlers(app: FastAPI) -> None:
         code = code_map.get(exc.status_code, "HTTP_ERROR")
         return JSONResponse(
             status_code=exc.status_code,
-            content={
-                "error": {
-                    "code": code,
-                    "message": str(exc.detail),
-                    "details": {},
-                }
-            },
+            content=error_payload(
+                code=code,
+                message=str(exc.detail),
+                details=[],
+                request_id=request_id,
+            ),
         )
 
     @app.exception_handler(Exception)
@@ -177,13 +217,13 @@ def setup_exception_handlers(app: FastAPI) -> None:
         request: Request, exc: Exception
     ) -> JSONResponse:
         logger.exception("Unhandled exception occurred: %s", exc)
+        request_id = getattr(request.state, "request_id", None) or get_request_id()
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "error": {
-                    "code": "INTERNAL_SERVER_ERROR",
-                    "message": "An unexpected error occurred",
-                    "details": {},
-                }
-            },
+            content=error_payload(
+                code="INTERNAL_SERVER_ERROR",
+                message="An unexpected error occurred",
+                details=[],
+                request_id=request_id,
+            ),
         )

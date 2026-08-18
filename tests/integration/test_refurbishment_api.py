@@ -35,7 +35,7 @@ async def test_agency_ai_and_dashboard_endpoints(
     await db_session.commit()
 
     client_response = await async_client.post(
-        f"/v1/orgs/{org_id}/clients",
+        "/v1/clients",
         headers=headers,
         json={"name": "Customer One"},
     )
@@ -43,7 +43,7 @@ async def test_agency_ai_and_dashboard_endpoints(
     client_id = client_response.json()["id"]
 
     app_response = await async_client.post(
-        f"/v1/orgs/{org_id}/clients/{client_id}/applications",
+        f"/v1/clients/{client_id}/applications",
         headers=headers,
         json={"name": "Production"},
     )
@@ -55,7 +55,7 @@ async def test_agency_ai_and_dashboard_endpoints(
         return_value=None,
     )
     provider_response = await async_client.post(
-        f"/v1/orgs/{org_id}/ai-providers",
+        "/v1/ai-providers",
         headers=headers,
         json={
             "name": "Evidence Explainer",
@@ -71,33 +71,33 @@ async def test_agency_ai_and_dashboard_endpoints(
     assert "api_key" not in provider_response.json()
 
     latency = await async_client.get(
-        f"/v1/orgs/{org_id}/dashboard/latency", headers=headers
+        "/v1/dashboard/latency", headers=headers
     )
     degradation = await async_client.get(
-        f"/v1/orgs/{org_id}/dashboard/sla-degradation", headers=headers
+        "/v1/dashboard/sla-degradation", headers=headers
     )
     assert latency.status_code == 200
     assert degradation.status_code == 200
     assert degradation.json()["period"] == "30d"
 
     vendor_metrics = await async_client.get(
-        "/v1/public/vendors/stripe/metrics?window=24h"
+        "/v1/vendors/stripe/metrics?window=24h"
     )
     vendor_incidents = await async_client.get(
-        "/v1/public/vendors/stripe/incidents"
+        "/v1/vendors/stripe/incidents"
     )
     assert vendor_metrics.status_code == 200
     assert vendor_metrics.json()["metrics"]["24h"]["total_observations"] == 0
     assert vendor_incidents.status_code == 200
 
     restricted_key = await async_client.post(
-        f"/v1/orgs/{org_id}/api-keys",
+        "/v1/api-keys",
         headers=headers,
         json={"name": "Read only", "scopes": ["read:checks"]},
     )
     assert restricted_key.status_code == 201
     forbidden = await async_client.post(
-        f"/v1/orgs/{org_id}/dependencies",
+        "/v1/dependencies",
         headers={"X-API-Key": restricted_key.json()["full_key"]},
         json={"name": "Not allowed", "endpoint_url": "https://example.com"},
     )
@@ -111,7 +111,7 @@ async def test_observation_attribution_snapshot_and_verification(
     headers = auth_data["headers"]
     org_id = auth_data["org_id"]
     dependency_response = await async_client.post(
-        f"/v1/orgs/{org_id}/dependencies",
+        "/v1/dependencies",
         headers=headers,
         json={
             "name": "Failing Vendor",

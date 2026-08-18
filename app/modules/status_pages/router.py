@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import SlidingWindowRateLimiter, enforce_rate_limit
 from app.db.session import get_db
-from app.dependencies import require_admin, require_member
+from app.dependencies import get_current_org, require_admin, require_member
 from app.modules.status_pages.schemas import (
     PublicStatusResponse,
     StatusPageConfigRequest,
@@ -18,10 +18,10 @@ from app.modules.status_pages.service import status_page_service
 logger = logging.getLogger(__name__)
 
 status_router = APIRouter(
-    prefix="/v1/public/status", tags=["Status Page"]
+    prefix="/v1/status", tags=["Status Page"]
 )
 status_page_router = APIRouter(
-    prefix="/v1/orgs/{org_id}/status-page", tags=["Status Page"]
+    prefix="/v1/status-page", tags=["Status Page"]
 )
 
 _public_status_limiter = SlidingWindowRateLimiter(
@@ -55,14 +55,12 @@ async def get_public_status_by_slug(
     "", response_model=StatusPageResponse, dependencies=[Depends(require_member)]
 )
 async def get_org_status_page(
-    org_id: str,
     db: AsyncSession = Depends(get_db),
+    current_org=Depends(get_current_org),
 ) -> StatusPageResponse:
     """Get organization's status page configuration (member+)."""
-    import uuid
-
     page = await status_page_service.get_org_status_page(
-        db, uuid.UUID(org_id)
+        db, current_org.id
     )
     if page is None:
         from app.core.exceptions import ResourceNotFoundException
@@ -78,13 +76,11 @@ async def get_org_status_page(
     dependencies=[Depends(require_admin)],
 )
 async def create_org_status_page(
-    org_id: str,
     request: StatusPageConfigRequest,
     db: AsyncSession = Depends(get_db),
+    current_org=Depends(get_current_org),
 ) -> StatusPageResponse:
     """Create a status page for the organization (admin+)."""
-    import uuid
-
     return await status_page_service.create_org_status_page(
-        db, uuid.UUID(org_id), request
+        db, current_org.id, request
     )

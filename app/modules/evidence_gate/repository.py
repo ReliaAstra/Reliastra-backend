@@ -130,7 +130,9 @@ class EvidenceGateTokenRepository:
             token_hash=token_hash,
             ip_address=ip_address,
             user_id=user_id,
-            expires_at=expires_at or (datetime.now(timezone.utc) + timedelta(hours=1)),
+            expires_at=expires_at or (
+                datetime.now(timezone.utc) + timedelta(days=7)
+            ),
         )
         session.add(record)
         await session.flush()

@@ -33,6 +33,7 @@ class EvidenceGateRequest(BaseModel):
 class EvidenceGateResponse(BaseModel):
     download_url: str
     report_id: uuid.UUID
+    report_token: str
     expires_at: datetime
     account_created: bool
     login_url: str | None

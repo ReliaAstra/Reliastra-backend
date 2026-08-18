@@ -19,6 +19,7 @@ from app.modules.auth.schemas import (
     ResetPasswordRequest,
     ResetPasswordResponse,
     SendVerificationRequest,
+    RegisterResponse,
     TokenResponse,
     VerifyEmailRequest,
     VerifyEmailResponse,

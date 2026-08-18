@@ -8,7 +8,7 @@ async def test_api_keys_endpoints_and_programmatic_auth(async_client, auth_data)
 
     # POST /v1/orgs/{org_id}/api-keys
     create_res = await async_client.post(
-        f"/v1/orgs/{org_id}/api-keys",
+        "/v1/api-keys",
         headers=headers,
         json={"name": "Programmatic CI Key", "scopes": ["read:checks", "write:dependencies"]},
     )
@@ -20,7 +20,7 @@ async def test_api_keys_endpoints_and_programmatic_auth(async_client, auth_data)
 
     # GET /v1/orgs/{org_id}/api-keys
     list_res = await async_client.get(
-        f"/v1/orgs/{org_id}/api-keys", headers=headers
+        "/v1/api-keys", headers=headers
     )
     assert list_res.status_code == 200
     keys = list_res.json()
@@ -31,18 +31,18 @@ async def test_api_keys_endpoints_and_programmatic_auth(async_client, auth_data)
     # Test programmatic API Key authentication on an endpoint
     api_key_headers = {"Authorization": f"ApiKey {full_key}"}
     dep_list_res = await async_client.get(
-        f"/v1/orgs/{org_id}/dependencies", headers=api_key_headers
+        "/v1/dependencies", headers=api_key_headers
     )
     assert dep_list_res.status_code == 200, dep_list_res.text
 
     # DELETE /v1/orgs/{org_id}/api-keys/{key_id}
     del_res = await async_client.delete(
-        f"/v1/orgs/{org_id}/api-keys/{key_id}", headers=headers
+        f"/v1/api-keys/{key_id}", headers=headers
     )
     assert del_res.status_code == 204
 
     # Verify key is revoked and fails auth
     revoked_res = await async_client.get(
-        f"/v1/orgs/{org_id}/dependencies", headers=api_key_headers
+        "/v1/dependencies", headers=api_key_headers
     )
     assert revoked_res.status_code == 401

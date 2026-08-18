@@ -11,7 +11,7 @@ from app.modules.api_keys.schemas import (
 from app.modules.api_keys.service import ApiKeyService, api_key_service
 from app.modules.organizations.models import Organization
 
-router = APIRouter(prefix="/v1/orgs/{org_id}/api-keys", tags=["API Keys"])
+router = APIRouter(prefix="/v1/api-keys", tags=["API Keys"])
 
 
 def get_api_key_service() -> ApiKeyService:
@@ -20,12 +20,11 @@ def get_api_key_service() -> ApiKeyService:
 
 @router.get("", response_model=list[ApiKeyResponse])
 async def list_api_keys(
-    org_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: ApiKeyService = Depends(get_api_key_service),
 ) -> list[ApiKeyResponse]:
-    return await service.list_keys(db, org_id)
+    return await service.list_keys(db, current_org.id)
 
 
 @router.post(
@@ -35,13 +34,12 @@ async def list_api_keys(
     dependencies=[Depends(require_admin)],
 )
 async def create_api_key(
-    org_id: uuid.UUID,
     request: ApiKeyCreateRequest,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: ApiKeyService = Depends(get_api_key_service),
 ) -> ApiKeyCreateResponse:
-    return await service.create_key(db, org_id, request)
+    return await service.create_key(db, current_org.id, request)
 
 
 @router.delete(
@@ -50,10 +48,9 @@ async def create_api_key(
     dependencies=[Depends(require_admin)],
 )
 async def revoke_api_key(
-    org_id: uuid.UUID,
     key_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: ApiKeyService = Depends(get_api_key_service),
 ) -> None:
-    await service.revoke_key(db, org_id, key_id)
+    await service.revoke_key(db, current_org.id, key_id)

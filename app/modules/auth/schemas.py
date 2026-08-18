@@ -45,6 +45,28 @@ class TokenResponse(BaseModel):
     expires_in: int
 
 
+class RegisterResponse(BaseModel):
+    """Single-step signup payload: user + default org + tokens."""
+
+    user: "UserResponseLite"
+    organization: "OrganizationLite"
+    tokens: TokenResponse
+
+
+class UserResponseLite(BaseModel):
+    id: uuid.UUID
+    email: EmailStr
+    full_name: str
+    is_active: bool = True
+
+
+class OrganizationLite(BaseModel):
+    id: uuid.UUID
+    name: str
+    slug: str
+    plan: str
+
+
 class GoogleAuthUrlResponse(BaseModel):
     authorization_url: str
     state: str

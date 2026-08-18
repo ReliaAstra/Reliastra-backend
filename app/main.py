@@ -14,6 +14,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from app.config import settings
 from app.core.exceptions import setup_exception_handlers
 from app.core.request_context import request_id_var, set_request_id
+from app.core.tenant import TenantContextMiddleware
 from app.db.session import get_engine
 from app.infrastructure.redis_client import (
     close_redis,
@@ -260,6 +261,7 @@ def create_app() -> FastAPI:
             "Authorization",
             "X-API-Key",
             "X-Organization-ID",
+            "Reliastra-Organization",
             "Content-Type",
             "Accept",
             "Accept-Language",
@@ -270,6 +272,7 @@ def create_app() -> FastAPI:
     )
 
     app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(TenantContextMiddleware)
     app.add_middleware(IdempotencyMiddleware)
 
     app.include_router(auth_router)

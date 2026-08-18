@@ -15,8 +15,11 @@ async def test_auth_endpoints(async_client):
     )
     assert reg_res.status_code == 201, reg_res.text
     reg_data = reg_res.json()
-    assert "access_token" in reg_data
-    assert "refresh_token" in reg_data
+    assert "tokens" in reg_data
+    assert "user" in reg_data
+    assert "organization" in reg_data
+    assert "access_token" in reg_data["tokens"]
+    assert "refresh_token" in reg_data["tokens"]
 
     # Test duplicate register -> 409
     dup_res = await async_client.post(
