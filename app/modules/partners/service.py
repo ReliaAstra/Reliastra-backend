@@ -1163,11 +1163,13 @@ class PartnerService:
             session, email_hash, now=now
         )
         if duplicate is not None:
+            # Deliberately identical for every duplicate, whoever owns the
+            # existing lead. Distinguishing "yours" from "someone else's" would
+            # turn this endpoint into an oracle for probing which prospects are
+            # already claimed across the partner network.
             raise ConflictException(
                 "This prospect already has an open introduction",
-                details={
-                    "is_own_lead": str(duplicate.partner_id) == str(partner.id),
-                },
+                details={},
             )
 
         lead = PartnerLead(

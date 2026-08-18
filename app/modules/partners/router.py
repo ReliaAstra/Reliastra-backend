@@ -21,6 +21,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Header, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import ForbiddenException
 from app.core.pagination import OffsetPagination
 from app.core.rate_limit import SlidingWindowRateLimiter, enforce_rate_limit
 from app.db.session import get_db
@@ -72,6 +73,26 @@ from app.modules.users.models import User
 
 logger = logging.getLogger(__name__)
 
+
+async def require_partner_user(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Authenticate a human partner, never an organization API key.
+
+    ``get_current_user`` resolves an organization API key to that org's
+    *owner* user. These routes hang off a user-bound partner identity and
+    expose commissions, payout accounts and payout requests, so an org-scoped
+    integration key must not reach them: it would let any holder of an API key
+    act on the owner's partner earnings.
+    """
+    if getattr(request.state, "auth_method", None) == "apikey":
+        raise ForbiddenException(
+            "Organization API keys cannot access partner self-service routes"
+        )
+    return current_user
+
+
 partners_router = APIRouter(prefix="/v1/partners", tags=["Partners"])
 
 #: Applying is cheap to abuse and expensive to review.
@@ -109,7 +130,7 @@ async def apply_to_partner_network(
     request: Request,
     payload: PartnerApplicationCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> PartnerApplicationResponse:
     """Submit a partner application for review.
 
@@ -128,7 +149,7 @@ async def apply_to_partner_network(
 )
 async def list_my_applications(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> list[PartnerApplicationResponse]:
     """All partner applications submitted by this user, newest first."""
     applications = await partner_service.list_my_applications(db, current_user)
@@ -146,7 +167,7 @@ async def list_my_applications(
 )
 async def get_my_partner_profile(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> PartnerResponse:
     """The authenticated user's partner account, including their
     canonical referral URL and lifetime totals.
@@ -164,7 +185,7 @@ async def update_my_partner_profile(
     request: Request,
     payload: PartnerProfileUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> PartnerResponse:
     """Update editable profile fields.
 
@@ -184,7 +205,7 @@ async def update_my_partner_profile(
 )
 async def get_my_capabilities(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> PartnerCapabilities:
     """What the current tier unlocks, plus the requirements for the next
     tier. Tiers grant capabilities only — commission rates are per
@@ -201,7 +222,7 @@ async def get_my_capabilities(
 )
 async def get_my_tier_history(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> list[PartnerTierHistoryItem]:
     """Every tier change on this account, with the reason and whether it
     was automatic or set by an admin.
@@ -221,7 +242,7 @@ async def get_my_tier_history(
 )
 async def get_partner_dashboard(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> PartnerDashboardResponse:
     """Headline metrics and balances.
 
@@ -240,7 +261,7 @@ async def get_partner_analytics(
     from_date: date | None = Query(default=None),
     to_date: date | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> PartnerAnalyticsResponse:
     """Daily click/conversion/revenue series plus campaign and country splits.
 
@@ -262,7 +283,7 @@ async def list_my_customers(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> OffsetPagination[ReferredCustomerItem]:
     """Referred customers with **masked** contact details at every tier."""
     partner = await partner_service.get_partner_for_user(db, current_user)
@@ -287,7 +308,7 @@ async def create_campaign(
     request: Request,
     payload: CampaignCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> CampaignResponse:
     """Create a campaign to group and measure links.
 
@@ -311,7 +332,7 @@ async def list_campaigns(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> OffsetPagination[CampaignResponse]:
     """Campaigns owned by the authenticated partner. Another partner's
     campaigns are never visible here.
@@ -338,7 +359,7 @@ async def list_campaigns(
 async def get_campaign(
     campaign_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> CampaignResponse:
     """One campaign owned by the authenticated partner."""
     partner = await partner_service.get_partner_for_user(db, current_user)
@@ -356,7 +377,7 @@ async def update_campaign(
     campaign_id: uuid.UUID,
     payload: CampaignUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> CampaignResponse:
     """Update a campaign the authenticated partner owns. Historical
     attribution and commissions are unaffected.
@@ -377,7 +398,7 @@ async def update_campaign(
 async def delete_campaign(
     campaign_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> None:
     """Soft delete. Historical attribution and commissions are preserved."""
     partner = await partner_service.get_partner_for_user(db, current_user)
@@ -397,7 +418,7 @@ async def create_referral_link(
     request: Request,
     payload: ReferralLinkCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> ReferralLinkResponse:
     """Create a trackable link.
 
@@ -422,7 +443,7 @@ async def list_referral_links(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> OffsetPagination[ReferralLinkResponse]:
     """Referral links owned by the authenticated partner, optionally
     filtered by campaign or status.
@@ -447,7 +468,7 @@ async def update_referral_link(
     link_id: uuid.UUID,
     payload: ReferralLinkUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> ReferralLinkResponse:
     """Update a link the authenticated partner owns. Pausing or archiving
     a link stops new clicks; it never affects commissions already
@@ -467,7 +488,7 @@ async def update_referral_link(
 async def delete_referral_link(
     link_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> None:
     """Archive a referral link (soft delete). The default link cannot be
     removed. Past attribution and commissions are preserved.
@@ -493,7 +514,7 @@ async def list_my_commissions(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> OffsetPagination[CommissionItem]:
     """Immutable ledger entries, newest first.
 
@@ -526,7 +547,7 @@ async def list_my_commissions(
 )
 async def get_my_balance(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> CommissionBalanceResponse:
     """Balances by ledger status, plus payout eligibility."""
     partner = await partner_service.get_partner_for_user(db, current_user)
@@ -543,7 +564,7 @@ async def get_my_balance(
 async def get_commission_events(
     commission_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> list[CommissionEventItem]:
     """The full state-transition history of one commission: who or what
     moved it, when, and why. This is the audit trail behind every
@@ -568,7 +589,7 @@ async def list_my_settlements(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=24, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> OffsetPagination[SettlementItem]:
     """Closed monthly settlements, newest first. A settlement is a frozen
     summary of the ledger for one month; the ledger itself remains the
@@ -600,7 +621,7 @@ async def add_payout_account(
     request: Request,
     payload: PayoutAccountCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> PayoutAccountResponse:
     """Store payout details.
 
@@ -620,7 +641,7 @@ async def add_payout_account(
 )
 async def list_payout_accounts(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> list[PayoutAccountResponse]:
     """Payout accounts for the authenticated partner. Only a masked label
     and the last four characters are returned — the stored details are
@@ -639,7 +660,7 @@ async def list_payout_accounts(
 async def delete_payout_account(
     account_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> None:
     """Remove a payout account. Refused while a payout referencing it is
     still in progress.
@@ -663,7 +684,7 @@ async def request_payout(
     payload: PayoutRequestCreate,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> PayoutResponse:
     """Request a payout.
 
@@ -694,7 +715,7 @@ async def list_my_payouts(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> OffsetPagination[PayoutResponse]:
     """Payouts requested by the authenticated partner, newest first."""
     partner = await partner_service.get_partner_for_user(db, current_user)
@@ -724,7 +745,7 @@ async def create_lead(
     request: Request,
     payload: LeadCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> LeadResponse:
     """Submit a lead introduction.
 
@@ -747,7 +768,7 @@ async def list_my_leads(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> OffsetPagination[LeadResponse]:
     """Lead introductions submitted by the authenticated partner. Contact
     emails are masked.
@@ -777,7 +798,7 @@ async def list_my_leads(
 async def get_my_lead(
     lead_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> LeadResponse:
     """One lead owned by the authenticated partner, with its contact email
     masked.
@@ -800,7 +821,7 @@ async def create_claim(
     request: Request,
     payload: DeploymentClaimCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> DeploymentClaimResponse:
     """Claim a deploy/create engagement.
 
@@ -827,7 +848,7 @@ async def list_my_claims(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> OffsetPagination[DeploymentClaimResponse]:
     """Deployment and creation claims submitted by the authenticated
     partner, each with its supporting evidence.
@@ -869,7 +890,7 @@ async def list_my_claims(
 async def get_my_claim(
     claim_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_partner_user),
 ) -> DeploymentClaimResponse:
     """One claim owned by the authenticated partner, with its evidence."""
     partner = await partner_service.get_partner_for_user(db, current_user)
