@@ -13,8 +13,11 @@ from starlette.concurrency import iterate_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from app.config import settings
 from app.core.exceptions import setup_exception_handlers
+from app.core.logging import configure_logging
 from app.core.request_context import request_id_var, set_request_id
 from app.core.tenant import TenantContextMiddleware
+
+configure_logging()
 from app.db.session import get_engine
 from app.infrastructure.redis_client import (
     close_redis,

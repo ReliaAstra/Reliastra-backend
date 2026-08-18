@@ -3,6 +3,9 @@ from celery import Celery
 from celery.schedules import crontab
 from celery.signals import task_postrun, task_prerun, task_failure
 from app.config import settings
+from app.core.logging import configure_logging
+
+configure_logging()
 
 logger = logging.getLogger(__name__)
 
@@ -90,15 +93,16 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
     task_always_eager=False,  # Can be set to True in tests
+    task_acks_late=True,
+    worker_prefetch_multiplier=1,
+    task_soft_time_limit=settings.CELERY_TASK_SOFT_TIME_LIMIT,
+    task_time_limit=settings.CELERY_TASK_TIME_LIMIT,
     beat_schedule={
-        # Dependency-check scheduling: a simple Celery Beat tick every 30s
-        # triggers `schedule_checks`, which reads due dependencies from the
-        # DB and dispatches one `execute_check` Celery task per dep/region.
-        # No custom scheduler loop, no APScheduler, no Redis ZSET queue.
+        # Interval is env-configurable (CHECK_SCHEDULE_SECONDS).
         "schedule-checks-periodic": {
             "task": "app.modules.checks.tasks.schedule_checks",
-            "schedule": 30.0,
-            "options": {"expires": 60},
+            "schedule": float(settings.CHECK_SCHEDULE_SECONDS),
+            "options": {"expires": max(int(settings.CHECK_SCHEDULE_SECONDS * 2), 60)},
         },
         "observation-outbox-process": {
             "task": "app.modules.observations.tasks.process_outbox",

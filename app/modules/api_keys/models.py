@@ -2,10 +2,10 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy import String, ForeignKey, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column
-from app.db.base import Base, UUIDMixin
+from app.db.base import Base, SoftDeleteMixin, UUIDMixin
 
 
-class ApiKey(UUIDMixin, Base):
+class ApiKey(UUIDMixin, SoftDeleteMixin, Base):
     __tablename__ = "api_keys"
 
     org_id: Mapped[uuid.UUID] = mapped_column(

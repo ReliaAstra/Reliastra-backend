@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, status
+import uuid
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.pagination import CursorPagination
 from app.dependencies import (
     get_current_org,
     get_current_user,
@@ -18,7 +20,6 @@ from app.modules.organizations.schemas import (
 )
 from app.modules.organizations.service import OrganizationService, org_service
 from app.modules.users.models import User
-import uuid
 
 router = APIRouter(prefix="/v1/orgs", tags=["Organizations"])
 
@@ -69,13 +70,20 @@ async def update_organization(
     return await service.update_org(db, current_org.id, request)
 
 
-@router.get("/members", response_model=list[OrganizationMemberResponse])
+@router.get(
+    "/members",
+    response_model=CursorPagination[OrganizationMemberResponse],
+)
 async def list_organization_members(
     db: AsyncSession = Depends(get_db),
     current_org: Organization = Depends(get_current_org),
     service: OrganizationService = Depends(get_org_service),
-) -> list[OrganizationMemberResponse]:
-    return await service.list_members(db, current_org.id)
+    cursor: uuid.UUID | None = Query(
+        default=None, description="Member id of the last item on the previous page"
+    ),
+    limit: int = Query(default=50, ge=1, le=100),
+) -> CursorPagination[OrganizationMemberResponse]:
+    return await service.list_members(db, current_org.id, limit=limit, cursor=cursor)
 
 
 @router.post(

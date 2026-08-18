@@ -59,7 +59,9 @@ async def test_orgs_endpoints(async_client, auth_data):
         "/v1/orgs/members", headers=headers
     )
     assert members_res.status_code == 200
-    members = members_res.json()
+    members_payload = members_res.json()
+    members = members_payload["items"]
+    assert members_payload["has_more"] is False
     assert len(members) == 2
 
     # PATCH /v1/orgs/{org_id}/members/{member_id}
@@ -77,3 +79,18 @@ async def test_orgs_endpoints(async_client, auth_data):
         headers=headers,
     )
     assert del_res.status_code == 204
+
+    after_del = await async_client.get(
+        f"/v1/orgs/{org_id}/members", headers=headers
+    )
+    assert after_del.status_code == 200
+    remaining_ids = {m["id"] for m in after_del.json()["items"]}
+    assert member_data["id"] not in remaining_ids
+
+    # Re-invite restores the soft-deleted membership
+    reinvite = await async_client.post(
+        f"/v1/orgs/{org_id}/members",
+        headers=headers,
+        json={"email": "invitee@reliastra.com", "role": "member"},
+    )
+    assert reinvite.status_code == 201, reinvite.text

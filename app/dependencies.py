@@ -88,6 +88,13 @@ async def get_current_user(
         raw_key = auth_header.split(None, 1)[1].strip()
 
     if raw_key:
+        from app.core.rate_limit import api_key_limiter, enforce_rate_limit
+
+        await enforce_rate_limit(
+            request,
+            api_key_limiter,
+            identifier=raw_key[:8] if len(raw_key) >= 8 else raw_key,
+        )
         api_key = await api_key_service.authenticate_key(db, raw_key)
         request.state.auth_method = "apikey"
         request.state.api_key_org_id = api_key.org_id

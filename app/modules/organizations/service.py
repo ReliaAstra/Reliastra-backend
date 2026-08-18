@@ -6,6 +6,7 @@ from app.core.exceptions import (
     ForbiddenException,
     ResourceNotFoundException,
 )
+from app.core.pagination import CursorPagination
 from app.core.permissions import Role
 from app.modules.organizations.repository import OrganizationRepository
 from app.modules.organizations.schemas import (
@@ -100,10 +101,23 @@ class OrganizationService:
         return OrganizationResponse.model_validate(updated)
 
     async def list_members(
-        self, session: AsyncSession, org_id: uuid.UUID
-    ) -> list[OrganizationMemberResponse]:
-        members = await self.org_repository.list_members(session, org_id)
-        return [OrganizationMemberResponse.model_validate(m) for m in members]
+        self,
+        session: AsyncSession,
+        org_id: uuid.UUID,
+        limit: int = 50,
+        cursor: uuid.UUID | None = None,
+    ) -> CursorPagination[OrganizationMemberResponse]:
+        members = await self.org_repository.list_members(
+            session, org_id, limit=limit + 1, cursor=cursor
+        )
+        has_more = len(members) > limit
+        items = members[:limit]
+        next_cursor = str(items[-1].id) if has_more and items else None
+        return CursorPagination(
+            items=[OrganizationMemberResponse.model_validate(m) for m in items],
+            next_cursor=next_cursor,
+            has_more=has_more,
+        )
 
     async def invite_member(
         self,
@@ -118,10 +132,15 @@ class OrganizationService:
             )
 
         existing_member = await self.org_repository.get_member(
-            session, org_id, user.id
+            session, org_id, user.id, include_deleted=True
         )
-        if existing_member:
+        if existing_member and not existing_member.is_deleted:
             raise ConflictException("User is already a member of this organization")
+        if existing_member and existing_member.is_deleted:
+            member = await self.org_repository.restore_member(
+                session, existing_member, request.role.value
+            )
+            return OrganizationMemberResponse.model_validate(member)
 
         member = await self.org_repository.add_member(
             session,

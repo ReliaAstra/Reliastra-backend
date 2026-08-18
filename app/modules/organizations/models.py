@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Boolean, String, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.db.base import Base, UUIDMixin, TimestampMixin
+from app.db.base import Base, SoftDeleteMixin, UUIDMixin, TimestampMixin
 
 
 class Organization(UUIDMixin, TimestampMixin, Base):
@@ -32,7 +32,7 @@ class Organization(UUIDMixin, TimestampMixin, Base):
     )
 
 
-class OrganizationMember(UUIDMixin, Base):
+class OrganizationMember(UUIDMixin, SoftDeleteMixin, Base):
     __tablename__ = "organization_members"
 
     org_id: Mapped[uuid.UUID] = mapped_column(

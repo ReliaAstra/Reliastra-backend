@@ -7,7 +7,13 @@ from app.infrastructure.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(name="app.modules.incidents.tasks.create_incident")
+@celery_app.task(
+    name="app.modules.incidents.tasks.create_incident",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=3,
+)
 def create_incident(
     dependency_id: str,
     check_id: str | None = None,
@@ -31,18 +37,23 @@ def create_incident(
                 error_message=error_message,
             )
             return {"incident_id": str(incident.id), "status": incident.status}
-        except Exception as exc:
+        except Exception:
             logger.exception(
-                "Error in create_incident task (request_id=%s): %s",
+                "Error in create_incident task (request_id=%s)",
                 request_id,
-                exc,
             )
-            return None
+            raise
 
     return async_task_body(_run)
 
 
-@celery_app.task(name="app.modules.incidents.tasks.resolve_incident")
+@celery_app.task(
+    name="app.modules.incidents.tasks.resolve_incident",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=3,
+)
 def resolve_incident(
     dependency_id: str, request_id: str | None = None
 ) -> dict[str, Any] | None:
@@ -62,12 +73,11 @@ def resolve_incident(
                 org_id=open_inc.org_id,
             )
             return {"incident_id": str(updated.id), "status": updated.status}
-        except Exception as exc:
+        except Exception:
             logger.exception(
-                "Error in resolve_incident task (request_id=%s): %s",
+                "Error in resolve_incident task (request_id=%s)",
                 request_id,
-                exc,
             )
-            return None
+            raise
 
     return async_task_body(_run)

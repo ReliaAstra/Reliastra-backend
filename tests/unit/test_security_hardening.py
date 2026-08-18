@@ -47,9 +47,45 @@ def test_access_and_refresh_tokens_carry_iat_claim():
 
 
 def test_iat_is_within_tolerance():
-    import time
     from datetime import datetime, timezone
 
     payload = decode_token(create_access_token("user-1"))
     now_ts = datetime.now(timezone.utc).timestamp()
     assert abs(payload["iat"] - now_ts) < 30
+
+
+def test_expired_token_raises_unauthorized():
+    from datetime import datetime, timedelta, timezone
+
+    import jwt
+
+    from app.config import settings
+    from app.core.exceptions import UnauthorizedException
+
+    expire = datetime.now(timezone.utc) - timedelta(minutes=5)
+    token = jwt.encode(
+        {
+            "sub": "user-1",
+            "iat": expire - timedelta(minutes=1),
+            "nbf": expire - timedelta(minutes=1),
+            "exp": expire,
+            "type": "access",
+            "jti": "deadbeef",
+        },
+        settings.SECRET_KEY,
+        algorithm="HS256",
+    )
+    with pytest.raises(UnauthorizedException, match="expired"):
+        decode_token(token)
+
+
+def test_fernet_roundtrip_and_decrypt_failure():
+    from app.core.security import decrypt_jsonb, encrypt_jsonb
+
+    payload = {"Authorization": "Bearer secret"}
+    encrypted = encrypt_jsonb(payload)
+    assert encrypted is not None
+    assert decrypt_jsonb(encrypted) == payload
+    assert decrypt_jsonb(None) is None
+    # Corrupt ciphertext must not raise — callers get a safe empty dict.
+    assert decrypt_jsonb("gAAAAA-not-a-valid-fernet-token") == {}

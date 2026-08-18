@@ -7,7 +7,15 @@ from app.infrastructure.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(name="app.modules.evidence.tasks.generate_evidence_report")
+@celery_app.task(
+    name="app.modules.evidence.tasks.generate_evidence_report",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=3,
+    soft_time_limit=180,
+    time_limit=240,
+)
 def generate_evidence_report(
     incident_id: str, request_id: str | None = None
 ) -> dict[str, Any] | None:
@@ -22,14 +30,13 @@ def generate_evidence_report(
                 "checksum": report.checksum,
                 "file_path": report.file_path,
             }
-        except Exception as exc:
+        except Exception:
             logger.exception(
                 "Error in generate_evidence_report task for incident %s "
-                "(request_id=%s): %s",
+                "(request_id=%s)",
                 incident_id,
                 request_id,
-                exc,
             )
-            return None
+            raise
 
     return async_task_body(_run)
