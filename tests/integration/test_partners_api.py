@@ -1480,6 +1480,219 @@ class TestPayouts:
 # ═════════════════════════ Customers & privacy ═══════════════════════════
 
 
+class TestPayoutReversalSafety:
+    """Regressions for the payout/refund race (Strix HIGH finding).
+
+    ``request_payout`` marks commissions ``paid`` at request time, before the
+    transfer settles. If the underlying customer payment is refunded during
+    that window, unwinding the payout must not hand the money back.
+    """
+
+    async def _payable_commission(
+        self, async_client, db_session, partner_ctx, commission_factory, *, reference
+    ):
+        from app.modules.partners.commissions import commission_service
+
+        commission = await commission_factory(
+            partner_ctx, collected_minor=100_000, reference=reference
+        )
+        commission.payable_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        await db_session.flush()
+        await commission_service.release_due_holds(db_session)
+        await db_session.commit()
+
+        await async_client.post(
+            "/v1/partners/me/payout-accounts",
+            json={
+                "account_name": "Acme",
+                "account_number": "0123456789",
+                "bank_name": "GTBank",
+            },
+            headers=partner_ctx["headers"],
+        )
+        return commission
+
+    async def test_fully_refunded_commission_is_not_recredited_when_payout_fails(
+        self, async_client, db_session, partner_a, commission_factory, admin_user
+    ):
+        from app.modules.partners.commissions import commission_service
+        from app.modules.partners.constants import ReversalReason
+        from app.modules.partners.payouts import payout_service
+        from app.modules.partners.repository import PayoutRepository
+
+        await self._payable_commission(
+            async_client,
+            db_session,
+            partner_a,
+            commission_factory,
+            reference="pay_refund_race",
+        )
+
+        created = await async_client.post(
+            "/v1/partners/me/payouts", json={}, headers=partner_a["headers"]
+        )
+        assert created.status_code == 201, created.text
+        assert created.json()["amount_minor"] == 20_000
+
+        # The customer charges back while the transfer is still in flight.
+        await commission_service.reverse_payment(
+            db_session,
+            payment_reference="pay_refund_race",
+            reason=ReversalReason.CHARGEBACK,
+        )
+        await db_session.commit()
+
+        # ...and then the transfer fails, unwinding the payout.
+        payout = await PayoutRepository.get_by_id(
+            db_session, uuid.UUID(created.json()["id"])
+        )
+        await payout_service.transition(
+            db_session,
+            payout,
+            to_status="failed",
+            actor_user_id=None,
+            reason="bank rejected",
+        )
+        await db_session.commit()
+
+        # The money is gone: it must NOT come back as payable.
+        balance = await async_client.get(
+            "/v1/partners/me/commissions/balance", headers=partner_a["headers"]
+        )
+        assert balance.json()["payable_minor"] == 0
+
+        # And a second payout for the same money must be impossible.
+        retry = await async_client.post(
+            "/v1/partners/me/payouts", json={}, headers=partner_a["headers"]
+        )
+        assert retry.status_code == 422
+
+    async def test_partial_refund_restores_only_the_unreversed_remainder(
+        self, async_client, db_session, partner_a, commission_factory
+    ):
+        from app.modules.partners.commissions import commission_service
+        from app.modules.partners.constants import ReversalReason
+        from app.modules.partners.payouts import payout_service
+        from app.modules.partners.repository import PayoutRepository
+
+        await self._payable_commission(
+            async_client,
+            db_session,
+            partner_a,
+            commission_factory,
+            reference="pay_partial_race",
+        )
+
+        created = await async_client.post(
+            "/v1/partners/me/payouts", json={}, headers=partner_a["headers"]
+        )
+        assert created.json()["amount_minor"] == 20_000
+
+        # Half the payment is refunded: 20% of 50_000 = 10_000 clawed back.
+        await commission_service.reverse_payment(
+            db_session,
+            payment_reference="pay_partial_race",
+            reason=ReversalReason.REFUND,
+            refunded_minor=50_000,
+        )
+        await db_session.commit()
+
+        payout = await PayoutRepository.get_by_id(
+            db_session, uuid.UUID(created.json()["id"])
+        )
+        await payout_service.transition(
+            db_session, payout, to_status="cancelled", actor_user_id=None
+        )
+        await db_session.commit()
+
+        balance = await async_client.get(
+            "/v1/partners/me/commissions/balance", headers=partner_a["headers"]
+        )
+        # Only the half the partner is still owed returns to payable.
+        assert balance.json()["payable_minor"] == 10_000
+
+    async def test_unrefunded_payout_failure_still_restores_in_full(
+        self, async_client, db_session, partner_a, commission_factory
+    ):
+        """The narrowing must not break the ordinary failure path."""
+        from app.modules.partners.payouts import payout_service
+        from app.modules.partners.repository import PayoutRepository
+
+        await self._payable_commission(
+            async_client,
+            db_session,
+            partner_a,
+            commission_factory,
+            reference="pay_clean_fail",
+        )
+        created = await async_client.post(
+            "/v1/partners/me/payouts", json={}, headers=partner_a["headers"]
+        )
+        payout = await PayoutRepository.get_by_id(
+            db_session, uuid.UUID(created.json()["id"])
+        )
+        await payout_service.transition(
+            db_session,
+            payout,
+            to_status="failed",
+            actor_user_id=None,
+            reason="bank rejected",
+        )
+        await db_session.commit()
+
+        balance = await async_client.get(
+            "/v1/partners/me/commissions/balance", headers=partner_a["headers"]
+        )
+        assert balance.json()["payable_minor"] == 20_000
+
+
+class TestApiKeyCannotActAsPartner:
+    """Regression for the org-API-key escalation (Strix MEDIUM finding).
+
+    ``get_current_user`` maps an org API key onto that org's *owner*. Partner
+    routes are user-bound and expose earnings and payout actions, so an
+    org-scoped integration key must be refused.
+    """
+
+    async def _api_key(self, async_client, ctx) -> str:
+        res = await async_client.post(
+            f"/v1/orgs/{ctx['org_id']}/api-keys",
+            json={
+                "name": "ci-integration",
+                "scopes": ["read:organizations", "write:organizations"],
+            },
+            headers=ctx["headers"],
+        )
+        assert res.status_code in (200, 201), res.text
+        return res.json()["full_key"]
+
+    async def test_api_key_cannot_read_partner_profile(
+        self, async_client, partner_a
+    ):
+        key = await self._api_key(async_client, partner_a)
+        res = await async_client.get("/v1/partners/me", headers={"X-API-Key": key})
+        assert res.status_code == 403, res.text
+
+    async def test_api_key_cannot_request_a_payout(self, async_client, partner_a):
+        key = await self._api_key(async_client, partner_a)
+        res = await async_client.post(
+            "/v1/partners/me/payouts", json={}, headers={"X-API-Key": key}
+        )
+        assert res.status_code == 403, res.text
+
+    async def test_api_key_cannot_read_commissions(self, async_client, partner_a):
+        key = await self._api_key(async_client, partner_a)
+        res = await async_client.get(
+            "/v1/partners/me/commissions", headers={"X-API-Key": key}
+        )
+        assert res.status_code == 403, res.text
+
+    async def test_normal_jwt_access_still_works(self, async_client, partner_a):
+        """The guard must not lock out legitimate partners."""
+        res = await async_client.get("/v1/partners/me", headers=partner_a["headers"])
+        assert res.status_code == 200
+
+
 class TestCustomerPrivacy:
     async def test_referred_customer_emails_are_masked(
         self, async_client, db_session, partner_a
@@ -1580,7 +1793,18 @@ class TestLeadsAndClaims:
         assert second.status_code == 409
         # It says "taken", not "taken by Partner A".
         assert "Partner A" not in second.text
-        assert second.json()["error"]["details"]["is_own_lead"] is False
+        # And it must not leak *whose* lead it is, not even as a boolean:
+        # that would let a partner probe which prospects rivals hold.
+        assert "is_own_lead" not in second.json()["error"].get("details", {})
+
+        # The same partner resubmitting their own lead gets a byte-identical
+        # response, so the conflict body carries no ownership signal at all.
+        repeat = await async_client.post(
+            "/v1/partners/me/leads", json=payload, headers=partner_a["headers"]
+        )
+        assert repeat.status_code == 409
+        assert repeat.json()["error"]["details"] == second.json()["error"]["details"]
+        assert repeat.json()["error"]["message"] == second.json()["error"]["message"]
 
     async def test_claim_requires_evidence(self, async_client, partner_a):
         res = await async_client.post(

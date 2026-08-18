@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -451,6 +452,28 @@ class PayoutService:
                 continue
             commission.payout_id = None
 
+            from app.modules.partners.models import PartnerCommission
+
+            # Only the portion of this commission that has NOT already been
+            # clawed back may return to the payable balance. A refund or
+            # chargeback that landed while the payout was in flight appends a
+            # negative ``reversal`` row against the original commission;
+            # restoring the full original amount here would re-credit money the
+            # partner is no longer owed and let it be paid out a second time.
+            reversed_total_result = await session.execute(
+                select(
+                    func.coalesce(func.sum(func.abs(PartnerCommission.amount_minor)), 0)
+                ).where(
+                    PartnerCommission.reverses_id == commission.id,
+                    PartnerCommission.entry_type == LedgerEntryType.REVERSAL.value,
+                )
+            )
+            already_reversed_minor = int(reversed_total_result.scalar_one())
+            restorable_minor = max(commission.amount_minor - already_reversed_minor, 0)
+            if restorable_minor <= 0:
+                # Fully refunded while in flight: nothing to give back.
+                continue
+
             key = f"payout_reversal:{payout.id}:{commission.id}"
             existing = await CommissionRepository.get_by_idempotency_key(
                 session,
@@ -460,8 +483,6 @@ class PayoutService:
             )
             if existing is not None:
                 continue
-
-            from app.modules.partners.models import PartnerCommission
 
             restored = PartnerCommission(
                 partner_id=payout.partner_id,
@@ -474,12 +495,14 @@ class PayoutService:
                 source_amount_minor=0,
                 commissionable_amount_minor=0,
                 rate_bps=0,
-                amount_minor=commission.amount_minor,
+                amount_minor=restorable_minor,
                 currency=commission.currency,
                 calculation_basis={
                     "restores_commission": str(commission.id),
                     "payout_id": str(payout.id),
                     "reason": reason,
+                    "original_amount_minor": commission.amount_minor,
+                    "already_reversed_minor": already_reversed_minor,
                 },
                 idempotency_key=key,
                 source_type="payout_reversal",
