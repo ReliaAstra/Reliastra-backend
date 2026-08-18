@@ -120,6 +120,32 @@ class Settings(BaseSettings):
         default="development",
         description="Current environment (development, staging, production)",
     )
+    LOG_JSON: bool = Field(
+        default=False,
+        description="Emit structured JSON logs. Production always uses JSON "
+                    "(see app.core.logging); set this to force JSON in other environments.",
+    )
+    CHECK_SCHEDULE_SECONDS: float = Field(
+        default=30.0,
+        ge=5,
+        le=3600,
+        description="Celery beat interval (seconds) for dispatching due dependency checks.",
+    )
+    CELERY_TASK_SOFT_TIME_LIMIT: int = Field(
+        default=240,
+        ge=10,
+        description="Soft time limit (seconds) for Celery tasks. SoftTimeLimitExceeded is raised first.",
+    )
+    CELERY_TASK_TIME_LIMIT: int = Field(
+        default=300,
+        ge=15,
+        description="Hard time limit (seconds) for Celery tasks. The worker process is killed after this.",
+    )
+    RUN_IN_PROCESS_SCHEDULER: bool = Field(
+        default=False,
+        description="When true, the API process also polls due checks. "
+                    "Keep false when Celery Beat + workers own scheduling.",
+    )
     TRUSTED_PROXY_HOPS: int = Field(
         default=1,
         description="Number of trusted reverse-proxy hops used when parsing "

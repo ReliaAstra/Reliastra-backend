@@ -33,6 +33,50 @@ async def test_vendors_list_is_cursor_paginated(async_client, db_session):
 
 
 @pytest.mark.asyncio
+async def test_org_members_list_is_cursor_paginated(async_client, auth_data):
+    headers = auth_data["headers"]
+    org_id = auth_data["org_id"]
+
+    for i in range(3):
+        await async_client.post(
+            "/v1/auth/register",
+            json={
+                "email": f"member{i}@reliastra.com",
+                "password": "Password123!",
+                "full_name": f"Member {i}",
+            },
+        )
+        invite = await async_client.post(
+            f"/v1/orgs/{org_id}/members",
+            headers=headers,
+            json={"email": f"member{i}@reliastra.com", "role": "member"},
+        )
+        assert invite.status_code == 201, invite.text
+
+    res = await async_client.get(
+        f"/v1/orgs/{org_id}/members",
+        headers=headers,
+        params={"limit": 2},
+    )
+    assert res.status_code == 200
+    payload = res.json()
+    assert set(payload.keys()) >= {"items", "next_cursor", "has_more"}
+    assert len(payload["items"]) == 2
+    assert payload["has_more"] is True
+    assert payload["next_cursor"] is not None
+
+    page2 = await async_client.get(
+        f"/v1/orgs/{org_id}/members",
+        headers=headers,
+        params={"limit": 2, "cursor": payload["next_cursor"]},
+    )
+    assert page2.status_code == 200
+    first_ids = {item["id"] for item in payload["items"]}
+    second_ids = {item["id"] for item in page2.json()["items"]}
+    assert first_ids.isdisjoint(second_ids)
+
+
+@pytest.mark.asyncio
 async def test_vendors_list_respects_limit_bound(async_client):
     res = await async_client.get("/v1/public/vendors", params={"limit": 10_000})
     assert res.status_code == 422

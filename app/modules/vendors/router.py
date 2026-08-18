@@ -32,6 +32,9 @@ async def _rate_limit(request: Request) -> None:
     await enforce_rate_limit(request, public_vendor_limiter)
 
 
+_PUBLIC_VENDORS_CACHE_TTL = 60
+
+
 @router.get("", response_model=CursorPagination[VendorResponse])
 async def list_public_vendors(
     request: Request,
@@ -42,15 +45,26 @@ async def list_public_vendors(
     ),
     limit: int = Query(default=50, ge=1, le=100),
 ) -> CursorPagination[VendorResponse]:
-    """FIX 17: cursor-paginated vendor listing."""
+    """FIX 17: cursor-paginated vendor listing, Redis-cached for 60s."""
     await _rate_limit(request)
+    cache_key = f"public_vendors:{cursor or 'start'}:{limit}"
+    from app.infrastructure.redis_client import safe_redis_get, safe_redis_setex
+
+    cached = await safe_redis_get(cache_key)
+    if cached:
+        try:
+            return CursorPagination[VendorResponse].model_validate_json(cached)
+        except Exception:
+            pass
     vendors = await service.list_public_vendors(db, limit=limit + 1, cursor=cursor)
     has_more = len(vendors) > limit
     items = vendors[:limit]
     next_cursor = str(items[-1].id) if has_more and items else None
-    return CursorPagination(
+    page = CursorPagination(
         items=items, next_cursor=next_cursor, has_more=has_more
     )
+    await safe_redis_setex(cache_key, _PUBLIC_VENDORS_CACHE_TTL, page.model_dump_json())
+    return page
 
 
 @router.get("/{vendor_name}", response_model=VendorDetailResponse)
