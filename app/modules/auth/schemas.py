@@ -11,7 +11,18 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     full_name: str
     org_name: str | None = None
+    #: Existing PLG referral code (`{FRONTEND_BASE_URL}/ref/{code}`).
     ref_code: str | None = None
+    #: Anonymous visitor id returned by
+    #: ``GET /v1/public/referral/{partner_code}`` and stored client-side.
+    #: Replaying it here is what links the new account to the partner touch
+    #: recorded at click time.
+    partner_visitor_id: str | None = Field(default=None, max_length=64)
+    #: Partner code typed directly into the signup form when no click was
+    #: recorded (offline introduction, word of mouth).
+    partner_code: str | None = Field(default=None, max_length=32)
+    #: Optional campaign code accompanying ``partner_code``.
+    partner_campaign_code: str | None = Field(default=None, max_length=32)
 
 
 class LoginRequest(BaseModel):

@@ -318,9 +318,87 @@ class BillingService:
         from app.modules.organizations.repository import OrganizationRepository
 
         await OrganizationRepository.update(session, org, plan=plan)
+
+        # Partner network: a verified, collected payment is the only thing
+        # that creates commission. We pass the amount Paystack reports as
+        # actually collected, never a plan list price. Both the direct
+        # verify call and the `charge.success` webhook land here, and the
+        # commission service is idempotent on the payment reference, so a
+        # duplicate delivery cannot pay a partner twice.
+        await self._record_partner_commission(session, org_id, data, reference)
+
         return VerifyTransactionResponse(
             verified=True, plan=plan, reference=reference
         )
+
+    @staticmethod
+    async def _record_partner_commission(
+        session: AsyncSession,
+        org_id: uuid.UUID,
+        data: dict[str, Any],
+        reference: str,
+    ) -> None:
+        """Convert a verified payment into partner commissions.
+
+        Failures here must never fail the payment itself — the customer has
+        already paid and their plan must be provisioned. Gaps are recovered
+        by the ``commission_calculation`` background job.
+        """
+        try:
+            collected = data.get("amount")
+            if not collected:
+                return
+
+            from app.modules.partners.commissions import commission_service
+            from app.modules.partners.tracking import tracking_service
+
+            paid_at = _parse_datetime(data.get("paid_at"))
+
+            # First collected payment promotes an attributed signup into a
+            # revenue-bearing relationship.
+            customer = data.get("customer")
+            customer = customer if isinstance(customer, dict) else {}
+            metadata = data.get("metadata")
+            metadata = metadata if isinstance(metadata, dict) else {}
+            user_id_raw = metadata.get("user_id")
+            user_id = None
+            if user_id_raw:
+                try:
+                    user_id = uuid.UUID(str(user_id_raw))
+                except ValueError:
+                    user_id = None
+            if user_id is None:
+                from app.modules.organizations.repository import (
+                    OrganizationRepository,
+                )
+
+                members = await OrganizationRepository.list_members(session, org_id)
+                owner = next((m for m in members if m.role == "owner"), None)
+                user_id = owner.user_id if owner else None
+
+            if user_id is not None:
+                await tracking_service.convert_attribution(
+                    session,
+                    organization_id=org_id,
+                    user_id=user_id,
+                    occurred_at=paid_at,
+                )
+
+            await commission_service.record_payment(
+                session,
+                organization_id=org_id,
+                collected_minor=int(collected),
+                currency=str(data.get("currency") or "USD").upper()[:3],
+                payment_reference=reference,
+                paid_at=paid_at,
+                payment_provider="paystack",
+            )
+        except Exception:
+            logger.exception(
+                "Partner commission processing failed for payment %s; the "
+                "commission_calculation job will retry",
+                reference,
+            )
 
     @staticmethod
     def _webhook_event_id(payload: dict[str, Any]) -> str | None:
@@ -395,8 +473,82 @@ class BillingService:
             await self._upsert_webhook_subscription(session, data)
         elif event_type in {"subscription.disable", "subscription.not_renew"}:
             await self._disable_webhook_subscription(session, data)
+            # Churn stops future partner accrual but never reverses
+            # commissions on revenue that was collected and kept.
+            await self._handle_partner_churn(session, data)
+        elif event_type in {"refund.processed", "charge.refunded"}:
+            await self._reverse_partner_commissions(session, data, "refund")
+        elif event_type in {"charge.dispute.create", "charge.dispute.remind"}:
+            await self._reverse_partner_commissions(session, data, "chargeback")
 
         return PaystackWebhookResponse(received=True, event_type=event_type)
+
+    @staticmethod
+    async def _reverse_partner_commissions(
+        session: AsyncSession, data: dict[str, Any], reason: str
+    ) -> None:
+        """Claw back partner commissions after a refund or chargeback.
+
+        The reversal is written as a new negative ledger entry; the original
+        commission row is never edited. Partial refunds reverse
+        proportionally.
+        """
+        try:
+            transaction = data.get("transaction")
+            transaction = transaction if isinstance(transaction, dict) else {}
+            reference = (
+                data.get("transaction_reference")
+                or data.get("reference")
+                or transaction.get("reference")
+            )
+            if not reference:
+                logger.info("Ignoring %s event without a transaction reference", reason)
+                return
+
+            refunded = data.get("amount") or data.get("refunded_amount")
+
+            from app.modules.partners.commissions import commission_service
+
+            reversals = await commission_service.reverse_payment(
+                session,
+                payment_reference=str(reference),
+                reason=reason,
+                refunded_minor=int(refunded) if refunded else None,
+            )
+            if reversals:
+                logger.info(
+                    "Reversed %d partner commissions for %s (%s)",
+                    len(reversals),
+                    reference,
+                    reason,
+                )
+        except Exception:
+            logger.exception("Partner commission reversal failed for %s", reason)
+
+    @staticmethod
+    async def _handle_partner_churn(
+        session: AsyncSession, data: dict[str, Any]
+    ) -> None:
+        try:
+            customer = data.get("customer")
+            customer = customer if isinstance(customer, dict) else {}
+            customer_code = customer.get("customer_code")
+            if not customer_code:
+                return
+
+            from app.modules.billing.repository import BillingRepository
+            from app.modules.partners.commissions import commission_service
+
+            org = await BillingRepository.get_org_by_provider_customer(
+                session, str(customer_code)
+            )
+            if org is None:
+                return
+            await commission_service.handle_churn(
+                session, organization_id=org.id
+            )
+        except Exception:
+            logger.exception("Partner churn handling failed")
 
     async def _upsert_webhook_subscription(
         self, session: AsyncSession, data: dict[str, Any]

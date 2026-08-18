@@ -230,6 +230,134 @@ class Settings(BaseSettings):
         description="Email of the first system admin to auto-promote on startup",
     )
 
+    # ── Partner Network / Distribution Infrastructure ────────────────────────
+    # Canonical public origin used to build partner referral links. NEVER
+    # hardcode "https://reliastra.com" anywhere in the codebase — read it here.
+    RELIASTRA_PUBLIC_URL: str = Field(
+        default="https://reliastra.com",
+        description="Canonical public website origin used to build partner "
+                    "referral links (https://<origin>/r/{partner_code}).",
+    )
+    PARTNER_REFERRAL_PATH_PREFIX: str = Field(
+        default="/r",
+        description="Path prefix for canonical partner referral links.",
+    )
+    PARTNER_ATTRIBUTION_WINDOW_DAYS: int = Field(
+        default=90,
+        ge=1,
+        le=730,
+        description="Last-touch attribution window in days. A click older "
+                    "than this no longer attributes a signup to the partner.",
+    )
+    PARTNER_COMMISSION_HOLD_DAYS: int = Field(
+        default=30,
+        ge=0,
+        le=365,
+        description="Holding period (days) between a commission being earned "
+                    "and becoming payable, covering refunds and chargebacks.",
+    )
+    PARTNER_DEFAULT_CURRENCY: str = Field(
+        default="USD",
+        description="Default ISO-4217 currency for partner money amounts. "
+                    "All amounts are stored as integer minor units.",
+    )
+    # Economics — expressed in basis points (1 bps = 0.01%) so that all money
+    # math stays in integers. 2000 bps = 20%.
+    PARTNER_RATE_REFER_BPS: int = Field(
+        default=2000,
+        ge=0,
+        le=10000,
+        description="Recurring commission rate (bps) for REFER relationships.",
+    )
+    PARTNER_RATE_DEPLOY_BPS: int = Field(
+        default=3000,
+        ge=0,
+        le=10000,
+        description="Recurring commission rate (bps) for DEPLOY relationships.",
+    )
+    PARTNER_RATE_CREATE_BPS: int = Field(
+        default=2500,
+        ge=0,
+        le=10000,
+        description="Recurring commission rate (bps) for CREATE relationships.",
+    )
+    PARTNER_RATE_INTRODUCE_BPS: int = Field(
+        default=1500,
+        ge=0,
+        le=10000,
+        description="Year-1 commission rate (bps) for INTRODUCE relationships.",
+    )
+    PARTNER_RATE_RESELL_BPS: int = Field(
+        default=0,
+        ge=0,
+        le=10000,
+        description="Commission rate (bps) for RESELL relationships. Resellers "
+                    "earn the wholesale margin, never a platform commission.",
+    )
+    PARTNER_MAX_TOTAL_COMMISSION_BPS: int = Field(
+        default=5000,
+        ge=0,
+        le=10000,
+        description="Hard ceiling on the combined commission rate applied to a "
+                    "single collected payment (bps of ACTUAL collected revenue).",
+    )
+    PARTNER_INTRODUCE_WINDOW_MONTHS: int = Field(
+        default=12,
+        ge=1,
+        le=60,
+        description="Year-1 window (months) during which INTRODUCE commissions "
+                    "accrue on collected revenue.",
+    )
+    PARTNER_MIN_PAYOUT_MINOR: int = Field(
+        default=5000,
+        ge=0,
+        description="Minimum payable balance (integer minor units) required "
+                    "before a partner can request a payout.",
+    )
+    PARTNER_CLICK_DEDUP_WINDOW_SECONDS: int = Field(
+        default=1800,
+        ge=0,
+        description="Window in which repeated clicks from the same visitor "
+                    "fingerprint on the same link are deduplicated.",
+    )
+    PARTNER_FRAUD_REVIEW_SCORE: int = Field(
+        default=70,
+        ge=0,
+        le=100,
+        description="Risk score at or above which a partner's commissions are "
+                    "held for manual review instead of becoming payable.",
+    )
+    PARTNER_AUTO_APPROVE_APPLICATIONS: bool = Field(
+        default=False,
+        description="Auto-approve partner applications (non-production only).",
+    )
+    MAXMIND_LICENSE_KEY: str = Field(
+        default="",
+        description="MaxMind license key used to download/refresh the local "
+                    "GeoLite2-Country database. Never used per-request.",
+    )
+    MAXMIND_ACCOUNT_ID: str = Field(
+        default="",
+        description="MaxMind account id paired with MAXMIND_LICENSE_KEY.",
+    )
+    MAXMIND_DB_PATH: str = Field(
+        default="/var/lib/geoip/GeoLite2-City.mmdb",
+        description="Filesystem path to the local MaxMind GeoLite2 database. "
+                    "Lookups are local + cached; no external call per request.",
+    )
+    MAXMIND_CACHE_TTL_SECONDS: int = Field(
+        default=86400,
+        ge=0,
+        description="Redis TTL for cached IP→geo lookups.",
+    )
+
+    @property
+    def partner_referral_base_url(self) -> str:
+        """Canonical base for partner referral links, without trailing slash."""
+        origin = self.RELIASTRA_PUBLIC_URL.rstrip("/")
+        prefix = "/" + self.PARTNER_REFERRAL_PATH_PREFIX.strip("/")
+        return f"{origin}{prefix}"
+
     @property
     def fernet_key(self) -> bytes:
         """Derive a 32-byte url-safe base64-encoded key from SECRET_KEY for Fernet encryption."""
