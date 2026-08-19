@@ -31,26 +31,6 @@ services:
       timeout: 5s
       retries: 5
 
-  minio:
-    image: minio/minio:latest
-    container_name: reliastra-minio
-    restart: always
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-      MINIO_DEFAULT_BUCKETS: reliastra-evidence
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   mailhog:
     image: mailhog/mailhog:latest
     container_name: reliastra-mailhog
@@ -74,12 +54,13 @@ services:
       SECRET_KEY: ${SECRET_KEY:-reliastra-dev-only-change-in-production-key}
       ACCESS_TOKEN_EXPIRE_MINUTES: 15
       REFRESH_TOKEN_EXPIRE_DAYS: 7
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: reliastra-evidence
-      MINIO_USE_SSL: "false"
-      MINIO_REGION: ""
+      # Object storage: Supabase Storage S3 (boto3). Local dev talks to a real
+      # Supabase bucket — use a SEPARATE dev bucket from production.
+      SUPABASE_S3_ENDPOINT: ${SUPABASE_S3_ENDPOINT:?set SUPABASE_S3_ENDPOINT in .env}
+      SUPABASE_S3_REGION: ${SUPABASE_S3_REGION:?set SUPABASE_S3_REGION in .env}
+      SUPABASE_S3_ACCESS_KEY_ID: ${SUPABASE_S3_ACCESS_KEY_ID:?set SUPABASE_S3_ACCESS_KEY_ID in .env}
+      SUPABASE_S3_SECRET_ACCESS_KEY: ${SUPABASE_S3_SECRET_ACCESS_KEY:?set SUPABASE_S3_SECRET_ACCESS_KEY in .env}
+      SUPABASE_S3_BUCKET: ${SUPABASE_S3_BUCKET:?set SUPABASE_S3_BUCKET in .env}
       PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
       PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
       SMTP_HOST: mailhog
@@ -91,8 +72,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_started
       mailhog:
         condition: service_started
 
@@ -109,12 +88,13 @@ services:
       SECRET_KEY: ${SECRET_KEY:-reliastra-dev-only-change-in-production-key}
       ACCESS_TOKEN_EXPIRE_MINUTES: 15
       REFRESH_TOKEN_EXPIRE_DAYS: 7
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: reliastra-evidence
-      MINIO_USE_SSL: "false"
-      MINIO_REGION: ""
+      # Object storage: Supabase Storage S3 (boto3). Local dev talks to a real
+      # Supabase bucket — use a SEPARATE dev bucket from production.
+      SUPABASE_S3_ENDPOINT: ${SUPABASE_S3_ENDPOINT:?set SUPABASE_S3_ENDPOINT in .env}
+      SUPABASE_S3_REGION: ${SUPABASE_S3_REGION:?set SUPABASE_S3_REGION in .env}
+      SUPABASE_S3_ACCESS_KEY_ID: ${SUPABASE_S3_ACCESS_KEY_ID:?set SUPABASE_S3_ACCESS_KEY_ID in .env}
+      SUPABASE_S3_SECRET_ACCESS_KEY: ${SUPABASE_S3_SECRET_ACCESS_KEY:?set SUPABASE_S3_SECRET_ACCESS_KEY in .env}
+      SUPABASE_S3_BUCKET: ${SUPABASE_S3_BUCKET:?set SUPABASE_S3_BUCKET in .env}
       PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
       PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
       SMTP_HOST: mailhog
@@ -139,12 +119,13 @@ services:
       SECRET_KEY: ${SECRET_KEY:-reliastra-dev-only-change-in-production-key}
       ACCESS_TOKEN_EXPIRE_MINUTES: 15
       REFRESH_TOKEN_EXPIRE_DAYS: 7
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: reliastra-evidence
-      MINIO_USE_SSL: "false"
-      MINIO_REGION: ""
+      # Object storage: Supabase Storage S3 (boto3). Local dev talks to a real
+      # Supabase bucket — use a SEPARATE dev bucket from production.
+      SUPABASE_S3_ENDPOINT: ${SUPABASE_S3_ENDPOINT:?set SUPABASE_S3_ENDPOINT in .env}
+      SUPABASE_S3_REGION: ${SUPABASE_S3_REGION:?set SUPABASE_S3_REGION in .env}
+      SUPABASE_S3_ACCESS_KEY_ID: ${SUPABASE_S3_ACCESS_KEY_ID:?set SUPABASE_S3_ACCESS_KEY_ID in .env}
+      SUPABASE_S3_SECRET_ACCESS_KEY: ${SUPABASE_S3_SECRET_ACCESS_KEY:?set SUPABASE_S3_SECRET_ACCESS_KEY in .env}
+      SUPABASE_S3_BUCKET: ${SUPABASE_S3_BUCKET:?set SUPABASE_S3_BUCKET in .env}
       PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
       PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
       SMTP_HOST: mailhog
@@ -158,4 +139,3 @@ services:
 
 volumes:
   postgres_data:
-  minio_data:

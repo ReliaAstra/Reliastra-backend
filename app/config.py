@@ -56,29 +56,33 @@ class Settings(BaseSettings):
         default=7,
         description="Refresh token expiration time in days",
     )
-    MINIO_ENDPOINT: str = Field(
-        default="localhost:9000",
-        description="MinIO/S3 server endpoint",
-    )
-    MINIO_ACCESS_KEY: str = Field(
-        default="minioadmin",
-        description="MinIO/S3 access key",
-    )
-    MINIO_SECRET_KEY: str = Field(
-        default="minioadmin",
-        description="MinIO/S3 secret key",
-    )
-    MINIO_BUCKET: str = Field(
-        default="reliastra-evidence",
-        description="MinIO/S3 default storage bucket",
-    )
-    MINIO_USE_SSL: bool = Field(
-        default=False,
-        description="Whether to use SSL when connecting to MinIO/S3",
-    )
-    MINIO_REGION: str = Field(
+    # Supabase Storage S3 API — the ONLY object-storage backend.
+    SUPABASE_S3_ENDPOINT: str = Field(
         default="",
-        description="S3 region (e.g. 'eu-west-3' for Supabase, 'us-east-1' for AWS). Leave empty for local MinIO.",
+        description="Supabase Storage S3 endpoint URL, e.g. "
+                    "'https://<project-ref>.supabase.co/storage/v1/s3'. "
+                    "Copy the full endpoint from the Supabase dashboard "
+                    "(Storage → S3 Access Keys).",
+    )
+    SUPABASE_S3_REGION: str = Field(
+        default="",
+        description="Supabase project region (e.g. 'eu-west-3', 'us-east-1'). "
+                    "Required — there is no default region.",
+    )
+    SUPABASE_S3_ACCESS_KEY_ID: str | None = Field(
+        default=None,
+        description="Supabase Storage S3 access key id (Storage → S3 Access "
+                    "Keys). NOT the anon/service-role API keys.",
+    )
+    SUPABASE_S3_SECRET_ACCESS_KEY: str | None = Field(
+        default=None,
+        description="Supabase Storage S3 secret access key (Storage → S3 "
+                    "Access Keys). NOT the anon/service-role API keys.",
+    )
+    SUPABASE_S3_BUCKET: str = Field(
+        default="",
+        description="Supabase Storage bucket name. Buckets are created in the "
+                    "Supabase dashboard — the app never creates them.",
     )
     SMTP_HOST: str = Field(
         default="localhost",
@@ -186,10 +190,33 @@ class Settings(BaseSettings):
         new_query = urlencode(existing_params, doseq=True)
         return urlunparse(parsed._replace(query=new_query))
 
-    @property
-    def minio_region_or_none(self) -> str | None:
-        """Return MINIO_REGION as None when empty so the Minio client auto-detects."""
-        return self.MINIO_REGION if self.MINIO_REGION else None
+    @model_validator(mode="after")
+    def _validate_supabase_s3_endpoint(self) -> type[Settings]:
+        """Enforce the Supabase Storage S3 endpoint shape.
+
+        Only the Supabase S3 API is supported: the endpoint must be an
+        https:// URL ending in ``/storage/v1/s3``.  A trailing slash is
+        stripped.  An empty endpoint is allowed (storage is simply
+        unconfigured) outside of production — the production validator
+        rejects it below.
+        """
+        endpoint = self.SUPABASE_S3_ENDPOINT.strip()
+        if not endpoint:
+            return self
+        if urlparse(endpoint).scheme != "https":
+            raise ValueError(
+                "SUPABASE_S3_ENDPOINT must be an https:// URL, e.g. "
+                "'https://<project-ref>.supabase.co/storage/v1/s3' "
+                "(copy it from the Supabase dashboard, Storage → S3 Access Keys)."
+            )
+        if not endpoint.rstrip("/").endswith("/storage/v1/s3"):
+            raise ValueError(
+                "SUPABASE_S3_ENDPOINT must end in '/storage/v1/s3' — only "
+                "Supabase Storage's S3-compatible API is supported, e.g. "
+                "'https://<project-ref>.supabase.co/storage/v1/s3'."
+            )
+        self.SUPABASE_S3_ENDPOINT = endpoint.rstrip("/")
+        return self
 
     @model_validator(mode="after")
     def _reject_insecure_defaults_in_production(self) -> type[Settings]:
@@ -199,8 +226,30 @@ class Settings(BaseSettings):
                     "SECRET_KEY must be changed from the default value in production. "
                     "Set a cryptographically random SECRET_KEY environment variable."
                 )
-            if self.MINIO_SECRET_KEY == "minioadmin":
-                logger.warning("MINIO_SECRET_KEY is set to the default 'minioadmin' in production")
+            missing = [
+                name
+                for name, value in (
+                    ("SUPABASE_S3_ENDPOINT", self.SUPABASE_S3_ENDPOINT),
+                    ("SUPABASE_S3_REGION", self.SUPABASE_S3_REGION),
+                    ("SUPABASE_S3_ACCESS_KEY_ID", self.SUPABASE_S3_ACCESS_KEY_ID),
+                    (
+                        "SUPABASE_S3_SECRET_ACCESS_KEY",
+                        self.SUPABASE_S3_SECRET_ACCESS_KEY,
+                    ),
+                    ("SUPABASE_S3_BUCKET", self.SUPABASE_S3_BUCKET),
+                )
+                if not value
+            ]
+            if missing:
+                raise ValueError(
+                    "Production requires Supabase Storage S3 configuration. "
+                    "Missing: " + ", ".join(missing) + ". Set them from the "
+                    "Supabase dashboard (Storage → S3 Access Keys)."
+                )
+            if not self.SUPABASE_S3_ENDPOINT.lower().startswith("https://"):
+                raise ValueError(
+                    "SUPABASE_S3_ENDPOINT must be an https:// URL in production."
+                )
         return self
 
     # Google OAuth settings

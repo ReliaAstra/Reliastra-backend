@@ -109,10 +109,9 @@ t "GET /v1/verify/test-id" GET "$BASE/v1/verify/test-id"
 # S3 Storage test
 echo "  --- S3 Storage ---"
 unset DATABASE_URL
-cd /home/z/my-project/reliastra-backend
 S3_RESULT=$(python3 -c "
 from app.infrastructure.storage import storage_client
-storage_client.upload_bytes('live-check-test/test.txt', b'live check data 123')
+storage_client.upload_bytes(b'live check data 123', 'live-check-test/test.txt')
 data = storage_client.download_bytes('live-check-test/test.txt')
 import json
 print(json.dumps({'match': data == b'live check data 123', 'size': len(data)}))

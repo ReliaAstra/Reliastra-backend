@@ -92,7 +92,6 @@ echo "[init] Database 'reliastra' is available."
 # Local in-container services (override any PaaS DATABASE_URL pointing elsewhere)
 export DATABASE_URL="postgresql+asyncpg://postgres@127.0.0.1:5432/reliastra"
 export REDIS_URL="redis://127.0.0.1:6379/0"
-export MINIO_ENDPOINT="127.0.0.1:9000"
 export ENVIRONMENT="${ENVIRONMENT:-development}"
 
 echo "[init] Running Alembic migrations..."
