@@ -124,44 +124,11 @@ celery_app.conf.update(
             "task": "app.modules.api_keys.tasks.flush_api_key_last_used",
             "schedule": 300.0,
         },
-        # ── Partner network ──────────────────────────────────────────
-        # Safety net for commissions the payment webhook failed to record.
-        "partner-commission-calculation": {
-            "task": "app.modules.partners.tasks.commission_calculation",
-            "schedule": crontab(minute=20, hour="*/6"),
-        },
-        # Promote pending -> payable once the 30-day hold has elapsed.
+        # ── Partner referral ─────────────────────────────────────────
+        # Promote pending -> payable once the hold period has elapsed.
         "partner-commission-hold-release": {
             "task": "app.modules.partners.tasks.commission_hold_release",
             "schedule": crontab(minute=15, hour=1),
-        },
-        # Close the previous month. Runs on the 1st, after hold release.
-        "partner-commission-monthly-settlement": {
-            "task": "app.modules.partners.tasks.commission_monthly_settlement",
-            "schedule": crontab(minute=45, hour=1, day_of_month=1),
-        },
-        # Expire Year-1 earning windows so accrual stops on time.
-        "partner-commission-reversal": {
-            "task": "app.modules.partners.tasks.commission_reversal",
-            "schedule": crontab(minute=30, hour=2),
-        },
-        "partner-tier-evaluation": {
-            "task": "app.modules.partners.tasks.partner_tier_evaluation",
-            "schedule": crontab(minute=0, hour=5),
-        },
-        "partner-fraud-analysis": {
-            "task": "app.modules.partners.tasks.fraud_analysis",
-            "schedule": crontab(minute=30, hour=5),
-        },
-        # Roll yesterday's clicks/conversions into per-country daily rows.
-        "partner-geo-aggregation": {
-            "task": "app.modules.partners.tasks.geo_aggregation",
-            "schedule": crontab(minute=20, hour=4),
-        },
-        # Expire unconverted attribution touches past the window.
-        "partner-referral-attribution-expiry": {
-            "task": "app.modules.partners.tasks.referral_attribution_expiry",
-            "schedule": crontab(minute=10, hour=3),
         },
     },
 )

@@ -95,38 +95,22 @@ class AuthService:
 
         # Process referral if ref_code provided
         if request.ref_code:
-            from app.modules.referrals.service import referral_service
-            await referral_service.process_referral_on_register(
-                session=session,
-                ref_code=request.ref_code,
-                new_user_id=user.id,
-                new_user_email=request.email,
-                new_user_org_id=org.id,
-            )
-
-        # Bind partner attribution. This runs alongside — never instead of —
-        # the PLG referral flow above: the two systems answer different
-        # questions (peer rewards vs. commissionable partner ownership) and a
-        # user can legitimately arrive through both.
-        #
-        # Attribution must never be able to fail a registration, so any
-        # error here is logged and swallowed.
-        if request.partner_visitor_id or request.partner_code:
+            # Bind the commissionable partner referral. Reuses the existing
+            # ``ref_code`` identity — one code, one partner, one customer.
+            # Attribution must never be able to fail a registration, so any
+            # error here is logged and swallowed.
             try:
-                from app.modules.partners.tracking import tracking_service
+                from app.modules.partners.service import partner_service
 
-                await tracking_service.bind_signup(
-                    session,
-                    user_id=user.id,
-                    organization_id=org.id,
-                    visitor_id=request.partner_visitor_id,
-                    partner_code=request.partner_code,
-                    campaign_code=request.partner_campaign_code,
-                    email=request.email,
+                await partner_service.bind_referral(
+                    session=session,
+                    referral_code=request.ref_code,
+                    new_user_id=user.id,
+                    new_org_id=org.id,
                 )
             except Exception:
                 logger.exception(
-                    "Partner attribution failed during registration for user %s",
+                    "Partner referral binding failed during registration for user %s",
                     user.id,
                 )
 

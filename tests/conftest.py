@@ -62,31 +62,12 @@ async def test_engine(setup_test_db_server: str) -> AsyncGenerator[AsyncEngine, 
 
     async with engine.begin() as conn:
         for table in [
-            # Partner network. Listed children-first so the FK graph unwinds
-            # without needing CASCADE; partner tables come before users and
-            # organizations, which they reference.
-            "partner_payout_items",
-            "partner_commission_events",
+            # Partner referral. Listed children-first so the FK graph
+            # unwinds; partner tables come before users/organizations.
             "partner_commissions",
-            "partner_settlements",
             "partner_payouts",
-            "partner_payout_accounts",
-            "partner_fraud_flags",
-            "partner_risk_assessments",
-            "partner_claim_evidence",
-            "partner_deployment_claims",
-            "partner_customer_relationships",
-            "partner_leads",
-            "partner_attributions",
-            "partner_click_events",
-            "partner_referral_links",
-            "partner_campaigns",
-            "partner_tier_history",
-            "partner_applications",
-            "partners",
-            "partner_geo_daily",
-            "geo_ip_cache",
-            "partner_program_content",
+            "partner_referrals",
+            "partner_profiles",
             "audit_logs",
             "observation_outbox",
             "refresh_tokens",

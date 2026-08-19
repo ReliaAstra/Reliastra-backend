@@ -61,13 +61,13 @@ def get_email_auth_service() -> EmailAuthService:
 # ── Email Auth ──────────────────────────────────────────────
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     request: Request,
     body: RegisterRequest,
     db: AsyncSession = Depends(get_db),
     service: AuthService = Depends(get_auth_service),
-) -> TokenResponse:
+) -> RegisterResponse:
     await enforce_rate_limit(request, ip_limiter)
     return await service.register(db, body)
 
