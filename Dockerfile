@@ -1,59 +1,67 @@
 # Dockerfile for Reliastra-backend
-# Builds a production-ready image using Python 3.12
+# Self-contained: PostgreSQL + Redis + Celery worker/beat + API in one container.
+# For single-container PaaS platforms (ZevCloud, Railway, Render, etc.)
+# ---------------------------------------------------------------------------
 
-# Use the official Python 3.12 image as the base
-FROM python:3.12-slim as builder
+# ── Stage 1: Build Python venv ───────────────────────────────────────────
+FROM python:3.12-slim AS builder
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory
 WORKDIR /app
-
-# Copy the entire project directory
 COPY . .
 
-# Create a virtual environment and install dependencies
 RUN python -m venv --copies /opt/venv && \
     . /opt/venv/bin/activate && \
     pip install --upgrade pip setuptools build && \
     pip install .
 
-# Use the virtual environment in the final image
+# ── Stage 2: Runtime image with all services ─────────────────────────────
 FROM python:3.12-slim
 
-# Create a non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
+# Install PostgreSQL 15, Redis, supervisord, and utilities
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-15 \
+    redis-server \
+    supervisor \
+    su-exec \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy the virtual environment from the builder stage
+# Copy Python venv from builder
 COPY --from=builder /opt/venv /opt/venv
-
-# Set environment variables for the virtual environment
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Set the working directory
 WORKDIR /app
 
-# Copy the application code
+# Copy application code
 COPY . .
 
-# Create required directories and set ownership
-RUN mkdir -p /app/templates && chown -R appuser:appuser /app
+# Install Playwright Chromium for evidence generation tasks
+RUN playwright install --with-deps chromium 2>/dev/null || true
 
-# Expose the port the app runs on
+# Create required directories
+RUN mkdir -p /app/templates /var/lib/postgresql/data /var/run/postgresql /var/log/supervisor
+
+# Copy supervisord config and entrypoint
+COPY supervisord.conf /app/supervisord.conf
+COPY scripts/entrypoint.sh /app/scripts/entrypoint.sh
+RUN chmod +x /app/scripts/entrypoint.sh
+
+# Expose the API port
 EXPOSE 8000
 
-# Switch to non-root user
-USER appuser
+# Health check for the container orchestrator
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -sf http://localhost:8000/health/live || exit 1
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# The entrypoint bootstraps Postgres, runs migrations, then hands off to supervisord
+ENTRYPOINT ["/app/scripts/entrypoint.sh"]
