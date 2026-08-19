@@ -3,6 +3,13 @@ set -euo pipefail
 
 echo "=== Reliastra standalone entrypoint ==="
 
+# Add PostgreSQL binaries to PATH (Debian puts them in /usr/lib/postgresql/<ver>/bin)
+PG_BIN=$(pg_config --bindir 2>/dev/null || find /usr/lib/postgresql -maxdepth 2 -name initdb -type f 2>/dev/null | head -1 | xargs dirname)
+if [ -n "$PG_BIN" ] && [ -d "$PG_BIN" ]; then
+    export PATH="$PG_BIN:$PATH"
+    echo "[init] PostgreSQL bin dir: $PG_BIN"
+fi
+
 # ── 1. Boot PostgreSQL ──────────────────────────────────────────────────
 PGDATA="/var/lib/postgresql/data"
 PGRUN="/var/run/postgresql"
@@ -103,5 +110,8 @@ echo "[init] Running Alembic migrations..."
 /opt/venv/bin/alembic upgrade head 2>&1
 echo "[init] Migrations complete."
 
-# ── 6. Hand off to supervisord (runs in foreground) ────────────────────
+# ── 6. Inject PG bin path into supervisord.conf and launch ──────────
+# supervisord `environment=` replaces the entire env, so we must inject PATH
+echo "[init] Launching supervisord..."
+sed -i "s|^environment=PGDATA=|environment=PATH=$PG_BIN:\$PATH,PGDATA=|" /app/supervisord.conf
 exec /usr/local/bin/supervisord -c /app/supervisord.conf
