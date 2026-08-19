@@ -72,10 +72,14 @@ GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
 GITHUB_REDIRECT_URI=
 
-# ── MinIO / Storage (optional) ────────────────────────────────
-MINIO_ENDPOINT=localhost:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
+# ── Supabase Storage S3 (required for evidence PDFs) ─────────────
+# From the Supabase dashboard: Storage → S3 Access Keys.
+# Buckets are created in the dashboard, never by the app.
+SUPABASE_S3_ENDPOINT=
+SUPABASE_S3_REGION=
+SUPABASE_S3_ACCESS_KEY_ID=
+SUPABASE_S3_SECRET_ACCESS_KEY=
+SUPABASE_S3_BUCKET=
 
 # ── SMTP (optional) ───────────────────────────────────────────
 SMTP_HOST=localhost

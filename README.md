@@ -79,12 +79,11 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 | `GITHUB_REDIRECT_URI` | _(empty)_ | GitHub OAuth redirect URI |
 | `PAYSTACK_SECRET_KEY` | _(empty)_ | Paystack API secret key |
 | `PAYSTACK_PUBLIC_KEY` | _(empty)_ | Paystack public key for checkout |
-| `MINIO_ENDPOINT` | `localhost:9000` | S3-compatible storage endpoint (MinIO, Supabase, AWS S3, R2) |
-| `MINIO_ACCESS_KEY` | `minioadmin` | Storage access key |
-| `MINIO_SECRET_KEY` | `minioadmin` | Storage secret key |
-| `MINIO_BUCKET` | `reliastra-evidence` | Storage bucket name |
-| `MINIO_USE_SSL` | `false` | Enable SSL for storage connection |
-| `MINIO_REGION` | _(empty)_ | S3 region (e.g. `eu-west-3` for Supabase, `us-east-1` for AWS) |
+| `SUPABASE_S3_ENDPOINT` | _(empty)_ | Supabase Storage S3 endpoint, e.g. `https://<project-ref>.supabase.co/storage/v1/s3` (Storage → S3 Access Keys) |
+| `SUPABASE_S3_REGION` | _(empty)_ | Supabase project region (e.g. `eu-west-3`) — required, no default |
+| `SUPABASE_S3_ACCESS_KEY_ID` | _(empty)_ | Supabase Storage S3 access key id (NOT the anon/service-role key) |
+| `SUPABASE_S3_SECRET_ACCESS_KEY` | _(empty)_ | Supabase Storage S3 secret access key |
+| `SUPABASE_S3_BUCKET` | _(empty)_ | Supabase Storage bucket name (created in the dashboard) |
 | `SMTP_HOST` | `localhost` | SMTP server for notifications |
 | `SMTP_PORT` | `1025` | SMTP port |
 | `SMTP_FROM` | `noreply@reliastra.com` | Sender email address |
@@ -98,7 +97,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 3. Run `alembic upgrade head` to create database tables
 4. Set OAuth variables to enable Google/GitHub sign-in
 5. Set `PAYSTACK_SECRET_KEY` and `PAYSTACK_PUBLIC_KEY` to enable billing
-6. Set `MINIO_*` variables to enable evidence PDF storage (supports Supabase Storage S3, AWS S3, Cloudflare R2, or local MinIO)
+6. Set the `SUPABASE_S3_*` variables (Supabase dashboard → Storage → S3 Access Keys) to enable evidence PDF storage
 7. Verify health: `GET /health` should return `{"status": "ok", ...}`
 
 ### Docker Compose (Local Development)
@@ -107,7 +106,37 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 docker-compose up -d --build
 ```
 
-This starts PostgreSQL, Redis, MinIO, MailHog, the API server, and Celery workers. The API auto-runs migrations on startup.
+This starts PostgreSQL, Redis, MailHog, the API server, and Celery workers. The API auto-runs migrations on startup.
+
+Object storage is **Supabase Storage (S3) only** — local dev talks to a real
+Supabase bucket. Set `SUPABASE_S3_*` in `.env` (see `.env.example`) before
+`docker-compose up`; compose fails loudly if they are missing. Use a
+**separate dev bucket**, never the production one.
+
+### Manual Storage Smoke Test
+
+Against a real Supabase bucket, verify the full evidence path:
+
+```python
+# Requires SUPABASE_S3_* env vars (Supabase dashboard → Storage → S3 Access Keys)
+from app.infrastructure.storage import storage_client
+import hashlib, urllib.request
+
+data = b"smoke test payload " + hashlib.sha256(b"reliastra").digest()
+
+storage_client.upload_bytes(data, "smoke/test.bin", "application/octet-stream")
+downloaded = storage_client.download_bytes("smoke/test.bin")
+assert downloaded == data, "byte-for-byte mismatch"
+
+url = storage_client.get_presigned_url("smoke/test.bin", expires_seconds=300)
+status = urllib.request.urlopen(url).status
+assert status == 200, f"presigned URL returned {status}"
+
+print("SMOKE OK: upload -> download byte-for-byte match, presigned URL 200")
+```
+
+Expected output: `SMOKE OK: upload -> download byte-for-byte match, presigned
+URL 200`.
 
 ## API Documentation
 
@@ -167,7 +196,7 @@ Owner (40) > Admin (30) > Member (20) > Viewer (10)
 | Database | PostgreSQL 15+ |
 | Cache / Queue | Redis 7+ |
 | Task Queue | Celery + Beat |
-| Object Storage | S3-compatible (MinIO, Supabase, AWS, R2) via boto3 + minio |
+| Object Storage | Supabase Storage (S3) via boto3 |
 | Billing | Paystack |
 | Auth | JWT + SHA-256 API Keys + OAuth 2.0 (Google, GitHub) |
 | Encryption | Fernet (derived from SECRET_KEY) |
@@ -267,7 +296,7 @@ Reliastra-backend/
 │   └── infrastructure/
 │       ├── celery_app.py       # Celery configuration and Beat check schedule
 │       ├── redis_client.py     # Shared async Redis client
-│       ├── storage.py          # Dual-backend S3 storage (boto3 for Supabase/AWS, minio for local)
+│       ├── storage.py          # Supabase Storage S3 client (boto3, path-style addressing + s3v4)
 │       └── email.py            # SMTP email sending client (verification & password reset emails)
 ├── templates/evidence/      # Jinja2 evidence report template
 ├── tests/                   # Unit, integration, and E2E tests

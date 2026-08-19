@@ -147,10 +147,9 @@ async def test():
 
         # 22. S3 Storage test
         try:
-            os.chdir("/home/z/my-project/reliastra-backend")
             from app.infrastructure.storage import storage_client
             test_data = b"live check test data"
-            storage_client.upload_bytes("live-check/test.txt", test_data)
+            storage_client.upload_bytes(test_data, "live-check/test.txt")
             downloaded = storage_client.download_bytes("live-check/test.txt")
             match = downloaded == test_data
             results.append(("S3 upload/download", 200 if match else 500, {"match": match, "size": len(downloaded)}))
