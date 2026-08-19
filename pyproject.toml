@@ -24,6 +24,8 @@ dependencies = [
     "email-validator>=2.1.0",
     "python-multipart>=0.0.9",
     "paystack>=1.5.0,<2",
+    "prometheus-client>=0.20.0",
+    "boto3>=1.35.0",
     # Local MaxMind GeoLite2 reader. Deliberately the lightweight reader
     # rather than the full `geoip2` client: geo lookups are served from a
     # local .mmdb file, never from a per-request external API call.
