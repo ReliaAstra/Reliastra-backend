@@ -333,3 +333,37 @@ The integration suite includes an end-to-end test covering apply → approve →
 code → link → campaign → click → attribution → signup → payment →
 commission → hold → payable → payout → ledger → analytics, plus a dedicated
 class asserting cross-partner denial on every ownership-scoped endpoint.
+
+---
+
+## 14. Frontend contract (`/partners`)
+
+The public Partner Network page must consume **`GET /v1/partner-program`**.
+The response includes live economics plus a `landing` object:
+
+* `positioning` — hero copy, CTAs, canonical path `/partners`
+* `how_it_works` — join → share → convert → earn
+* `audiences` / `reasons` / `scenario` / `diagnostic`
+* `faq` — visible DOM answers; use for FAQPage structured data
+* `seo` — title, description, canonical
+* `commission_illustration` — labelled **ILLUSTRATIVE EXAMPLE**; never treat as a payout
+* `resources` — catalog; `available: false` means no file exists
+* `frontend_endpoints` — the only paths the UI should call
+
+Authenticated surfaces:
+
+| UI | Endpoint |
+|----|----------|
+| Apply | `POST /v1/partners/apply` |
+| Application status | `GET /v1/partners/applications` |
+| Profile + referral URL | `GET /v1/partners/me` |
+| Dashboard KPIs | `GET /v1/partners/me/dashboard` |
+| Activity series | `GET /v1/partners/me/analytics` |
+| Resource center | `GET /v1/partners/me/resources` |
+| Ledger / balance | `GET /v1/partners/me/commissions`, `.../balance` |
+| Customers | `GET /v1/partners/me/customers` (emails masked) |
+| Link click | `GET /v1/referral/{partner_code}` |
+
+Do not invent endpoints. Do not compute commission on the client. Do not
+render private dashboard numbers in public HTML. White-label rebranding is
+**not** a live API — the FAQ states this explicitly.

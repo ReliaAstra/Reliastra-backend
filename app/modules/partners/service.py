@@ -50,6 +50,7 @@ from app.modules.partners.constants import (
     PartnerTier,
     RelationshipStatus,
 )
+from app.modules.partners.landing import build_program_landing
 from app.modules.partners.links import ReferralLinkService
 from app.modules.partners.models import (
     Partner,
@@ -1567,6 +1568,12 @@ class PartnerService:
             }
             for method in EarningMethod
         ]
+        from app.modules.partners.schemas import PartnerProgramContentItem
+
+        content_items = [
+            PartnerProgramContentItem.model_validate(c) for c in content
+        ]
+        landing = build_program_landing()
         return PartnerProgramResponse(
             tiers=tiers,
             earning_methods=methods,
@@ -1575,7 +1582,8 @@ class PartnerService:
             min_payout_minor=settings.PARTNER_MIN_PAYOUT_MINOR,
             currency=settings.PARTNER_DEFAULT_CURRENCY,
             max_total_commission_bps=settings.PARTNER_MAX_TOTAL_COMMISSION_BPS,
-            content=content,
+            content=content_items,
+            landing=landing,
         )
 
 

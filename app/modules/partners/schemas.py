@@ -498,7 +498,7 @@ class PartnerProgramResponse(BaseModel):
     """Backend-managed program copy + the live economics.
 
     Rates are served from configuration so that no client ever hardcodes the
-    commission structure.
+    commission structure. ``landing`` is the public /partners page contract.
     """
 
     tiers: list[dict]
@@ -509,6 +509,23 @@ class PartnerProgramResponse(BaseModel):
     currency: str
     max_total_commission_bps: int
     content: list[PartnerProgramContentItem]
+    landing: dict = Field(default_factory=dict)
+
+
+class PartnerResourceItem(BaseModel):
+    id: str
+    title: str
+    kind: str
+    available: bool
+    body: str | None = None
+    href: str | None = None
+
+
+class PartnerResourceCenterResponse(BaseModel):
+    """Partner resource catalog. Missing files are marked unavailable."""
+
+    items: list[PartnerResourceItem]
+    referral_url: str | None = None
 
 
 # ═════════════════════════════ Analytics ═════════════════════════════════

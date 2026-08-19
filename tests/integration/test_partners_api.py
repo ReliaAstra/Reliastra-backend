@@ -697,6 +697,30 @@ class TestPublicDirectory:
         assert body["commission_hold_days"] == 30
         assert body["min_payout_minor"] == 5000
         assert body["max_total_commission_bps"] == 5000
+        landing = body["landing"]
+        assert landing["positioning"]["canonical_path"] == "/partners"
+        assert landing["commission_illustration"]["label"] == "ILLUSTRATIVE EXAMPLE"
+        assert landing["commission_illustration"]["rate_bps"] == 2000
+        assert landing["commission_illustration"]["commission_minor"] == 1980
+        assert any(q["id"] == "earn" for q in landing["faq"])
+
+    async def test_resource_center_requires_a_partner_and_invents_no_files(
+        self, async_client, partner_a, auth_data
+    ):
+        denied = await async_client.get(
+            "/v1/partners/me/resources", headers=auth_data["headers"]
+        )
+        assert denied.status_code == 404
+
+        res = await async_client.get(
+            "/v1/partners/me/resources", headers=partner_a["headers"]
+        )
+        assert res.status_code == 200
+        body = res.json()
+        assert body["referral_url"] == partner_a["partner"]["referral_url"]
+        missing = [item for item in body["items"] if not item["available"]]
+        assert missing
+        assert all(item["href"] is None for item in missing)
 
 
 # ═══════════════════════ Attribution through signup ══════════════════════

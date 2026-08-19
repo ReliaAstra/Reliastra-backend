@@ -274,6 +274,30 @@ async def get_partner_analytics(
 
 
 @partners_router.get(
+    "/me/resources",
+    response_model=PartnerResourceCenterResponse,
+    summary="Partner resource center",
+)
+async def get_partner_resources(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_partner_user),
+) -> PartnerResourceCenterResponse:
+    """Copy and asset catalog for introductions.
+
+    Downloadable files that do not exist are returned with
+    ``available: false`` rather than invented URLs.
+    """
+    from app.modules.partners.landing import _resources
+    from app.modules.partners.links import ReferralLinkService
+
+    partner = await partner_service.get_partner_for_user(db, current_user)
+    return PartnerResourceCenterResponse(
+        items=[PartnerResourceItem(**item) for item in _resources()],
+        referral_url=ReferralLinkService.build(partner.partner_code),
+    )
+
+
+@partners_router.get(
     "/me/customers",
     response_model=OffsetPagination[ReferredCustomerItem],
     summary="List customers attributed to me",
