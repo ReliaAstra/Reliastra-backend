@@ -27,12 +27,13 @@ RUN python -m venv --copies /opt/venv && \
 # ── Stage 2: Runtime image with all services ─────────────────────────────
 FROM python:3.12-slim
 
-# Install PostgreSQL 15, Redis, supervisord, and utilities
+# Install PostgreSQL, Redis, supervisord, and utilities
+# Debian Trixie ships PostgreSQL 17; gosu replaces Alpine's su-exec
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    postgresql-15 \
+    postgresql \
     redis-server \
     supervisor \
-    su-exec \
+    gosu \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

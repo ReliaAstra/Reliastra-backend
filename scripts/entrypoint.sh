@@ -11,7 +11,7 @@ if [ ! -f "$PGDATA/PG_VERSION" ]; then
     echo "[init] Initializing PostgreSQL database cluster..."
     mkdir -p "$PGDATA" "$PGRUN"
     chown -R postgres:postgres "$PGDATA" "$PGRUN"
-    su-exec postgres initdb --auth=trust --username=postgres
+    gosu postgres initdb --auth=trust --username=postgres
     # Configure pg_hba.conf for local trust auth
     echo "local all all trust" > "$PGDATA/pg_hba.conf"
     echo "host  all all 127.0.0.1/32 trust" >> "$PGDATA/pg_hba.conf"
@@ -42,11 +42,11 @@ chmod 0777 "$PGRUN"
 
 # Start PostgreSQL in background for init/migrations
 echo "[init] Starting PostgreSQL for migrations..."
-su-exec postgres pg_ctl start -w -D "$PGDATA" -o "-c listen_addresses='*' -p 5432" 2>&1 | tail -3
+gosu postgres pg_ctl start -w -D "$PGDATA" -o "-c listen_addresses='*' -p 5432" 2>&1 | tail -3
 
 # Wait for Postgres to be ready
 for i in $(seq 1 30); do
-    if su-exec postgres psql -h 127.0.0.1 -U postgres -c "SELECT 1" &>/dev/null; then
+    if gosu postgres psql -h 127.0.0.1 -U postgres -c "SELECT 1" &>/dev/null; then
         echo "[init] PostgreSQL is ready."
         break
     fi
@@ -55,13 +55,13 @@ for i in $(seq 1 30); do
 done
 
 # Create the database if it doesn't exist
-su-exec postgres psql -h 127.0.0.1 -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='reliastra'" | grep -q 1 || \
-    su-exec postgres psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE reliastra"
+gosu postgres psql -h 127.0.0.1 -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='reliastra'" | grep -q 1 || \
+    gosu postgres psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE reliastra"
 echo "[init] Database 'reliastra' is available."
 
 # Stop PostgreSQL (supervisord will start it)
 echo "[init] Stopping PostgreSQL (supervisord will manage it)..."
-su-exec postgres pg_ctl stop -D "$PGDATA" -m fast 2>/dev/null || true
+gosu postgres pg_ctl stop -D "$PGDATA" -m fast 2>/dev/null || true
 
 # ── 2. Redis is stateless — supervisord handles it ─────────────────────
 echo "[init] Redis will be started by supervisord."
@@ -80,7 +80,7 @@ echo "=== Starting supervisord (postgres → redis → celery → api) ==="
 # Wait for postgres to be ready again under supervisord
 sleep 3
 for i in $(seq 1 30); do
-    if su-exec postgres psql -h 127.0.0.1 -U postgres -c "SELECT 1" &>/dev/null; then
+    if gosu postgres psql -h 127.0.0.1 -U postgres -c "SELECT 1" &>/dev/null; then
         echo "[init] PostgreSQL (supervisord) is ready."
         break
     fi
