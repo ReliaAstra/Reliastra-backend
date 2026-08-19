@@ -338,11 +338,10 @@ class BillingService:
         data: dict[str, Any],
         reference: str,
     ) -> None:
-        """Convert a verified payment into partner commissions.
+        """Convert a verified payment into a partner commission.
 
         Failures here must never fail the payment itself — the customer has
-        already paid and their plan must be provisioned. Gaps are recovered
-        by the ``commission_calculation`` background job.
+        already paid and their plan must be provisioned.
         """
         try:
             collected = data.get("amount")
@@ -350,39 +349,8 @@ class BillingService:
                 return
 
             from app.modules.partners.commissions import commission_service
-            from app.modules.partners.tracking import tracking_service
 
             paid_at = _parse_datetime(data.get("paid_at"))
-
-            # First collected payment promotes an attributed signup into a
-            # revenue-bearing relationship.
-            customer = data.get("customer")
-            customer = customer if isinstance(customer, dict) else {}
-            metadata = data.get("metadata")
-            metadata = metadata if isinstance(metadata, dict) else {}
-            user_id_raw = metadata.get("user_id")
-            user_id = None
-            if user_id_raw:
-                try:
-                    user_id = uuid.UUID(str(user_id_raw))
-                except ValueError:
-                    user_id = None
-            if user_id is None:
-                from app.modules.organizations.repository import (
-                    OrganizationRepository,
-                )
-
-                members = await OrganizationRepository.list_members(session, org_id)
-                owner = next((m for m in members if m.role == "owner"), None)
-                user_id = owner.user_id if owner else None
-
-            if user_id is not None:
-                await tracking_service.convert_attribution(
-                    session,
-                    organization_id=org_id,
-                    user_id=user_id,
-                    occurred_at=paid_at,
-                )
 
             await commission_service.record_payment(
                 session,
@@ -395,8 +363,7 @@ class BillingService:
             )
         except Exception:
             logger.exception(
-                "Partner commission processing failed for payment %s; the "
-                "commission_calculation job will retry",
+                "Partner commission processing failed for payment %s",
                 reference,
             )
 
@@ -487,11 +454,10 @@ class BillingService:
     async def _reverse_partner_commissions(
         session: AsyncSession, data: dict[str, Any], reason: str
     ) -> None:
-        """Claw back partner commissions after a refund or chargeback.
+        """Reverse partner commissions after a refund or chargeback.
 
-        The reversal is written as a new negative ledger entry; the original
-        commission row is never edited. Partial refunds reverse
-        proportionally.
+        The original commission rows are never deleted — their status is set
+        to ``reversed``.
         """
         try:
             transaction = data.get("transaction")
@@ -505,20 +471,17 @@ class BillingService:
                 logger.info("Ignoring %s event without a transaction reference", reason)
                 return
 
-            refunded = data.get("amount") or data.get("refunded_amount")
-
             from app.modules.partners.commissions import commission_service
 
-            reversals = await commission_service.reverse_payment(
+            count = await commission_service.reverse_by_reference(
                 session,
                 payment_reference=str(reference),
                 reason=reason,
-                refunded_minor=int(refunded) if refunded else None,
             )
-            if reversals:
+            if count:
                 logger.info(
                     "Reversed %d partner commissions for %s (%s)",
-                    len(reversals),
+                    count,
                     reference,
                     reason,
                 )

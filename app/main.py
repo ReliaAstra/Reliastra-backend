@@ -47,10 +47,7 @@ from app.modules.verification.router import router as verification_router
 from app.modules.referrals.router import referrals_router
 from app.modules.partners.router import partners_router
 from app.modules.partners.public_router import public_partners_router
-from app.modules.partners.admin_router import (
-    admin_geo_router,
-    admin_partners_router,
-)
+from app.modules.partners.admin_router import admin_partners_router
 from app.modules.webhooks.router import webhooks_router as webhooks_router
 from app.modules.badges.router import router as badges_router
 from app.modules.vendor_submissions.router import submission_router, submission_admin_router
@@ -310,7 +307,6 @@ def create_app() -> FastAPI:
     app.include_router(partners_router)
     app.include_router(public_partners_router)
     app.include_router(admin_partners_router)
-    app.include_router(admin_geo_router)
 
     async def _run_health_checks() -> tuple[dict[str, Any], int]:
         checks: dict[str, Any] = {}
