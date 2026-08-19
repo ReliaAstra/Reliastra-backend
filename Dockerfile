@@ -50,7 +50,8 @@ COPY . .
 RUN playwright install --with-deps chromium 2>/dev/null || true
 
 # Create required directories
-RUN mkdir -p /app/templates /var/lib/postgresql/data /var/run/postgresql /var/log/supervisor
+RUN mkdir -p /app/templates /var/lib/postgresql/data /var/run/postgresql /var/log/supervisor /var/log/postgresql \
+    && chown -R postgres:postgres /var/run/postgresql /var/log/postgresql
 
 # Copy supervisord config and entrypoint
 COPY supervisord.conf /app/supervisord.conf
@@ -60,8 +61,10 @@ RUN chmod +x /app/scripts/entrypoint.sh
 # Expose the API port
 EXPOSE 8000
 
-# Health check for the container orchestrator
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+# Health check for the container orchestrator.
+# start-period must cover initdb + bootstrap Postgres + Alembic + supervisord
+# boot on a cold volume; 60s was too short and caused premature rollbacks.
+HEALTHCHECK --interval=15s --timeout=10s --start-period=180s --retries=8 \
     CMD curl -sf http://localhost:8000/health/live || exit 1
 
 # The entrypoint bootstraps Postgres, runs migrations, then hands off to supervisord

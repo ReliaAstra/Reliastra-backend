@@ -17,6 +17,8 @@ fi
 export PGDATA="${PGDATA:-/var/lib/postgresql/data}"
 export PGHOST="${PGHOST:-/var/run/postgresql}"
 PGRUN="${PGHOST}"
+PGLOGDIR="/var/log/postgresql"
+PGBOOTLOG="$PGLOGDIR/bootstrap.log"
 
 # ── 1. Boot PostgreSQL ──────────────────────────────────────────────────
 if [ ! -f "$PGDATA/PG_VERSION" ]; then
@@ -35,6 +37,7 @@ HBA
     chown postgres:postgres "$PGDATA/pg_hba.conf"
     cat >> "$PGDATA/postgresql.auto.conf" <<'PGCONF'
 listen_addresses = '*'
+unix_socket_directories = '/var/run/postgresql'
 max_connections = 100
 shared_buffers = 128MB
 effective_cache_size = 256MB
@@ -51,13 +54,27 @@ PGCONF
     chown postgres:postgres "$PGDATA/postgresql.auto.conf"
 fi
 
-mkdir -p "$PGDATA" "$PGRUN"
-chown -R postgres:postgres "$PGDATA" "$PGRUN"
+mkdir -p "$PGDATA" "$PGRUN" "$PGLOGDIR"
+chown -R postgres:postgres "$PGDATA" "$PGRUN" "$PGLOGDIR"
 chmod 700 "$PGDATA"
 chmod 0777 "$PGRUN"
 
 echo "[init] Starting PostgreSQL for migrations..."
-gosu postgres pg_ctl start -w -D "$PGDATA" -o "-c listen_addresses='*' -p 5432" 2>&1 | tail -5
+# NEVER pipe `pg_ctl -w` (e.g. `| tail -5`): the server inherits the pipe, the
+# pipe buffer fills, `tail` blocks waiting for EOF that never comes, and
+# `pg_ctl -w` blocks waiting for the server -> container boot deadlocks.
+# Use -l so the server writes to a file and pg_ctl owns no pipe at all.
+: > "$PGBOOTLOG"
+chown postgres:postgres "$PGBOOTLOG"
+if gosu postgres pg_ctl start -w -t 120 -D "$PGDATA" -l "$PGBOOTLOG" \
+        -o "-c listen_addresses='*' -p 5432 -c unix_socket_directories='$PGRUN'"; then
+    echo "[init] pg_ctl start finished"
+else
+    echo "[init] FATAL: pg_ctl start failed; bootstrap log follows:" >&2
+    tail -50 "$PGBOOTLOG" >&2 || true
+    exit 1
+fi
+tail -20 "$PGBOOTLOG" || true
 
 for i in $(seq 1 30); do
     if gosu postgres psql -h 127.0.0.1 -U postgres -c "SELECT 1" &>/dev/null; then
