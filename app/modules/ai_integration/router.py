@@ -59,6 +59,27 @@ async def update_ai_provider(
     return await service.update_provider(db, current_org.id, provider_id, request)
 
 
+@router.post(
+    "/{provider_id}/test",
+    dependencies=[Depends(require_admin)],
+)
+async def test_ai_provider(
+    provider_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_org: Organization = Depends(get_current_org),
+    service: AIService = Depends(get_ai_service),
+) -> dict[str, str]:
+    """Validate connectivity and credentials for a stored provider.
+
+    Useful after creation to surface auth/endpoint errors immediately
+    instead of waiting for the next incident's evidence generation.
+    """
+    result = await service.test_provider(db, current_org.id, provider_id)
+    # Don't leak raw provider output — just confirm success.
+    status_msg = "ok" if result.get("text") is not None else "ok (empty response)"
+    return {"status": status_msg}
+
+
 @router.delete(
     "/{provider_id}",
     status_code=status.HTTP_204_NO_CONTENT,
