@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -161,7 +161,7 @@ async def supabase_me(
     # the Supabase JWT on every call).  The access_token expires in 15 min
     # and can be refreshed with /v1/auth/refresh.
     tokens = auth_service._generate_token_pair(user.id)
-    expires_at = datetime.now(timezone.utc) + settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     await auth_service.auth_repository.create_refresh_token(
         db, user.id, tokens.refresh_token, expires_at
     )
