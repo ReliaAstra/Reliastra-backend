@@ -3,28 +3,36 @@ set -euo pipefail
 
 echo "=== Reliastra standalone entrypoint ==="
 
-# Add PostgreSQL binaries to PATH (Debian puts them in /usr/lib/postgresql/<ver>/bin)
-PG_BIN=$(pg_config --bindir 2>/dev/null || find /usr/lib/postgresql -maxdepth 2 -name initdb -type f 2>/dev/null | head -1 | xargs dirname)
-if [ -n "$PG_BIN" ] && [ -d "$PG_BIN" ]; then
+# Debian puts PG binaries in /usr/lib/postgresql/<ver>/bin — not on default PATH.
+PG_BIN=$(pg_config --bindir 2>/dev/null || true)
+if [ -z "${PG_BIN:-}" ] || [ ! -d "$PG_BIN" ]; then
+    PG_BIN=$(find /usr/lib/postgresql -maxdepth 2 -name initdb -type f 2>/dev/null | head -1 | xargs -r dirname)
+fi
+if [ -n "${PG_BIN:-}" ] && [ -d "$PG_BIN" ]; then
     export PATH="$PG_BIN:$PATH"
     echo "[init] PostgreSQL bin dir: $PG_BIN"
 fi
 
-# ── 1. Boot PostgreSQL ──────────────────────────────────────────────────
-PGDATA="/var/lib/postgresql/data"
-PGRUN="/var/run/postgresql"
+# Must be exported: initdb/pg_ctl read PGDATA from the environment.
+export PGDATA="${PGDATA:-/var/lib/postgresql/data}"
+export PGHOST="${PGHOST:-/var/run/postgresql}"
+PGRUN="${PGHOST}"
 
+# ── 1. Boot PostgreSQL ──────────────────────────────────────────────────
 if [ ! -f "$PGDATA/PG_VERSION" ]; then
-    echo "[init] Initializing PostgreSQL database cluster..."
+    echo "[init] Initializing PostgreSQL database cluster at $PGDATA..."
     mkdir -p "$PGDATA" "$PGRUN"
     chown -R postgres:postgres "$PGDATA" "$PGRUN"
-    gosu postgres initdb --auth=trust --username=postgres
-    # Configure pg_hba.conf for local trust auth
-    echo "local all all trust" > "$PGDATA/pg_hba.conf"
-    echo "host  all all 127.0.0.1/32 trust" >> "$PGDATA/pg_hba.conf"
-    echo "host  all all ::1/128 trust" >> "$PGDATA/pg_hba.conf"
-    echo "host  all all 0.0.0.0/0 trust" >> "$PGDATA/pg_hba.conf"
-    # Tune for small container
+    chmod 700 "$PGDATA"
+    # -D is required; a local (non-exported) PGDATA is invisible to initdb.
+    gosu postgres initdb -D "$PGDATA" --auth=trust --username=postgres
+    cat > "$PGDATA/pg_hba.conf" <<'HBA'
+local all all trust
+host  all all 127.0.0.1/32 trust
+host  all all ::1/128 trust
+host  all all 0.0.0.0/0 trust
+HBA
+    chown postgres:postgres "$PGDATA/pg_hba.conf"
     cat >> "$PGDATA/postgresql.auto.conf" <<'PGCONF'
 listen_addresses = '*'
 max_connections = 100
@@ -40,18 +48,17 @@ work_mem = 4MB
 min_wal_size = 100MB
 max_wal_size = 2GB
 PGCONF
+    chown postgres:postgres "$PGDATA/postgresql.auto.conf"
 fi
 
-# Ensure runtime dirs exist with correct ownership
 mkdir -p "$PGDATA" "$PGRUN"
 chown -R postgres:postgres "$PGDATA" "$PGRUN"
+chmod 700 "$PGDATA"
 chmod 0777 "$PGRUN"
 
-# Start PostgreSQL in background for init/migrations
 echo "[init] Starting PostgreSQL for migrations..."
-gosu postgres pg_ctl start -w -D "$PGDATA" -o "-c listen_addresses='*' -p 5432" 2>&1 | tail -3
+gosu postgres pg_ctl start -w -D "$PGDATA" -o "-c listen_addresses='*' -p 5432" 2>&1 | tail -5
 
-# Wait for Postgres to be ready
 for i in $(seq 1 30); do
     if gosu postgres psql -h 127.0.0.1 -U postgres -c "SELECT 1" &>/dev/null; then
         echo "[init] PostgreSQL is ready."
@@ -61,57 +68,35 @@ for i in $(seq 1 30); do
     sleep 1
 done
 
-# Create the database if it doesn't exist
 gosu postgres psql -h 127.0.0.1 -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='reliastra'" | grep -q 1 || \
     gosu postgres psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE reliastra"
 echo "[init] Database 'reliastra' is available."
 
-# Stop PostgreSQL (supervisord will start it)
-echo "[init] Stopping PostgreSQL (supervisord will manage it)..."
-gosu postgres pg_ctl stop -D "$PGDATA" -m fast 2>/dev/null || true
-
-# ── 2. Redis is stateless — supervisord handles it ─────────────────────
-echo "[init] Redis will be started by supervisord."
-
-# ── 3. Override connection URLs for local services ────────────────────────
+# Local in-container services (override any PaaS DATABASE_URL pointing elsewhere)
 export DATABASE_URL="postgresql+asyncpg://postgres@127.0.0.1:5432/reliastra"
 export REDIS_URL="redis://127.0.0.1:6379/0"
 export MINIO_ENDPOINT="127.0.0.1:9000"
-
-# Ensure dev environment unless explicitly set (production rejects default SECRET_KEY)
 export ENVIRONMENT="${ENVIRONMENT:-development}"
 
-# ── 4. Start all services via supervisord ──────────────────────────────
-echo "=== Starting supervisord (postgres → redis → celery → api) ==="
-
-# Wait for postgres to be ready again under supervisord
-sleep 3
-for i in $(seq 1 30); do
-    if gosu postgres psql -h 127.0.0.1 -U postgres -c "SELECT 1" &>/dev/null; then
-        echo "[init] PostgreSQL (supervisord) is ready."
-        break
-    fi
-    echo "[init] Waiting for PostgreSQL (supervisord)... ($i/30)"
-    sleep 1
-done
-
-# Wait for Redis
-for i in $(seq 1 15); do
-    if redis-cli -h 127.0.0.1 ping 2>/dev/null | grep -q PONG; then
-        echo "[init] Redis is ready."
-        break
-    fi
-    echo "[init] Waiting for Redis... ($i/15)"
-    sleep 1
-done
-
-# ── 5. Run database migrations ─────────────────────────────────────────
 echo "[init] Running Alembic migrations..."
-/opt/venv/bin/alembic upgrade head 2>&1
+/opt/venv/bin/alembic upgrade head
 echo "[init] Migrations complete."
 
-# ── 6. Inject PG bin path into supervisord.conf and launch ──────────
-# supervisord `environment=` replaces the entire env, so we must inject PATH
-echo "[init] Launching supervisord..."
-sed -i "s|^environment=PGDATA=|environment=PATH=$PG_BIN:\$PATH,PGDATA=|" /app/supervisord.conf
-exec /usr/local/bin/supervisord -c /app/supervisord.conf
+echo "[init] Stopping bootstrap PostgreSQL (supervisord will manage it)..."
+gosu postgres pg_ctl stop -D "$PGDATA" -m fast 2>/dev/null || true
+
+# ── 2. Launch supervisord ───────────────────────────────────────────────
+# Debian installs supervisor at /usr/bin/supervisord (not /usr/local/bin).
+SUPERVISORD_BIN="$(command -v supervisord || true)"
+if [ -z "$SUPERVISORD_BIN" ]; then
+    echo "[init] FATAL: supervisord not found on PATH" >&2
+    exit 1
+fi
+
+# supervisord `environment=` replaces the process env; inject PATH + PGDATA.
+if grep -q '^environment=PGDATA=' /app/supervisord.conf; then
+    sed -i "s|^environment=PGDATA=|environment=PATH=${PG_BIN}:/opt/venv/bin:/usr/local/bin:/usr/bin:/bin,PGDATA=|" /app/supervisord.conf
+fi
+
+echo "=== Starting supervisord ($SUPERVISORD_BIN) ==="
+exec "$SUPERVISORD_BIN" -c /app/supervisord.conf
