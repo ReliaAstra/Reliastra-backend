@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +19,8 @@ from app.modules.dependencies.schemas import (
     DependencyUpdateRequest,
 )
 from app.modules.organizations.repository import OrganizationRepository
+
+logger = logging.getLogger(__name__)
 
 
 class DependencyService:
