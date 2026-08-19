@@ -265,7 +265,7 @@ async def initialize_payment(
     current_org: Organization = Depends(get_current_org),
     service: BillingService = Depends(get_bill_service),
 ) -> InitializePaymentResponse:
-    return await service.initialize_payment(db, org_id, request)
+    return await service.initialize_payment(db, current_org.id, request)
 
 
 @router.post(

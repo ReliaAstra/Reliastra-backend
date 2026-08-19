@@ -129,7 +129,7 @@ async def publicize_evidence(
 ) -> PublicizeResponse:
     """Make an evidence report public (or private)."""
     return await service.publicize_evidence(
-        db, org_id, current_user.id, body
+        db, current_org.id, current_user.id, body
     )
 
 
