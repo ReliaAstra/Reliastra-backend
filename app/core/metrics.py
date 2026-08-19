@@ -9,6 +9,8 @@ Metrics:
 * ``reliastra_incidents_total{action}``          — incidents opened/resolved
 * ``reliastra_celery_tasks_total{task,status}``  — Celery task completions
 * ``reliastra_http_requests_total{method,status}``— inbound HTTP requests
+* ``reliastra_ai_generation_total{provider_type,status}`` — AI explanation attempts
+* ``reliastra_ai_generation_latency_seconds{provider_type}`` — AI latency
 """
 
 from __future__ import annotations
@@ -49,6 +51,19 @@ http_requests_total = Counter(
     "reliastra_http_requests_total",
     "Total inbound HTTP requests",
     ["method", "status"],
+)
+
+ai_generation_total = Counter(
+    "reliastra_ai_generation_total",
+    "Total AI explanation generation attempts",
+    ["provider_type", "status"],
+)
+
+ai_generation_latency = Histogram(
+    "reliastra_ai_generation_latency_seconds",
+    "AI explanation generation latency in seconds",
+    ["provider_type"],
+    buckets=(0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0),
 )
 
 
