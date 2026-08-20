@@ -1,55 +1,78 @@
-# Python
+# ── Node / Next.js (frontend) ──────────────────────────────────────────
+node_modules/
+.next/
+out/
+dist/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ── Python (backend) ──────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-
-# Virtual environments
 .venv/
 venv/
 ENV/
-
-# Distribution / packaging
 *.egg-info/
-dist/
-build/
 *.egg
-
-# Testing
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
 .nox/
+.mypy_cache/
+.ruff_cache/
 
-# Environment files
+# ── Environment ───────────────────────────────────────────────────────
 .env
 .env.*
 !.env.example
 
-# IDE
+# ── Build / cache ─────────────────────────────────────────────────────
+coverage/
+.cache/
+tmp/
+.turbo/
+.parcel-cache/
+
+# ── IDE ───────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
+# ── OS ────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Docker
+# ── Docker / Vercel / TypeScript ──────────────────────────────────────
 .docker/
+.vercel
+*.tsbuildinfo
+next-env.d.ts
 
-# Database
-*.db
-*.sqlite3
-
-# Celery
+# ── Backend runtime ───────────────────────────────────────────────────
+backend/*.db
+backend/*.sqlite3
 celerybeat-schedule
 celerybeat.pid
-
-# Logs
-*.log
 logs/
+
+# ── Frontend project-specific ─────────────────────────────────────────
+local-*
+.claude
+.z-ai-config
+/skills/tool-results/

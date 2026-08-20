@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  partner Partner?
+}
+
+model Partner {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  referralCode  String   @unique
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referrals Referral[]
+  commissions Commission[]
+  payouts    Payout[]
+}
+
+model Referral {
+  id            String   @id @default(cuid())
+  partnerId     String
+  referredEmail String?
+  referredName  String?
+  plan          String?
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+}
+
+model Commission {
+  id          String   @id @default(cuid())
+  partnerId   String
+  referralId  String?
+  amount      Int
+  currency    String   @default("USD")
+  status      String   @default("pending")
+  period      String?
+  createdAt   DateTime @default(now())
+
+  partner  Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+}
+
+model SupportTicket {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Payout {
+  id          String   @id @default(cuid())
+  partnerId   String
+  amount      Int
+  currency    String   @default("USD")
+  status      String   @default("pending")
+  method      String?
+  createdAt   DateTime @default(now())
+  paidAt      DateTime?
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+}
