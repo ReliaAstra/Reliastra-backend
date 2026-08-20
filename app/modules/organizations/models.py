@@ -18,12 +18,6 @@ class Organization(UUIDMixin, TimestampMixin, Base):
     has_agency_mode: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
-    is_founding_customer: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False
-    )
-    founding_discount_pct: Mapped[int] = mapped_column(
-        default=0, nullable=False
-    )
 
     members: Mapped[list["OrganizationMember"]] = relationship(
         "OrganizationMember",

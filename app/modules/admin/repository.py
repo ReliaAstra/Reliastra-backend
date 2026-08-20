@@ -334,43 +334,6 @@ class AdminBusinessRepository:
             })
         return results
 
-    @staticmethod
-    async def get_founding_customers(session: AsyncSession) -> list[dict[str, Any]]:
-        from app.modules.organizations.models import Organization, OrganizationMember
-
-        query = (
-            select(
-                Organization.id,
-                Organization.name,
-                Organization.plan,
-                Organization.founding_discount_pct,
-                Organization.created_at,
-                func.count(OrganizationMember.id).label("member_count"),
-            )
-            .outerjoin(OrganizationMember, OrganizationMember.org_id == Organization.id)
-            .where(Organization.is_founding_customer.is_(True))
-            .group_by(
-                Organization.id,
-                Organization.name,
-                Organization.plan,
-                Organization.founding_discount_pct,
-                Organization.created_at,
-            )
-            .order_by(Organization.created_at.asc())
-        )
-        rows = (await session.execute(query)).all()
-        return [
-            {
-                "org_id": org_id,
-                "org_name": name,
-                "plan": plan,
-                "founding_discount_pct": discount,
-                "member_count": member_count,
-                "created_at": created_at,
-            }
-            for org_id, name, plan, discount, created_at, member_count in rows
-        ]
-
 
 # =============================================================================
 # AdminAnalyticsRepository

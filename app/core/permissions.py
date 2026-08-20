@@ -184,22 +184,6 @@ PLAN_DESCRIPTIONS: dict[str, str] = {
 PLAN_AMOUNTS = PLAN_PRICES_USD
 
 
-# ── Founding Customer Program ──────────────────────────────────────────────────
-# PRIVATE program: not advertised publicly. Max 25 spots.
-# 40% lifetime discount off ANY paid tier (starter, standard, professional, agency).
-
-FOUNDING_DISCOUNT_PCT: int = 40
-FOUNDING_MAX_SPOTS: int = 25
-
-# Plans eligible for founding discount (all paid plans)
-FOUNDING_ELIGIBLE_PLANS: set[str] = {
-    Plan.STARTER.value,
-    Plan.STANDARD.value,
-    Plan.PROFESSIONAL.value,
-    Plan.AGENCY.value,
-}
-
-
 # ── Helper Functions ──────────────────────────────────────────────────────────
 
 
@@ -217,19 +201,6 @@ def get_plan_price_usd(plan: str) -> int:
 
 def get_retention_days(plan: str) -> int:
     return PLAN_RETENTION_DAYS.get(plan.lower(), 1)
-
-
-def get_discounted_price_usd(plan: str) -> int:
-    """Calculate the founding-customer discounted price.
-
-    Applies 40% discount to all paid tiers.
-    Returns 0 for free plan or if the plan has no base price.
-    """
-    base = PLAN_PRICES_USD.get(plan.lower(), 0)
-    if base <= 0 or plan.lower() not in FOUNDING_ELIGIBLE_PLANS:
-        return 0
-    discount = base * FOUNDING_DISCOUNT_PCT // 100
-    return base - discount
 
 
 def is_valid_plan(plan: str) -> bool:

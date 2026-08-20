@@ -35,7 +35,6 @@ from app.modules.admin.schemas import (
     EmailCampaignSendResponse,
     EngagementResponse,
     ErrorLogListResponse,
-    FoundingCustomersResponse,
     FeedbackBulkUpdateRequest,
     FeedbackMessageCreateRequest,
     FeedbackMessageResponse,
@@ -397,12 +396,6 @@ class AdminBusinessService:
     ) -> ChurnSignalsResponse:
         items = await self.repository.get_churn_signals(session, limit)
         return ChurnSignalsResponse(items=items)
-
-    async def get_founding_customers(
-        self, session: AsyncSession,
-    ) -> FoundingCustomersResponse:
-        items = await self.repository.get_founding_customers(session)
-        return FoundingCustomersResponse(items=items)
 
 
 admin_business_service = AdminBusinessService()

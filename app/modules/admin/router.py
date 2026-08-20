@@ -93,16 +93,6 @@ async def get_churn_signals(
     return await admin_business_service.get_churn_signals(db, limit=limit)
 
 
-@business_router.get("/founding-customers")
-async def get_founding_customers(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    admin_user: User = Depends(require_system_admin),
-):
-    """List all founding customer organizations."""
-    return await admin_business_service.get_founding_customers(db)
-
-
 # =============================================================================
 # Analytics Dashboard Router
 # =============================================================================

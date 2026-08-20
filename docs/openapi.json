@@ -3415,7 +3415,7 @@
           "Billing"
         ],
         "summary": "Get Pricing Plans",
-        "description": "Public endpoint returning all plan details for the pricing page.\n\nDoes NOT include founding discount pricing \u2014 the founding program is private.",
+        "description": "Public endpoint returning all plan details for the pricing page.",
         "operationId": "get_pricing_plans_v1_public_pricing_get",
         "responses": {
           "200": {
@@ -3424,121 +3424,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PricingPlansResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/orgs/{org_id}/billing/founding-spots": {
-      "get": {
-        "tags": [
-          "Billing"
-        ],
-        "summary": "Get Founding Spots",
-        "description": "PRIVATE endpoint: founding customer program status.\n\nRequires authentication. Returns founding spots remaining and\nthe discounted prices for all eligible paid tiers.\n\nThe founding program is invite-only and not advertised publicly.",
-        "operationId": "get_founding_spots_v1_orgs__org_id__billing_founding_spots_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "org_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Org Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FoundingSpotsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/orgs/{org_id}/billing/founding-spot/claim": {
-      "post": {
-        "tags": [
-          "Billing"
-        ],
-        "summary": "Claim Founding Spot",
-        "description": "PRIVATE endpoint: claim a founding customer spot for an organization.\n\nOnly org owners/admins can claim. Enforces the 25-spot hard cap.\nOnce all 25 spots are taken, no more organizations can join.\n\nThe founding discount (40% off any paid tier) is applied automatically\nat payment initialization for founding organizations.",
-        "operationId": "claim_founding_spot_v1_orgs__org_id__billing_founding_spot_claim_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "org_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Org Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ClaimFoundingSpotRequest"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "title": "Body"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClaimFoundingSpotResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -11452,52 +11337,6 @@
         ],
         "title": "ClaimEvidenceResponse"
       },
-      "ClaimFoundingSpotRequest": {
-        "properties": {
-          "email": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Email"
-          }
-        },
-        "type": "object",
-        "title": "ClaimFoundingSpotRequest",
-        "description": "Request body for claiming a founding customer spot."
-      },
-      "ClaimFoundingSpotResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message"
-          },
-          "is_founding_customer": {
-            "type": "boolean",
-            "title": "Is Founding Customer"
-          },
-          "founding_discount_pct": {
-            "type": "integer",
-            "title": "Founding Discount Pct"
-          }
-        },
-        "type": "object",
-        "required": [
-          "success",
-          "message",
-          "is_founding_customer",
-          "founding_discount_pct"
-        ],
-        "title": "ClaimFoundingSpotResponse"
-      },
       "ClaimReviewRequest": {
         "properties": {
           "approve": {
@@ -13694,51 +13533,6 @@
           "email"
         ],
         "title": "ForgotPasswordRequest"
-      },
-      "FoundingSpotsResponse": {
-        "properties": {
-          "total_spots": {
-            "type": "integer",
-            "title": "Total Spots"
-          },
-          "spots_taken": {
-            "type": "integer",
-            "title": "Spots Taken"
-          },
-          "spots_remaining": {
-            "type": "integer",
-            "title": "Spots Remaining"
-          },
-          "founding_discount_pct": {
-            "type": "integer",
-            "title": "Founding Discount Pct"
-          },
-          "eligible_plans": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Eligible Plans"
-          },
-          "plan_discounts": {
-            "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "object",
-            "title": "Plan Discounts"
-          }
-        },
-        "type": "object",
-        "required": [
-          "total_spots",
-          "spots_taken",
-          "spots_remaining",
-          "founding_discount_pct",
-          "eligible_plans",
-          "plan_discounts"
-        ],
-        "title": "FoundingSpotsResponse"
       },
       "FraudFlagItem": {
         "properties": {
@@ -18614,31 +18408,10 @@
             ],
             "title": "Current Period End"
           },
-          "is_founding_customer": {
-            "type": "boolean",
-            "title": "Is Founding Customer",
-            "default": false
-          },
-          "founding_discount_pct": {
-            "type": "integer",
-            "title": "Founding Discount Pct",
-            "default": 0
-          },
           "price_usd": {
             "type": "integer",
             "title": "Price Usd",
             "default": 0
-          },
-          "discounted_price_usd": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Discounted Price Usd"
           }
         },
         "type": "object",

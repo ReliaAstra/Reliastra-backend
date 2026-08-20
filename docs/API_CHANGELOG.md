@@ -92,3 +92,18 @@ Every 4xx/5xx body is:
 ## Evidence report tokens
 
 `report_token` TTL is **7 days**. Gate responses include `report_token` and `expires_at`.
+
+## Founding customer program removed
+
+The private founding customer program is retired. The following endpoints are
+**gone** (404):
+
+| Removed |
+| --- |
+| `GET /v1/billing/founding-spots` |
+| `POST /v1/billing/founding-spot/claim` |
+| `GET /v1/admin/business/founding-customers` |
+
+`GET /v1/billing/plan` no longer returns `is_founding_customer`,
+`founding_discount_pct` or `discounted_price_usd` — every organization is
+charged the published plan price (`price_usd`).

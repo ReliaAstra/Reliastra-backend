@@ -15,12 +15,8 @@ from app.core.exceptions import (
     ValidationException,
 )
 from app.core.permissions import (
-    FOUNDING_DISCOUNT_PCT,
-    FOUNDING_ELIGIBLE_PLANS,
-    FOUNDING_MAX_SPOTS,
     Plan,
     get_dependency_limit,
-    get_discounted_price_usd,
     get_min_check_interval,
     get_plan_price_usd,
     is_paid_plan,
@@ -153,12 +149,7 @@ class BillingService:
         if not org:
             raise ResourceNotFoundException("Organization not found")
         subscription = await self.repository.get_subscription(session, org_id)
-        is_founding = getattr(org, "is_founding_customer", False)
-        discount_pct = getattr(org, "founding_discount_pct", 0)
         base_price = get_plan_price_usd(org.plan)
-        discounted_price = None
-        if is_founding and base_price > 0:
-            discounted_price = get_discounted_price_usd(org.plan)
         return PlanDetailsResponse(
             org_id=org.id,
             plan=org.plan,
@@ -168,10 +159,7 @@ class BillingService:
             current_period_end=(
                 subscription.current_period_end if subscription else None
             ),
-            is_founding_customer=is_founding,
-            founding_discount_pct=discount_pct,
             price_usd=base_price,
-            discounted_price_usd=discounted_price,
         )
 
     async def initialize_payment(
@@ -198,23 +186,6 @@ class BillingService:
             )
 
         base_amount = PLAN_AMOUNTS[plan]
-        is_founding = getattr(org, "is_founding_customer", False)
-        discount_pct = 0
-
-        # Apply founding discount to ALL eligible paid plans
-        if is_founding and plan in FOUNDING_ELIGIBLE_PLANS:
-            discount_pct = FOUNDING_DISCOUNT_PCT
-            discounted_kobo = base_amount - (base_amount * discount_pct // 100)
-            logger.info(
-                "Founding customer discount applied: org=%s plan=%s "
-                "base=%dkobo discounted=%dkobo (%d%% off)",
-                org_id,
-                plan,
-                base_amount,
-                discounted_kobo,
-                discount_pct,
-            )
-            base_amount = discounted_kobo
 
         email = str(request.email) if request.email else None
         if not email:
@@ -239,8 +210,6 @@ class BillingService:
                 metadata={
                     "org_id": str(org_id),
                     "plan": plan,
-                    "is_founding": str(is_founding).lower(),
-                    "discount_pct": str(discount_pct),
                 },
             )
         except httpx.HTTPError as exc:
