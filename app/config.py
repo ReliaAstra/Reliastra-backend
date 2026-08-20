@@ -35,9 +35,11 @@ class Settings(BaseSettings):
     )
     DATABASE_SSL_MODE: str = Field(
         default="",
-        description="PostgreSQL SSL mode (e.g. 'require', 'verify-full'). "
-                    "Appended to DATABASE_URL if set. "
-                    "Supabase and most managed Postgres services require 'require'.",
+        description="PostgreSQL SSL mode: disable | allow | prefer | require | "
+                    "verify-ca | verify-full. Appended to DATABASE_URL if set. "
+                    "Supabase and most managed Postgres services require 'require'. "
+                    "Empty/'prefer' negotiates TLS opportunistically (asyncpg "
+                    "default); 'disable' forces plaintext.",
     )
     REDIS_URL: str = Field(
         default="redis://localhost:6379/0",

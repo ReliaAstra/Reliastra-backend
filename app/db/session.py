@@ -93,7 +93,7 @@ def _build_connect_args(pooler_compat: bool = False) -> dict:
     asyncpg expects an ``ssl.SSLContext`` object — it does **not** read
     ``sslmode`` from the connection URL.  We detect the desired mode from
     the ``DATABASE_SSL_MODE`` setting (or from the raw URL query string as
-    a fallback) and translate it into an appropriate Python SSL context.
+    a fallback) and translate it via :func:`app.db.connect_args`.
 
     When *pooler_compat* is True (PgBouncer/Supabase pooler), we also set
     ``statement_cache_size=0`` to prevent asyncpg from using named prepared
@@ -112,29 +112,9 @@ def _build_connect_args(pooler_compat: bool = False) -> dict:
         if "sslmode" in qs:
             ssl_mode = qs["sslmode"][0]
 
-    args: dict = {}
+    from app.db.connect_args import build_ssl_connect_args
 
-    if ssl_mode:
-        import ssl as _ssl
-        ctx = _ssl.create_default_context()
-        if ssl_mode == "require":
-            ctx.check_hostname = False
-            ctx.verify_mode = _ssl.CERT_NONE
-        elif ssl_mode == "verify-ca":
-            ctx.check_hostname = False
-            ctx.verify_mode = _ssl.CERT_REQUIRED
-        elif ssl_mode == "verify-full":
-            ctx.check_hostname = True
-            ctx.verify_mode = _ssl.CERT_REQUIRED
-        else:
-            ctx.check_hostname = False
-            ctx.verify_mode = _ssl.CERT_NONE
-        args["ssl"] = ctx
-
-    if pooler_compat:
-        args["statement_cache_size"] = 0
-
-    return args
+    return build_ssl_connect_args(ssl_mode, pooler_compat=pooler_compat)
 
 
 def _needs_pooler_compat(url: str) -> bool:
