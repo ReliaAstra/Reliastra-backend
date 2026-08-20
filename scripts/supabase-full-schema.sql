@@ -46,8 +46,6 @@ CREATE TABLE IF NOT EXISTS organizations (
     slug VARCHAR(150) NOT NULL,
     plan VARCHAR(50) NOT NULL DEFAULT 'free',
     has_agency_mode BOOLEAN NOT NULL DEFAULT FALSE,
-    is_founding_customer BOOLEAN NOT NULL DEFAULT FALSE,
-    founding_discount_pct INTEGER NOT NULL DEFAULT 0,
     stripe_customer_id VARCHAR(100),
     stripe_subscription_id VARCHAR(100),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

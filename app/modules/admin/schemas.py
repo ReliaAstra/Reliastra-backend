@@ -81,19 +81,6 @@ class ChurnSignalsResponse(BaseModel):
     items: list[ChurnSignal] = []
 
 
-class FoundingCustomer(BaseModel):
-    org_id: uuid.UUID
-    org_name: str
-    plan: str
-    founding_discount_pct: int
-    member_count: int
-    created_at: datetime
-
-
-class FoundingCustomersResponse(BaseModel):
-    items: list[FoundingCustomer] = []
-
-
 # =============================================================================
 # Analytics Dashboard Schemas
 # =============================================================================

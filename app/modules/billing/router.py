@@ -3,7 +3,6 @@ import uuid
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -14,8 +13,6 @@ from app.core.exceptions import (
     ValidationException,
 )
 from app.core.permissions import (
-    FOUNDING_DISCOUNT_PCT,
-    FOUNDING_MAX_SPOTS,
     PLAN_DEPENDENCY_LIMITS,
     PLAN_DESCRIPTIONS,
     PLAN_FEATURES,
@@ -23,7 +20,6 @@ from app.core.permissions import (
     PLAN_RETENTION_DAYS,
     PLAN_TAGS,
     Plan,
-    get_discounted_price_usd,
     get_min_check_interval,
     get_plan_price_usd,
 )
@@ -68,10 +64,7 @@ class PricingPlansResponse(BaseModel):
 
 @router.get("/pricing", response_model=PricingPlansResponse)
 async def get_pricing_plans() -> PricingPlansResponse:
-    """Public endpoint returning all plan details for the pricing page.
-
-    Does NOT include founding discount pricing — the founding program is private.
-    """
+    """Public endpoint returning all plan details for the pricing page."""
     plans = []
     for plan_enum in Plan:
         p = plan_enum.value
@@ -87,159 +80,6 @@ async def get_pricing_plans() -> PricingPlansResponse:
             features=PLAN_FEATURES.get(p, {}),
         ))
     return PricingPlansResponse(plans=plans)
-
-
-# ── Founding Program (PRIVATE — auth required) ──────────────────────────────────
-
-
-class FoundingSpotsResponse(BaseModel):
-    total_spots: int
-    spots_taken: int
-    spots_remaining: int
-    founding_discount_pct: int
-    eligible_plans: list[str]
-    plan_discounts: dict[str, dict]
-
-
-@router.get(
-    "/billing/founding-spots",
-    response_model=FoundingSpotsResponse,
-)
-async def get_founding_spots(
-    db: AsyncSession = Depends(get_db),
-    current_org: Organization = Depends(get_current_org),
-) -> FoundingSpotsResponse:
-    """PRIVATE endpoint: founding customer program status.
-
-    Requires authentication. Returns founding spots remaining and
-    the discounted prices for all eligible paid tiers.
-
-    The founding program is invite-only and not advertised publicly.
-    """
-    try:
-        result = await db.execute(
-            select(func.count()).select_from(Organization).where(
-                Organization.is_founding_customer.is_(True)
-            )
-        )
-        spots_taken = result.scalar() or 0
-    except Exception:
-        spots_taken = 0
-
-    # Calculate discounts for all eligible paid plans
-    plan_discounts = {}
-    for plan_value in {Plan.STARTER.value, Plan.STANDARD.value,
-                       Plan.PROFESSIONAL.value, Plan.AGENCY.value}:
-        base = PLAN_PRICES_USD.get(plan_value, 0)
-        if base > 0:
-            discounted = get_discounted_price_usd(plan_value)
-            plan_discounts[plan_value] = {
-                "base_price_usd": base,
-                "discounted_price_usd": discounted,
-                "savings_usd": base - discounted,
-            }
-
-    return FoundingSpotsResponse(
-        total_spots=FOUNDING_MAX_SPOTS,
-        spots_taken=spots_taken,
-        spots_remaining=max(0, FOUNDING_MAX_SPOTS - spots_taken),
-        founding_discount_pct=FOUNDING_DISCOUNT_PCT,
-        eligible_plans=[Plan.STARTER.value, Plan.STANDARD.value,
-                       Plan.PROFESSIONAL.value, Plan.AGENCY.value],
-        plan_discounts=plan_discounts,
-    )
-
-
-class ClaimFoundingSpotRequest(BaseModel):
-    """Request body for claiming a founding customer spot."""
-    email: str | None = None
-
-
-class ClaimFoundingSpotResponse(BaseModel):
-    success: bool
-    message: str
-    is_founding_customer: bool
-    founding_discount_pct: int
-
-
-@router.post(
-    "/billing/founding-spot/claim",
-    response_model=ClaimFoundingSpotResponse,
-    dependencies=[Depends(require_admin)],
-)
-async def claim_founding_spot(
-    body: ClaimFoundingSpotRequest | None = None,
-    db: AsyncSession = Depends(get_db),
-    current_org: Organization = Depends(get_current_org),
-) -> ClaimFoundingSpotResponse:
-    """PRIVATE endpoint: claim a founding customer spot for an organization.
-
-    Only org owners/admins can claim. Enforces the 25-spot hard cap.
-    Once all 25 spots are taken, no more organizations can join.
-
-    The founding discount (40% off any paid tier) is applied automatically
-    at payment initialization for founding organizations.
-    """
-    # Check if org is already a founding customer
-    if current_org.is_founding_customer:
-        return ClaimFoundingSpotResponse(
-            success=False,
-            message="This organization is already a founding customer. The 40% discount is already applied.",
-            is_founding_customer=True,
-            founding_discount_pct=FOUNDING_DISCOUNT_PCT,
-        )
-
-    # Lock the current org row to serialize concurrent claim attempts
-    await db.execute(
-        select(Organization).where(Organization.id == current_org.id).with_for_update()
-    )
-
-    # Re-check spots remaining inside the lock — this prevents the
-    # TOCTOU race where two concurrent requests both read 24 and both
-    # try to claim spot 25.
-    try:
-        result = await db.execute(
-            select(func.count()).select_from(Organization).where(
-                Organization.is_founding_customer.is_(True)
-            )
-        )
-        spots_taken = result.scalar() or 0
-    except Exception:
-        spots_taken = 0
-
-    if spots_taken >= FOUNDING_MAX_SPOTS:
-        raise ValidationException(
-            f"All {FOUNDING_MAX_SPOTS} founding customer spots have been claimed. "
-            f"The founding program is now closed.",
-            details={
-                "code": "FOUNDING_PROGRAM_FULL",
-                "total_spots": FOUNDING_MAX_SPOTS,
-                "spots_taken": spots_taken,
-            },
-        )
-
-    # Claim the spot — still inside the lock, so no other request can
-    # read a stale count.
-    from app.modules.organizations.repository import OrganizationRepository
-
-    await OrganizationRepository.update(
-        db,
-        current_org,
-        is_founding_customer=True,
-        founding_discount_pct=FOUNDING_DISCOUNT_PCT,
-    )
-
-    spots_remaining = FOUNDING_MAX_SPOTS - spots_taken - 1
-
-    return ClaimFoundingSpotResponse(
-        success=True,
-        message=(
-            f"Founding customer spot claimed! Your organization now has a lifetime "
-            f"40% discount on all paid tiers. {spots_remaining} founding spots remaining."
-        ),
-        is_founding_customer=True,
-        founding_discount_pct=FOUNDING_DISCOUNT_PCT,
-    )
 
 
 # ── Authenticated Endpoints ──────────────────────────────────────────────────────
