@@ -107,3 +107,58 @@ The private founding customer program is retired. The following endpoints are
 `GET /v1/billing/plan` no longer returns `is_founding_customer`,
 `founding_discount_pct` or `discounted_price_usd` — every organization is
 charged the published plan price (`price_usd`).
+
+## Admin control plane (2026-08)
+
+The platform admin API is reorganized into an operational control plane.
+Legacy module-oriented routes remain available and are marked **deprecated**
+in OpenAPI. Prefer the canonical surface below.
+
+Full mapping: [`docs/ADMIN_CONTROL_PLANE.md`](./ADMIN_CONTROL_PLANE.md).
+
+### Bootstrap
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/v1/admin/overview` | Primary admin home payload |
+| `GET` | `/v1/admin/attention` | Prioritized action-required alerts |
+| `GET` | `/v1/admin/search?q=` | Global admin search |
+
+### Customers (replaces `/v1/admin/users`)
+
+| Method | Path |
+| --- | --- |
+| `GET` | `/v1/admin/customers` |
+| `GET` | `/v1/admin/customers/recent` |
+| `GET` | `/v1/admin/customers/churn-risk` |
+| `GET` | `/v1/admin/customers/{customer_id}` |
+| `PATCH` | `/v1/admin/customers/{customer_id}` |
+| `POST` | `/v1/admin/customers/{customer_id}/impersonate` |
+| `POST` | `/v1/admin/customers/{customer_id}/plan` |
+| `POST` | `/v1/admin/customers/{customer_id}/email` |
+| `POST` | `/v1/admin/customers/{customer_id}/deactivate` |
+| `GET` | `/v1/admin/customers/{customer_id}/activity` |
+
+Impersonation now requires `{ "reason": "..." }` and returns a short-lived
+access token only (no refresh).
+
+### Revenue / Growth / Product
+
+```
+GET /v1/admin/revenue/summary|timeseries|attention
+GET /v1/admin/growth/overview|funnel|retention|referrals
+GET /v1/admin/product/overview|features|vendors|engagement|activation
+```
+
+### Support / Communications / Operations
+
+```
+GET  /v1/admin/support/overview
+GET  /v1/admin/support/tickets/{id}   # full workspace (customer + billing context)
+GET  /v1/admin/communications/overview
+GET  /v1/admin/operations/overview
+GET  /v1/admin/operations/errors      # was /error-logs
+```
+
+Partners (`/v1/admin/partners/*`) and vendor-submission tenant-admin routes
+are unchanged.

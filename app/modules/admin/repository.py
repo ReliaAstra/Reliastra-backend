@@ -301,35 +301,53 @@ class AdminBusinessRepository:
     async def get_churn_signals(
         session: AsyncSession, limit: int = 20,
     ) -> list[dict[str, Any]]:
-        from app.modules.organizations.models import Organization
+        from app.modules.organizations.models import Organization, OrganizationMember
         from app.modules.billing.models import Subscription
-        from app.modules.checks.models import CheckResult
+        from app.modules.users.models import User
 
         thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+        # Derive activity from owner users — Organization has no last_activity_at column.
         query = (
             select(
                 Organization.id,
                 Organization.name,
                 Organization.plan,
-                Organization.last_activity_at,
+                func.max(User.last_activity_at).label("last_activity_at"),
+                Subscription.status,
             )
             .outerjoin(Subscription, Subscription.organization_id == Organization.id)
+            .outerjoin(
+                OrganizationMember,
+                and_(
+                    OrganizationMember.org_id == Organization.id,
+                    OrganizationMember.role == "owner",
+                ),
+            )
+            .outerjoin(User, User.id == OrganizationMember.user_id)
             .where(Organization.plan != "free")
+            .group_by(
+                Organization.id,
+                Organization.name,
+                Organization.plan,
+                Subscription.status,
+            )
             .order_by(Organization.created_at.desc())
             .limit(limit)
         )
         rows = (await session.execute(query)).all()
         results = []
-        for org_id, name, plan, last_act in rows:
+        for org_id, name, plan, last_act, sub_status in rows:
             risk = "low"
-            if last_act and last_act < thirty_days_ago:
+            if last_act is None or last_act < thirty_days_ago:
                 risk = "high"
+            elif last_act < datetime.now(timezone.utc) - timedelta(days=14):
+                risk = "medium"
             results.append({
                 "org_id": org_id,
                 "org_name": name,
                 "plan": plan,
-                "last_activity_at": getattr(last_act, "last_activity_at", None),
-                "subscription_status": "active",
+                "last_activity_at": last_act,
+                "subscription_status": sub_status or "unknown",
                 "risk_level": risk,
             })
         return results
