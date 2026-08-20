@@ -1,5 +1,4 @@
 import asyncio
-import ssl as _ssl
 from logging.config import fileConfig
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from sqlalchemy import pool
@@ -22,6 +21,11 @@ def _build_ssl_connect_args(db_url: str, pooler_compat: bool = False) -> dict:
 
     Only returns args for PostgreSQL URLs; all other drivers return an empty dict.
     When *pooler_compat* is True, also disables statement caching for PgBouncer.
+
+    The sslmode → connect_args translation lives in
+    :mod:`app.db.connect_args`; see there for why ``disable``/``prefer`` must
+    not be turned into a hard SSL requirement (asyncpg answers a plaintext
+    server's ``N`` to the SSLRequest with "rejected SSL upgrade").
     """
     if not db_url.startswith("postgresql"):
         return {}
@@ -33,27 +37,9 @@ def _build_ssl_connect_args(db_url: str, pooler_compat: bool = False) -> dict:
         if "sslmode" in qs:
             ssl_mode = qs["sslmode"][0]
 
-    args: dict = {}
-    if ssl_mode:
-        ctx = _ssl.create_default_context()
-        if ssl_mode == "require":
-            ctx.check_hostname = False
-            ctx.verify_mode = _ssl.CERT_NONE
-        elif ssl_mode == "verify-ca":
-            ctx.check_hostname = False
-            ctx.verify_mode = _ssl.CERT_REQUIRED
-        elif ssl_mode == "verify-full":
-            ctx.check_hostname = True
-            ctx.verify_mode = _ssl.CERT_REQUIRED
-        else:
-            ctx.check_hostname = False
-            ctx.verify_mode = _ssl.CERT_NONE
-        args["ssl"] = ctx
+    from app.db.connect_args import build_ssl_connect_args
 
-    if pooler_compat:
-        args["statement_cache_size"] = 0
-
-    return args
+    return build_ssl_connect_args(ssl_mode, pooler_compat=pooler_compat)
 
 
 # Use the SSL-aware database URL for migrations (only appends sslmode for PostgreSQL)
