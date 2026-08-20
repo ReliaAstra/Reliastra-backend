@@ -1,0 +1,730 @@
+     1→'use client';
+     2→
+     3→import { useState } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import { Palette, BookOpen, Cpu, HelpCircle, Code, Mail, ArrowRight, X, ExternalLink, Download, Copy, Check } from 'lucide-react';
+     6→import { Button } from '@/components/ui/button';
+     7→import { usePartnerStore } from '@/stores/partner-store';
+     8→import { Separator } from '@/components/ui/separator';
+     9→import { toast } from 'sonner';
+    10→
+    11→type LucideIcon = typeof Palette;
+    12→
+    13→interface Resource {
+    14→  title: string;
+    15→  description: string;
+    16→  icon: LucideIcon;
+    17→  category: string;
+    18→  readTime: string;
+    19→  navigate?: string;
+    20→  content: ResourceContent;
+    21→}
+    22→
+    23→interface ContentBlock {
+    24→  type: 'paragraph' | 'heading' | 'code' | 'list' | 'tip' | 'color-swatch' | 'template';
+    25→  content: string;
+    26→  items?: string[];
+    27→  lang?: string;
+    28→  colors?: { name: string; value: string }[];
+    29→  templateData?: { subject: string; body: string };
+    30→}
+    31→
+    32→interface ResourceContent {
+    33→  summary: string;
+    34→  blocks: ContentBlock[];
+    35→}
+    36→
+    37→const resources: Resource[] = [
+    38→  {
+    39→    title: 'Brand Guidelines',
+    40→    description: 'Logo usage, colors, typography rules. Ensure your materials are on-brand.',
+    41→    icon: Palette,
+    42→    category: 'Brand',
+    43→    readTime: '5 min read',
+    44→    content: {
+    45→      summary: 'Official guidelines for using RELIASTRA branding in your partner materials, presentations, and referral content.',
+    46→      blocks: [
+    47→        {
+    48→          type: 'heading',
+    49→          content: 'Logo Usage',
+    50→        },
+    51→        {
+    52→          type: 'paragraph',
+    53→          content: 'The RELIASTRA logo should always appear with adequate clear space. Never stretch, rotate, or alter the logo. Use the provided SVG files for digital applications and high-resolution PNGs for print.',
+    54→        },
+    55→        {
+    56→          type: 'list',
+    57→          content: 'Minimum clear space equals the height of the checkmark inside the logo mark.',
+    58→          items: [
+    59→            'Always display the logo at its original proportions',
+    60→            'Minimum size: 24px width for digital, 0.5" for print',
+    61→            'Never place the logo on busy backgrounds without a container',
+    62→            'The wordmark "RELIASTRA" uses Inter or a similar geometric sans-serif',
+    63→            'On dark backgrounds, use the reversed (white) version',
+    64→          ],
+    65→        },
+    66→        {
+    67→          type: 'heading',
+    68→          content: 'Color Palette',
+    69→        },
+    70→        {
+    71→          type: 'color-swatch',
+    72→          content: 'Primary colors used across RELIASTRA brand materials.',
+    73→          colors: [
+    74→            { name: 'Primary Black', value: '#09090B' },
+    75→            { name: 'Foreground', value: '#18181B' },
+    76→            { name: 'Muted', value: '#71717A' },
+    77→            { name: 'Border', value: '#E4E4E7' },
+    78→            { name: 'Background', value: '#FAFAFA' },
+    79→            { name: 'Accent Emerald', value: '#10B981' },
+    80→          ],
+    81→        },
+    82→        {
+    83→          type: 'heading',
+    84→          content: 'Typography',
+    85→        },
+    86→        {
+    87→          type: 'paragraph',
+    88→          content: 'RELIASTRA uses Inter as its primary typeface. For mono-spaced elements (labels, code, metadata), use JetBrains Mono. Headlines use semibold weight (600), body text uses regular (400).',
+    89→        },
+    90→        {
+    91→          type: 'tip',
+    92→          content: 'When creating referral materials, use the RELIASTRA brand colors as accents only. Your own brand identity should remain primary — the goal is subtle co-branding, not a full rebrand.',
+    93→        },
+    94→      ],
+    95→    },
+    96→  },
+    97→  {
+    98→    title: 'Referral Playbook',
+    99→    description: 'Strategies for effective referrals. Learn what works and what doesn\'t.',
+   100→    icon: BookOpen,
+   101→    category: 'Strategy',
+   102→    readTime: '8 min read',
+   103→    content: {
+   104→      summary: 'Battle-tested strategies from top-performing partners. Learn how to identify prospects, craft your pitch, and close referrals consistently.',
+   105→      blocks: [
+   106→        {
+   107→          type: 'heading',
+   108→          content: 'Identifying the Right Prospects',
+   109→        },
+   110→        {
+   111→          type: 'paragraph',
+   112→          content: 'The most effective referrals come from existing relationships. Look for people who have explicitly mentioned infrastructure reliability challenges, incident management pain, or compliance reporting needs.',
+   113→        },
+   114→        {
+   115→          type: 'list',
+   116→          content: 'Signs someone is a strong referral candidate:',
+   117→          items: [
+   118→            'They manage or oversee production infrastructure',
+   119→            'They\'ve expressed frustration with post-incident processes',
+   120→            'They need to produce evidence-based reliability reports',
+   121→            'Their team spends significant time on manual correlation',
+   122→            'They work in regulated industries (finance, healthcare, energy)',
+   123→          ],
+   124→        },
+   125→        {
+   126→          type: 'heading',
+   127→          content: 'The Referral Conversation',
+   128→        },
+   129→        {
+   130→          type: 'paragraph',
+   131→          content: 'Don\'t lead with the commission. Lead with the problem RELIASTRA solves. Frame it as: "I found something that addresses [specific pain point] we talked about." Let the product speak for itself — your role is to make the introduction.',
+   132→        },
+   133→        {
+   134→          type: 'tip',
+   135→          content: 'Avoid hard-selling. The best referrals feel like helpful recommendations between professionals, not sales pitches. Share your referral link naturally, ideally in a 1:1 context.',
+   136→        },
+   137→        {
+   138→          type: 'heading',
+   139→          content: 'Follow-Up Cadence',
+   140→        },
+   141→        {
+   142→          type: 'paragraph',
+   143→          content: 'After sharing your link, wait 5-7 days before following up. A simple "Did you get a chance to look at RELIASTRA? Happy to walk through it" is sufficient. Avoid more than two follow-ups — if they\'re not interested, move on.',
+   144→        },
+   145→        {
+   146→          type: 'heading',
+   147→          content: 'Channels That Work Best',
+   148→        },
+   149→        {
+   150→          type: 'list',
+   151→          content: 'Ranked by conversion rate from partner data:',
+   152→          items: [
+   153→            '1:1 email or Slack message (highest conversion)',
+   154→            'In-person conversation at events/meetings',
+   155→            'Technical blog post with contextual mention',
+   156→            'Community forum or Discord recommendation',
+   157→            'Social media post (lowest conversion, highest reach)',
+   158→          ],
+   159→        },
+   160→      ],
+   161→    },
+   162→  },
+   163→  {
+   164→    title: 'Technical Overview',
+   165→    description: 'Product architecture and capabilities for technical audiences.',
+   166→    icon: Cpu,
+   167→    category: 'Product',
+   168→    readTime: '6 min read',
+   169→    content: {
+   170→      summary: 'A technical summary of RELIASTRA\'s architecture and capabilities, designed to help you answer technical questions from prospects.',
+   171→      blocks: [
+   172→        {
+   173→          type: 'heading',
+   174→          content: 'What RELIASTRA Does',
+   175→        },
+   176→        {
+   177→          type: 'paragraph',
+   178→          content: 'RELIASTRA is an infrastructure reliability platform that provides incident tracking, cross-system correlation, and evidence-based reporting. It connects to your existing monitoring tools and enriches incident data with dependency mapping.',
+   179→        },
+   180→        {
+   181→          type: 'heading',
+   182→          content: 'Core Capabilities',
+   183→        },
+   184→        {
+   185→          type: 'list',
+   186→          content: 'Three pillars of the platform:',
+   187→          items: [
+   188→            'TRACK — Full incident timeline with automated evidence collection from connected tools',
+   189→            'CORRELATE — Cross-system dependency mapping reveals root causes across services',
+   190→            'PROVE — Actionable compliance reports and stakeholder-ready incident summaries',
+   191→          ],
+   192→        },
+   193→        {
+   194→          type: 'heading',
+   195→          content: 'Integration Points',
+   196→        },
+   197→        {
+   198→          type: 'paragraph',
+   199→          content: 'RELIASTRA integrates with common infrastructure tooling via webhooks and APIs. Typical setup takes under 30 minutes. No agents or sidecars required — it works with your existing observability stack.',
+   200→        },
+   201→        {
+   202→          type: 'code',
+   203→          content: `# Example webhook configuration
+   204→{
+   205→  "endpoint": "https://app.reliastra.com/webhooks/incidents",
+   206→  "events": ["incident.created", "incident.updated", "incident.resolved"],
+   207→  "secret": "whsec_..."
+   208→}`,
+   209→          lang: 'json',
+   210→        },
+   211→        {
+   212→          type: 'tip',
+   213→          content: 'When prospects ask technical questions you can\'t answer, direct them to support@reliastra.com or the RELIASTRA documentation. You don\'t need to be a product expert — you need to be a trusted introducer.',
+   214→        },
+   215→      ],
+   216→    },
+   217→  },
+   218→  {
+   219→    title: 'Commission FAQ',
+   220→    description: 'Detailed commission questions. Everything about how you get paid.',
+   221→    icon: HelpCircle,
+   222→    category: 'Finance',
+   223→    readTime: '4 min read',
+   224→    navigate: 'faq',
+   225→    content: {
+   226→      summary: 'Comprehensive answers to the most common commission and payment questions from partners.',
+   227→      blocks: [
+   228→        {
+   229→          type: 'paragraph',
+   230→          content: 'For the full FAQ covering all aspects of the partner program, visit our dedicated FAQ page.',
+   231→        },
+   232→        {
+   233→          type: 'tip',
+   234→          content: 'This resource covers commission-specific questions. For program structure, eligibility, and referral tracking, see the main FAQ page.',
+   235→        },
+   236→      ],
+   237→    },
+   238→  },
+   239→  {
+   240→    title: 'API Documentation',
+   241→    description: 'For integrating RELIASTRA references into your own tools.',
+   242→    icon: Code,
+   243→    category: 'Developer',
+   244→    readTime: '7 min read',
+   245→    content: {
+   246→      summary: 'API reference for partners who want to build custom integrations or embed RELIASTRA referral tracking into their own applications.',
+   247→      blocks: [
+   248→        {
+   249→          type: 'heading',
+   250→          content: 'Partner API Overview',
+   251→        },
+   252→        {
+   253→          type: 'paragraph',
+   254→          content: 'The Partner API allows you to programmatically access your referral data, commission history, and payout status. All endpoints require a partner API key available in your dashboard settings.',
+   255→        },
+   256→        {
+   257→          type: 'heading',
+   258→          content: 'Authentication',
+   259→        },
+   260→        {
+   261→          type: 'code',
+   262→          content: `curl -X GET https://app.reliastra.com/api/partner/v1/referrals \
+   263→  -H "Authorization: Bearer ra_partner_sk_..." \
+   264→  -H "Content-Type: application/json"`,
+   265→          lang: 'bash',
+   266→        },
+   267→        {
+   268→          type: 'heading',
+   269→          content: 'Available Endpoints',
+   270→        },
+   271→        {
+   272→          type: 'list',
+   273→          content: 'Core partner API endpoints:',
+   274→          items: [
+   275→            'GET /v1/referrals — List all referrals with status and earnings',
+   276→            'GET /v1/commissions — Commission history with period breakdown',
+   277→            'GET /v1/payouts — Payout status and payment history',
+   278→            'GET /v1/stats — Summary statistics for dashboard widgets',
+   279→            'POST /v1/referrals/attribution — Manually attribute a referral',
+   280→          ],
+   281→        },
+   282→        {
+   283→          type: 'heading',
+   284→          content: 'Rate Limits',
+   285→        },
+   286→        {
+   287→          type: 'paragraph',
+   288→          content: 'Partner API is rate-limited to 100 requests per minute. Standard HTTP rate limit headers are included in all responses. If you need higher throughput, contact support.',
+   289→        },
+   290→        {
+   291→          type: 'tip',
+   292→          content: 'API access is available to all active partners. Your API key can be regenerated from Settings > API Access in the partner dashboard.',
+   293→        },
+   294→      ],
+   295→    },
+   296→  },
+   297→  {
+   298→    title: 'Email Templates',
+   299→    description: 'Pre-written email templates for outreach. Personalize and send.',
+   300→    icon: Mail,
+   301→    category: 'Outreach',
+   302→    readTime: '3 min read',
+   303→    content: {
+   304→      summary: 'Copy-ready email templates for different referral scenarios. Personalize the bracketed sections before sending.',
+   305→      blocks: [
+   306→        {
+   307→          type: 'heading',
+   308→          content: 'Template 1: Direct Introduction',
+   309→        },
+   310→        {
+   311→          type: 'template',
+   312→          content: 'Best for warm contacts who have expressed infrastructure challenges.',
+   313→          templateData: {
+   314→            subject: 'Found something for your incident management workflow',
+   315→            body: 'Hi [Name],\n\nFollowing up on our conversation about [specific pain point]. I\'ve been using a tool called RELIASTRA that handles exactly this — it tracks incidents across systems and produces the correlation reports you mentioned needing.\n\nWorth a look: [your referral link]\n\nHappy to share more about my experience with it if useful.\n\nBest,\n[Your name]',
+   316→          },
+   317→        },
+   318→        {
+   319→          type: 'heading',
+   320→          content: 'Template 2: Technical Community Share',
+   321→        },
+   322→        {
+   323→          type: 'template',
+   324→          content: 'Best for sharing in Slack communities, Discord servers, or email lists.',
+   325→          templateData: {
+   326→            subject: 'Tool recommendation: cross-system incident correlation',
+   327→            body: 'Hey everyone — wanted to share a tool I\'ve been using for incident tracking and cross-system correlation. RELIASTRA connects to your existing monitoring stack and builds dependency maps automatically.\n\nThe evidence-based reporting has been particularly useful for our compliance audits.\n\nIf you want to check it out: [your referral link]\n\nHappy to answer questions about my setup.',
+   328→          },
+   329→        },
+   330→        {
+   331→          type: 'heading',
+   332→          content: 'Template 3: Client Recommendation',
+   333→        },
+   334→        {
+   335→          type: 'template',
+   336→          content: 'Best for consultants and agencies recommending to clients.',
+   337→          templateData: {
+   338→            subject: 'Incident management recommendation for [Client Name]',
+   339→            body: 'Hi [Name],\n\nDuring our recent assessment, I identified an opportunity to improve your incident response workflow. I\'d recommend evaluating RELIASTRA — it provides the cross-system correlation and audit-ready reporting that aligns with your compliance requirements.\n\nYou can explore the platform here: [your referral link]\n\nI\'m happy to facilitate an introduction to their team if you\'d like.\n\nRegards,\n[Your name]',
+   340→          },
+   341→        },
+   342→        {
+   343→          type: 'tip',
+   344→          content: 'Always personalize the [bracketed] sections. Generic outreach converts at less than 2%, while personalized messages convert at 15-25%. The more specific you are about the prospect\'s situation, the better.',
+   345→        },
+   346→      ],
+   347→    },
+   348→  },
+   349→];
+   350→
+   351→const staggerContainer = {
+   352→  hidden: { opacity: 0 },
+   353→  visible: {
+   354→    opacity: 1,
+   355→    transition: {
+   356→      staggerChildren: 0.07,
+   357→      delayChildren: 0.15,
+   358→    },
+   359→  },
+   360→};
+   361→
+   362→const staggerChild = {
+   363→  hidden: { opacity: 0, y: 20 },
+   364→  visible: {
+   365→    opacity: 1,
+   366→    y: 0,
+   367→    transition: { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] },
+   368→  },
+   369→};
+   370→
+   371→// --- Resource detail sheet content ---
+   372→function ResourceDetail({ resource, onClose }: { resource: Resource; onClose: () => void }) {
+   373→  const [copiedId, setCopiedId] = useState<string | null>(null);
+   374→
+   375→  const handleCopy = (text: string, id: string) => {
+   376→    navigator.clipboard.writeText(text);
+   377→    setCopiedId(id);
+   378→    setTimeout(() => setCopiedId(null), 2000);
+   379→    toast.success('Copied to clipboard');
+   380→  };
+   381→
+   382→  return (
+   383→    <div className="flex h-full flex-col">
+   384→      {/* Header */}
+   385→      <div className="border-b border-border/60 px-6 py-5">
+   386→        <div className="flex items-start justify-between gap-4">
+   387→          <div className="flex items-start gap-3">
+   388→            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border/80">
+   389→              <resource.icon className="size-4 text-muted-foreground" />
+   390→            </div>
+   391→            <div>
+   392→              <h2 className="text-base font-semibold text-foreground">{resource.title}</h2>
+   393→              <div className="mt-1 flex items-center gap-2">
+   394→                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+   395→                  {resource.category}
+   396→                </span>
+   397→                <span className="text-muted-foreground/40">·</span>
+   398→                <span className="text-[11px] text-muted-foreground">{resource.readTime}</span>
+   399→              </div>
+   400→            </div>
+   401→          </div>
+   402→          <button
+   403→            onClick={onClose}
+   404→            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+   405→            aria-label="Close"
+   406→          >
+   407→            <X className="size-4" />
+   408→          </button>
+   409→        </div>
+   410→      </div>
+   411→
+   412→      {/* Body - scrollable */}
+   413→      <div className="flex-1 overflow-y-auto px-6 py-6">
+   414→        <p className="text-sm leading-relaxed text-muted-foreground">
+   415→          {resource.content.summary}
+   416→        </p>
+   417→
+   418→        <div className="mt-8 space-y-8">
+   419→          {resource.content.blocks.map((block, i) => (
+   420→            <div key={i}>
+   421→              {block.type === 'heading' && (
+   422→                <h3 className="mb-3 text-sm font-semibold text-foreground">{block.content}</h3>
+   423→              )}
+   424→
+   425→              {block.type === 'paragraph' && (
+   426→                <p className="text-sm leading-relaxed text-muted-foreground">{block.content}</p>
+   427→              )}
+   428→
+   429→              {block.type === 'list' && (
+   430→                <div className="space-y-2">
+   431→                  {block.content && (
+   432→                    <p className="mb-2 text-sm text-muted-foreground">{block.content}</p>
+   433→                  )}
+   434→                  {block.items?.map((item, j) => (
+   435→                    <div key={j} className="flex gap-2.5">
+   436→                      <div className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-foreground/40" />
+   437→                      <p className="text-sm leading-relaxed text-muted-foreground">{item}</p>
+   438→                    </div>
+   439→                  ))}
+   440→                </div>
+   441→              )}
+   442→
+   443→              {block.type === 'code' && (
+   444→                <div className="relative rounded-lg border border-border/60 bg-muted/30">
+   445→                  <div className="flex items-center justify-between border-b border-border/40 px-4 py-2">
+   446→                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+   447→                      {block.lang || 'code'}
+   448→                    </span>
+   449→                    <button
+   450→                      onClick={() => handleCopy(block.content, `code-${i}`)}
+   451→                      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+   452→                    >
+   453→                      {copiedId === `code-${i}` ? (
+   454→                        <><Check className="size-3" /> Copied</>
+   455→                      ) : (
+   456→                        <><Copy className="size-3" /> Copy</>
+   457→                      )}
+   458→                    </button>
+   459→                  </div>
+   460→                  <pre className="overflow-x-auto p-4">
+   461→                    <code className="font-mono text-xs leading-relaxed text-foreground/80">
+   462→                      {block.content}
+   463→                    </code>
+   464→                  </pre>
+   465→                </div>
+   466→              )}
+   467→
+   468→              {block.type === 'tip' && (
+   469→                <div className="rounded-lg border border-emerald-500/20 bg-emerald-50/40 px-4 py-3">
+   470→                  <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-emerald-700">
+   471→                    Pro tip
+   472→                  </p>
+   473→                  <p className="text-sm leading-relaxed text-emerald-900/80">{block.content}</p>
+   474→                </div>
+   475→              )}
+   476→
+   477→              {block.type === 'color-swatch' && (
+   478→                <div>
+   479→                  {block.content && (
+   480→                    <p className="mb-3 text-sm text-muted-foreground">{block.content}</p>
+   481→                  )}
+   482→                  <div className="grid grid-cols-2 gap-2">
+   483→                    {block.colors?.map((color) => (
+   484→                      <div
+   485→                        key={color.name}
+   486→                        className="flex items-center gap-3 rounded-md border border-border/60 px-3 py-2.5"
+   487→                      >
+   488→                        <div
+   489→                          className="h-6 w-6 shrink-0 rounded border border-border/40"
+   490→                          style={{ backgroundColor: color.value }}
+   491→                        />
+   492→                        <div className="min-w-0">
+   493→                          <p className="truncate text-xs font-medium text-foreground">{color.name}</p>
+   494→                          <p className="font-mono text-[10px] text-muted-foreground">{color.value}</p>
+   495→                        </div>
+   496→                        <button
+   497→                          onClick={() => handleCopy(color.value, `color-${color.name}`)}
+   498→                          className="ml-auto shrink-0 rounded p-1 text-muted-foreground/50 transition-colors hover:text-foreground"
+   499→                          aria-label={`Copy ${color.value}`}
+   500→                        >
+   501→                          {copiedId === `color-${color.name}` ? (
+   502→                            <Check className="size-3" />
+   503→                          ) : (
+   504→                            <Copy className="size-3" />
+   505→                          )}
+   506→                        </button>
+   507→                      </div>
+   508→                    ))}
+   509→                  </div>
+   510→                </div>
+   511→              )}
+   512→
+   513→              {block.type === 'template' && block.templateData && (
+   514→                <div className="rounded-lg border border-border/60 bg-background">
+   515→                  <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
+   516→                    <span className="text-xs text-muted-foreground">{block.content}</span>
+   517→                    <button
+   518→                      onClick={() => handleCopy(`${block.templateData!.subject}\n\n${block.templateData!.body}`, `tpl-${i}`)}
+   519→                      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+   520→                    >
+   521→                      {copiedId === `tpl-${i}` ? (
+   522→                        <><Check className="size-3" /> Copied</>
+   523→                      ) : (
+   524→                        <><Copy className="size-3" /> Copy</>
+   525→                      )}
+   526→                    </button>
+   527→                  </div>
+   528→                  <div className="p-4">
+   529→                    <p className="mb-1.5">
+   530→                      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+   531→                        Subject
+   532→                      </span>
+   533→                    </p>
+   534→                    <p className="mb-3 text-sm font-medium text-foreground">
+   535→                      {block.templateData.subject}
+   536→                    </p>
+   537→                    <p className="mb-1.5">
+   538→                      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+   539→                        Body
+   540→                      </span>
+   541→                    </p>
+   542→                    <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-muted-foreground">
+   543→                      {block.templateData.body}
+   544→                    </pre>
+   545→                  </div>
+   546→                </div>
+   547→              )}
+   548→            </div>
+   549→          ))}
+   550→        </div>
+   551→      </div>
+   552→
+   553→      {/* Footer */}
+   554→      <div className="border-t border-border/60 px-6 py-4">
+   555→        {resource.navigate ? (
+   556→          <Button
+   557→            variant="outline"
+   558→            size="sm"
+   559→            onClick={() => {
+   560→              onClose();
+   561→              setTimeout(() => {
+   562→                usePartnerStore.getState().navigate(resource.navigate as any);
+   563→                window.scrollTo({ top: 0, behavior: 'smooth' });
+   564→              }, 200);
+   565→            }}
+   566→            className="w-full gap-2"
+   567→          >
+   568→            View full FAQ page
+   569→            <ExternalLink className="size-3.5" />
+   570→          </Button>
+   571→        ) : (
+   572→          <Button
+   573→            variant="outline"
+   574→            size="sm"
+   575→            onClick={onClose}
+   576→            className="w-full"
+   577→          >
+   578→            Close
+   579→          </Button>
+   580→        )}
+   581→      </div>
+   582→    </div>
+   583→  );
+   584→}
+   585→
+   586→export function PageResources() {
+   587→  const navigate = usePartnerStore((s) => s.navigate);
+   588→  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+   589→
+   590→  return (
+   591→    <div className="flex flex-col">
+   592→      {/* Header */}
+   593→      <div className="border-b border-border/60">
+   594→        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+   595→          <motion.div
+   596→            initial={{ opacity: 0, y: 12 }}
+   597→            animate={{ opacity: 1, y: 0 }}
+   598→            transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+   599→          >
+   600→            <p className="mb-4 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+   601→              RESOURCES
+   602→            </p>
+   603→            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+   604→              Partner resources.
+   605→            </h1>
+   606→            <p className="mt-3 max-w-lg text-base text-muted-foreground">
+   607→              Everything you need to effectively refer customers to RELIASTRA.
+   608→            </p>
+   609→          </motion.div>
+   610→        </div>
+   611→      </div>
+   612→
+   613→      {/* Resource cards grid */}
+   614→      <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+   615→        <motion.div
+   616→          variants={staggerContainer}
+   617→          initial="hidden"
+   618→          whileInView="visible"
+   619→          viewport={{ once: true, margin: '-40px' }}
+   620→          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+   621→        >
+   622→          {resources.map((resource) => {
+   623→            const Icon = resource.icon;
+   624→            return (
+   625→              <motion.div
+   626→                key={resource.title}
+   627→                variants={staggerChild}
+   628→                onClick={() => setSelectedResource(resource)}
+   629→                className="cursor-pointer"
+   630→              >
+   631→                <div className="group h-full rounded-lg border border-border/80 p-6 transition-all duration-200 hover:-translate-y-[1px] hover:border-foreground/20 hover:shadow-sm">
+   632→                  <div className="mb-4 flex items-center justify-between">
+   633→                    <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border/80 transition-colors group-hover:border-foreground/20">
+   634→                      <Icon className="size-4 text-muted-foreground transition-colors group-hover:text-foreground" />
+   635→                    </div>
+   636→                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60">
+   637→                      {resource.readTime}
+   638→                    </span>
+   639→                  </div>
+   640→                  <h3 className="mb-1.5 text-sm font-semibold">
+   641→                    {resource.title}
+   642→                  </h3>
+   643→                  <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
+   644→                    {resource.description}
+   645→                  </p>
+   646→                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors group-hover:text-foreground">
+   647→                    View
+   648→                    <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
+   649→                  </span>
+   650→                </div>
+   651→              </motion.div>
+   652→            );
+   653→          })}
+   654→        </motion.div>
+   655→
+   656→        {/* More resources note */}
+   657→        <motion.p
+   658→          initial={{ opacity: 0 }}
+   659→          whileInView={{ opacity: 1 }}
+   660→          viewport={{ once: true }}
+   661→          transition={{ delay: 0.4, duration: 0.5 }}
+   662→          className="mt-10 font-mono text-xs text-muted-foreground"
+   663→        >
+   664→          More resources are added regularly. Check back for updates.
+   665→        </motion.p>
+   666→      </div>
+   667→
+   668→      <Separator className="mx-auto max-w-6xl" />
+   669→
+   670→      {/* CTA Section */}
+   671→      <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+   672→        <motion.div
+   673→          initial={{ opacity: 0, y: 12 }}
+   674→          whileInView={{ opacity: 1, y: 0 }}
+   675→          viewport={{ once: true }}
+   676→          transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+   677→          className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between"
+   678→        >
+   679→          <div>
+   680→            <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
+   681→              Ready to start?
+   682→            </h2>
+   683→            <p className="mt-1 text-sm text-muted-foreground">
+   684→              Join the partner program and start earning today.
+   685→            </p>
+   686→          </div>
+   687→          <Button
+   688→            size="lg"
+   689→            onClick={() => {
+   690→              navigate('signup');
+   691→              window.scrollTo({ top: 0, behavior: 'smooth' });
+   692→            }}
+   693→            className="shrink-0"
+   694→          >
+   695→            BECOME A PARTNER
+   696→            <ArrowRight className="ml-2 size-4" />
+   697→          </Button>
+   698→        </motion.div>
+   699→      </div>
+   700→
+   701→      {/* Resource Detail Sheet */}
+   702→      {selectedResource && (
+   703→        <AnimatePresence>
+   704→          <motion.div
+   705→            initial={{ opacity: 0 }}
+   706→            animate={{ opacity: 1 }}
+   707→            exit={{ opacity: 0 }}
+   708→            transition={{ duration: 0.2 }}
+   709→            className="fixed inset-0 z-50 bg-black/50"
+   710→            onClick={() => setSelectedResource(null)}
+   711→          />
+   712→          <motion.div
+   713→            initial={{ opacity: 0, x: '100%' }}
+   714→            animate={{ opacity: 1, x: 0 }}
+   715→            exit={{ opacity: 0, x: '100%' }}
+   716→            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+   717→            className="fixed inset-y-0 right-0 z-50 w-full max-w-lg border-l border-border/60 bg-background shadow-2xl sm:max-w-md"
+   718→            onClick={(e) => e.stopPropagation()}
+   719→          >
+   720→            <ResourceDetail
+   721→              resource={selectedResource}
+   722→              onClose={() => setSelectedResource(null)}
+   723→            />
+   724→          </motion.div>
+   725→        </AnimatePresence>
+   726→      )}
+   727→    </div>
+   728→  );
+   729→}
+   730→

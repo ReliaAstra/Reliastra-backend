@@ -1,0 +1,768 @@
+     1→▲ Next.js 16.1.3 (Turbopack)
+     2→- Local:         http://localhost:3000
+     3→- Network:       http://21.0.5.23:3000
+     4→- Environments: .env
+     5→
+     6→✓ Starting...
+     7→✓ Ready in 686ms
+     8→○ Compiling / ...
+     9→ GET / 200 in 3.9s (compile: 3.6s, render: 285ms)
+    10→ GET / 200 in 37ms (compile: 3ms, render: 33ms)
+    11→ GET / 200 in 53ms (compile: 3ms, render: 50ms)
+    12→ GET / 200 in 25ms (compile: 2ms, render: 23ms)
+    13→ GET / 200 in 60ms (compile: 3ms, render: 57ms)
+    14→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    15→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    16→ GET /api/auth/me 200 in 147ms (compile: 120ms, render: 27ms)
+    17→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    18→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    19→ GET /api/auth/me 200 in 9ms (compile: 3ms, render: 6ms)
+    20→prisma:query SELECT 1
+    21→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+    22→ POST /api/auth/forgot-password 200 in 55ms (compile: 44ms, render: 11ms)
+    23→prisma:query SELECT 1
+    24→prisma:query INSERT INTO `main`.`SupportTicket` (`id`, `name`, `email`, `subject`, `message`, `status`, `createdAt`, `updatedAt`) VALUES (?,?,?,?,?,?,?,?) RETURNING `id` AS `id`, `name` AS `name`, `email` AS `email`, `subject` AS `subject`, `message` AS `message`, `status` AS `status`, `createdAt` AS `createdAt`, `updatedAt` AS `updatedAt`
+    25→ POST /api/support 200 in 48ms (compile: 37ms, render: 10ms)
+    26→ POST /api/partners/apply 401 in 78ms (compile: 69ms, render: 9ms)
+    27→prisma:query SELECT 1
+    28→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` LEFT JOIN `main`.`Partner` AS `j0` ON (`j0`.`userId`) = (`main`.`User`.`id`) WHERE (`j0`.`userId` IS NULL) ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    29→prisma:query SELECT 1
+    30→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+    31→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    32→ POST /api/auth/login 200 in 54ms (compile: 43ms, render: 11ms)
+    33→ GET /api/partners/dashboard 200 in 91ms (compile: 55ms, render: 37ms)
+    34→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    35→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    36→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    37→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    38→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    39→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    40→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    41→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    42→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    43→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    44→ GET /api/partners/dashboard 200 in 18ms (compile: 5ms, render: 13ms)
+    45→prisma:query SELECT 1
+    46→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    47→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    48→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    49→ GET /api/partners/payouts 200 in 65ms (compile: 50ms, render: 15ms)
+    50→ GET / 200 in 41ms (compile: 3ms, render: 38ms)
+    51→prisma:query SELECT 1
+    52→ POST /api/partners/apply 401 in 10ms (compile: 3ms, render: 6ms)
+    53→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` LEFT JOIN `main`.`Partner` AS `j0` ON (`j0`.`userId`) = (`main`.`User`.`id`) WHERE (`j0`.`userId` IS NULL) ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    54→ GET / 200 in 41ms (compile: 2ms, render: 38ms)
+    55→ GET / 200 in 36ms (compile: 3ms, render: 33ms)
+    56→prisma:query SELECT 1
+    57→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    58→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    59→ GET /api/auth/me 200 in 21ms (compile: 6ms, render: 14ms)
+    60→ GET / 200 in 39ms (compile: 4ms, render: 35ms)
+    61→ GET / 200 in 37ms (compile: 5ms, render: 32ms)
+    62→prisma:query SELECT 1
+    63→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    64→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    65→ GET /api/auth/me 200 in 10ms (compile: 3ms, render: 7ms)
+    66→ GET / 200 in 39ms (compile: 4ms, render: 35ms)
+    67→ GET / 200 in 36ms (compile: 4ms, render: 32ms)
+    68→prisma:query SELECT 1
+    69→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    70→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    71→ GET /api/auth/me 200 in 8ms (compile: 2ms, render: 6ms)
+    72→ GET / 200 in 42ms (compile: 5ms, render: 37ms)
+    73→ GET / 200 in 299ms (compile: 4ms, render: 295ms)
+    74→prisma:query SELECT 1
+    75→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    76→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    77→ GET /api/auth/me 200 in 26ms (compile: 4ms, render: 21ms)
+    78→prisma:query SELECT 1
+    79→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+    80→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    81→ POST /api/auth/login 200 in 24ms (compile: 5ms, render: 18ms)
+    82→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    83→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    84→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    85→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    86→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    87→ GET /api/partners/dashboard 200 in 24ms (compile: 10ms, render: 14ms)
+    88→ GET /api/partners/dashboard 200 in 12ms (compile: 2ms, render: 10ms)
+    89→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    90→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    91→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    92→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    93→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    94→ GET /api/partners/referrals 200 in 59ms (compile: 47ms, render: 12ms)
+    95→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+    96→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+    97→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+    98→prisma:query SELECT 1
+    99→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   100→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   101→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   102→ GET /api/partners/commissions 200 in 47ms (compile: 38ms, render: 9ms)
+   103→ GET /api/partners/payouts 200 in 8ms (compile: 3ms, render: 6ms)
+   104→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   105→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   106→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   107→✓ Compiled in 244ms
+   108→✓ Compiled in 225ms
+   109→✓ Compiled in 202ms
+   110→✓ Compiled in 463ms
+   111→✓ Compiled in 116ms
+   112→ GET / 200 in 707ms (compile: 329ms, render: 378ms)
+   113→ GET / 200 in 489ms (compile: 139ms, render: 350ms)
+   114→prisma:query SELECT 1
+   115→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   116→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   117→ GET /api/auth/me 200 in 20ms (compile: 8ms, render: 12ms)
+   118→✓ Compiled in 120ms
+   119→✓ Compiled in 160ms
+   120→✓ Compiled in 401ms
+   121→✓ Compiled in 402ms
+   122→✓ Compiled in 205ms
+   123→✓ Compiled in 316ms
+   124→✓ Compiled in 221ms
+   125→✓ Compiled in 198ms
+   126→✓ Compiled in 292ms
+   127→✓ Compiled in 165ms
+   128→✓ Compiled in 150ms
+   129→✓ Compiled in 240ms
+   130→ GET / 200 in 200ms (compile: 56ms, render: 143ms)
+   131→ GET / 200 in 42ms (compile: 6ms, render: 35ms)
+   132→prisma:query SELECT 1
+   133→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   134→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   135→ GET /api/auth/me 200 in 13ms (compile: 3ms, render: 10ms)
+   136→prisma:query SELECT 1
+   137→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   138→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   139→ POST /api/auth/login 200 in 27ms (compile: 3ms, render: 24ms)
+   140→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   141→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   142→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   143→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   144→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   145→ GET /api/partners/dashboard 200 in 41ms (compile: 18ms, render: 23ms)
+   146→ GET /api/partners/dashboard 200 in 12ms (compile: 5ms, render: 7ms)
+   147→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   148→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   149→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   150→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   151→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   152→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   153→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   154→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   155→ GET /api/partners/commissions 200 in 9ms (compile: 3ms, render: 6ms)
+   156→ GET / 200 in 45ms (compile: 5ms, render: 40ms)
+   157→ GET / 200 in 33ms (compile: 4ms, render: 29ms)
+   158→ GET / 200 in 35ms (compile: 4ms, render: 31ms)
+   159→ GET /api/auth/me 200 in 30ms (compile: 11ms, render: 20ms)
+   160→prisma:query SELECT 1
+   161→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   162→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   163→✓ Compiled in 270ms
+   164→✓ Compiled in 153ms
+   165→✓ Compiled in 259ms
+   166→✓ Compiled in 154ms
+   167→✓ Compiled in 157ms
+   168→✓ Compiled in 204ms
+   169→prisma:query SELECT 1
+   170→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   171→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   172→ POST /api/auth/login 200 in 17ms (compile: 5ms, render: 12ms)
+   173→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   174→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   175→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   176→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   177→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   178→ GET /api/partners/dashboard 200 in 29ms (compile: 7ms, render: 23ms)
+   179→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   180→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   181→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   182→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   183→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   184→ GET /api/partners/dashboard 200 in 13ms (compile: 1789µs, render: 12ms)
+   185→✓ Compiled in 235ms
+   186→ GET / 200 in 327ms (compile: 67ms, render: 260ms)
+   187→ GET / 200 in 36ms (compile: 3ms, render: 33ms)
+   188→ GET / 200 in 48ms (compile: 5ms, render: 43ms)
+   189→prisma:query SELECT 1
+   190→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   191→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   192→ GET /api/auth/me 200 in 27ms (compile: 6ms, render: 21ms)
+   193→ GET / 200 in 169ms (compile: 6ms, render: 163ms)
+   194→prisma:query SELECT 1
+   195→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   196→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   197→ GET /api/auth/me 200 in 15ms (compile: 3ms, render: 12ms)
+   198→ GET / 200 in 177ms (compile: 4ms, render: 173ms)
+   199→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   200→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   201→ GET /api/auth/me 200 in 67ms (compile: 24ms, render: 43ms)
+   202→✓ Compiled in 281ms
+   203→✓ Compiled in 151ms
+   204→✓ Compiled in 175ms
+   205→✓ Compiled in 281ms
+   206→✓ Compiled in 231ms
+   207→✓ Compiled in 156ms
+   208→✓ Compiled in 282ms
+   209→✓ Compiled in 166ms
+   210→✓ Compiled in 306ms
+   211→✓ Compiled in 153ms
+   212→✓ Compiled in 231ms
+   213→✓ Compiled in 220ms
+   214→✓ Compiled in 144ms
+   215→✓ Compiled in 323ms
+   216→✓ Compiled in 251ms
+   217→✓ Compiled in 266ms
+   218→✓ Compiled in 275ms
+   219→✓ Compiled in 151ms
+   220→✓ Compiled in 189ms
+   221→✓ Compiled in 165ms
+   222→✓ Compiled in 230ms
+   223→ GET / 200 in 113ms (compile: 73ms, render: 40ms)
+   224→✓ Compiled in 182ms
+   225→ GET /?ref=PARTNER123 200 in 215ms (compile: 51ms, render: 164ms)
+   226→prisma:query SELECT 1
+   227→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   228→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   229→ GET /api/auth/me 200 in 8ms (compile: 1949µs, render: 6ms)
+   230→ GET / 200 in 36ms (compile: 3ms, render: 33ms)
+   231→ GET / 200 in 43ms (compile: 7ms, render: 36ms)
+   232→prisma:query SELECT 1
+   233→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   234→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   235→ GET /api/auth/me 200 in 12ms (compile: 3ms, render: 9ms)
+   236→prisma:query SELECT 1
+   237→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   238→ POST /api/auth/login 401 in 41ms (compile: 24ms, render: 17ms)
+   239→ GET / 200 in 51ms (compile: 3ms, render: 47ms)
+   240→prisma:query SELECT 1
+   241→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   242→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   243→ GET /api/auth/me 200 in 12ms (compile: 6ms, render: 6ms)
+   244→ GET / 200 in 39ms (compile: 8ms, render: 31ms)
+   245→ GET /api/auth/me 200 in 10ms (compile: 4ms, render: 6ms)
+   246→prisma:query SELECT 1
+   247→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   248→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   249→ GET / 200 in 86ms (compile: 4ms, render: 83ms)
+   250→prisma:query SELECT 1
+   251→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   252→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   253→ GET /api/auth/me 200 in 8ms (compile: 2ms, render: 6ms)
+   254→ GET / 200 in 38ms (compile: 7ms, render: 32ms)
+   255→prisma:query SELECT 1
+   256→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   257→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   258→ GET /api/auth/me 200 in 10ms (compile: 3ms, render: 6ms)
+   259→ GET / 200 in 42ms (compile: 4ms, render: 38ms)
+   260→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   261→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   262→ GET /api/auth/me 200 in 28ms (compile: 3ms, render: 25ms)
+   263→prisma:query SELECT 1
+   264→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   265→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   266→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   267→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   268→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   269→ GET /api/partners/dashboard 200 in 12ms (compile: 3ms, render: 8ms)
+   270→prisma:query SELECT 1
+   271→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   272→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   273→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   274→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   275→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   276→ GET /api/partners/dashboard 200 in 12ms (compile: 4ms, render: 8ms)
+   277→ GET /api/partners/referrals 200 in 11ms (compile: 1995µs, render: 9ms)
+   278→prisma:query SELECT 1
+   279→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   280→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   281→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   282→ GET / 200 in 58ms (compile: 7ms, render: 51ms)
+   283→ GET /api/auth/me 200 in 18ms (compile: 4ms, render: 14ms)
+   284→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   285→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   286→ GET / 200 in 137ms (compile: 6ms, render: 131ms)
+   287→prisma:query SELECT 1
+   288→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   289→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   290→ GET /api/auth/me 200 in 16ms (compile: 3ms, render: 13ms)
+   291→ GET / 200 in 50ms (compile: 5ms, render: 45ms)
+   292→ GET /api/auth/me 200 in 12ms (compile: 3ms, render: 9ms)
+   293→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   294→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   295→prisma:query SELECT 1
+   296→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   297→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   298→ POST /api/auth/login 200 in 10ms (compile: 2ms, render: 8ms)
+   299→ GET /api/partners/dashboard 200 in 28ms (compile: 2ms, render: 26ms)
+   300→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   301→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   302→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   303→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   304→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   305→ GET /api/partners/dashboard 200 in 10ms (compile: 3ms, render: 7ms)
+   306→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   307→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   308→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   309→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   310→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   311→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   312→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   313→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   314→ GET /api/partners/referrals 200 in 7ms (compile: 2ms, render: 5ms)
+   315→prisma:query SELECT 1
+   316→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   317→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   318→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   319→ GET /api/partners/commissions 200 in 9ms (compile: 3ms, render: 6ms)
+   320→prisma:query SELECT 1
+   321→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   322→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   323→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   324→ GET /api/partners/commissions 200 in 12ms (compile: 3ms, render: 8ms)
+   325→ GET /api/partners/dashboard 200 in 76ms (compile: 61ms, render: 14ms)
+   326→prisma:query SELECT 1
+   327→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   328→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   329→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   330→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   331→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   332→✓ Compiled in 1553ms
+   333→✓ Compiled in 227ms
+   334→✓ Compiled in 231ms
+   335→✓ Compiled in 150ms
+   336→✓ Compiled in 153ms
+   337→prisma:query SELECT 1
+   338→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   339→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   340→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   341→ GET /api/partners/commissions 200 in 114ms (compile: 102ms, render: 12ms)
+   342→✓ Compiled in 243ms
+   343→✓ Compiled in 182ms
+   344→✓ Compiled in 180ms
+   345→✓ Compiled in 152ms
+   346→✓ Compiled in 160ms
+   347→✓ Compiled in 168ms
+   348→✓ Compiled in 115ms
+   349→✓ Compiled in 116ms
+   350→✓ Compiled in 206ms
+   351→prisma:query SELECT 1
+   352→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   353→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   354→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   355→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   356→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   357→ GET /api/partners/dashboard 200 in 19ms (compile: 3ms, render: 16ms)
+   358→✓ Compiled in 161ms
+   359→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   360→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   361→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   362→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   363→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   364→ GET /api/partners/dashboard 200 in 16ms (compile: 10ms, render: 7ms)
+   365→ GET / 200 in 319ms (compile: 56ms, render: 263ms)
+   366→prisma:query SELECT 1
+   367→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   368→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   369→ GET /api/auth/me 200 in 18ms (compile: 5ms, render: 13ms)
+   370→ GET / 200 in 104ms (compile: 10ms, render: 94ms)
+   371→ GET /api/auth/me 200 in 13ms (compile: 2ms, render: 10ms)
+   372→prisma:query SELECT 1
+   373→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   374→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   375→✓ Compiled in 163ms
+   376→⚠ Fast Refresh had to perform a full reload due to a runtime error.
+   377→✓ Compiled in 272ms
+   378→prisma:query SELECT 1
+   379→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   380→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   381→ GET /api/auth/me 200 in 26ms (compile: 5ms, render: 21ms)
+   382→ GET / 200 in 574ms (compile: 131ms, render: 443ms)
+   383→ GET /api/auth/me 200 in 15ms (compile: 4ms, render: 11ms)
+   384→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   385→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   386→ GET / 200 in 45ms (compile: 4ms, render: 41ms)
+   387→prisma:query SELECT 1
+   388→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   389→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   390→ GET /api/auth/me 200 in 16ms (compile: 2ms, render: 14ms)
+   391→ GET / 200 in 45ms (compile: 3ms, render: 42ms)
+   392→ GET /api/auth/me 200 in 36ms (compile: 3ms, render: 33ms)
+   393→prisma:query SELECT 1
+   394→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   395→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   396→✓ Compiled in 186ms
+   397→ GET / 200 in 347ms (compile: 62ms, render: 285ms)
+   398→ GET /api/auth/me 200 in 73ms (compile: 3ms, render: 71ms)
+   399→prisma:query SELECT 1
+   400→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   401→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   402→✓ Compiled in 272ms
+   403→⚠ Fast Refresh had to perform a full reload due to a runtime error.
+   404→prisma:query SELECT 1
+   405→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   406→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   407→ GET /api/auth/me 200 in 27ms (compile: 7ms, render: 20ms)
+   408→✓ Compiled in 169ms
+   409→ GET / 200 in 424ms (compile: 123ms, render: 301ms)
+   410→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   411→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   412→ GET /api/auth/me 200 in 14ms (compile: 5ms, render: 9ms)
+   413→ GET / 200 in 46ms (compile: 7ms, render: 40ms)
+   414→prisma:query SELECT 1
+   415→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   416→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   417→ GET /api/auth/me 200 in 23ms (compile: 3ms, render: 20ms)
+   418→ GET / 200 in 131ms (compile: 5ms, render: 126ms)
+   419→prisma:query SELECT 1
+   420→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   421→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   422→ GET /api/auth/me 200 in 10ms (compile: 4ms, render: 6ms)
+   423→ GET / 200 in 51ms (compile: 6ms, render: 46ms)
+   424→prisma:query SELECT 1
+   425→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   426→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   427→ GET /api/auth/me 200 in 11ms (compile: 3ms, render: 8ms)
+   428→ GET / 200 in 46ms (compile: 6ms, render: 39ms)
+   429→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   430→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   431→ GET /api/auth/me 200 in 50ms (compile: 6ms, render: 43ms)
+   432→prisma:query SELECT 1
+   433→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   434→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   435→ POST /api/auth/login 200 in 25ms (compile: 4ms, render: 21ms)
+   436→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   437→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   438→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   439→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   440→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   441→ GET /api/partners/dashboard 200 in 74ms (compile: 9ms, render: 65ms)
+   442→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   443→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   444→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   445→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   446→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   447→ GET /api/partners/dashboard 200 in 12ms (compile: 3ms, render: 9ms)
+   448→ GET /api/partners/payouts 200 in 74ms (compile: 61ms, render: 14ms)
+   449→prisma:query SELECT 1
+   450→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   451→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   452→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   453→ POST /api/auth/logout 200 in 56ms (compile: 52ms, render: 5ms)
+   454→ GET / 200 in 34ms (compile: 2ms, render: 31ms)
+   455→ GET / 200 in 32ms (compile: 5ms, render: 27ms)
+   456→ GET / 200 in 61ms (compile: 6ms, render: 55ms)
+   457→prisma:query SELECT 1
+   458→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   459→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   460→ GET /api/auth/me 200 in 21ms (compile: 3ms, render: 18ms)
+   461→ GET / 200 in 84ms (compile: 4ms, render: 80ms)
+   462→prisma:query SELECT 1
+   463→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   464→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   465→ GET /api/auth/me 200 in 22ms (compile: 10ms, render: 12ms)
+   466→ GET / 200 in 67ms (compile: 5ms, render: 62ms)
+   467→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   468→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   469→ GET /api/auth/me 200 in 8ms (compile: 3ms, render: 6ms)
+   470→ GET / 200 in 52ms (compile: 4ms, render: 48ms)
+   471→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   472→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   473→ GET /api/auth/me 200 in 17ms (compile: 4ms, render: 13ms)
+   474→prisma:query SELECT 1
+   475→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   476→ POST /api/auth/login 401 in 17ms (compile: 7ms, render: 10ms)
+   477→ POST /api/auth/login 200 in 22ms (compile: 4ms, render: 18ms)
+   478→prisma:query SELECT 1
+   479→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   480→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   481→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   482→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   483→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   484→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   485→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   486→ GET /api/partners/dashboard 200 in 14ms (compile: 3ms, render: 11ms)
+   487→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   488→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   489→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   490→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   491→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   492→ GET /api/partners/dashboard 200 in 33ms (compile: 8ms, render: 25ms)
+   493→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   494→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   495→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   496→ GET /api/partners/referrals 200 in 95ms (compile: 77ms, render: 18ms)
+   497→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   498→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   499→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   500→ GET /api/partners/commissions 200 in 13ms (compile: 3ms, render: 10ms)
+   501→prisma:query SELECT 1
+   502→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   503→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   504→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   505→ GET /api/partners/payouts 200 in 14ms (compile: 3ms, render: 12ms)
+   506→ GET / 200 in 353ms (compile: 6ms, render: 347ms)
+   507→ GET /api/auth/me 200 in 44ms (compile: 4ms, render: 41ms)
+   508→prisma:query SELECT 1
+   509→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   510→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   511→ GET / 200 in 71ms (compile: 4ms, render: 67ms)
+   512→ GET /api/auth/me 200 in 11ms (compile: 2ms, render: 9ms)
+   513→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   514→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   515→✓ Compiled in 0ms
+   516→ GET / 200 in 413ms (compile: 184ms, render: 229ms)
+   517→ GET / 200 in 206ms (compile: 3ms, render: 204ms)
+   518→prisma:query SELECT 1
+   519→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   520→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   521→ GET /api/auth/me 200 in 14ms (compile: 3ms, render: 11ms)
+   522→✓ Compiled in 282ms
+   523→✓ Compiled in 162ms
+   524→✓ Compiled in 280ms
+   525→✓ Compiled in 179ms
+   526→✓ Compiled in 164ms
+   527→✓ Compiled in 179ms
+   528→✓ Compiled in 227ms
+   529→✓ Compiled in 366ms
+   530→✓ Compiled in 140ms
+   531→✓ Compiled in 258ms
+   532→✓ Compiled in 352ms
+   533→✓ Compiled in 335ms
+   534→✓ Compiled in 140ms
+   535→✓ Compiled in 138ms
+   536→✓ Compiled in 160ms
+   537→✓ Compiled in 297ms
+   538→✓ Compiled in 145ms
+   539→✓ Compiled in 189ms
+   540→✓ Compiled in 1238ms
+   541→✓ Compiled in 128ms
+   542→✓ Compiled in 167ms
+   543→ GET / 200 in 203ms (compile: 114ms, render: 88ms)
+   544→✓ Compiled in 828ms
+   545→✓ Compiled in 143ms
+   546→ GET / 200 in 279ms (compile: 52ms, render: 227ms)
+   547→ GET / 200 in 97ms (compile: 7ms, render: 90ms)
+   548→prisma:query SELECT 1
+   549→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   550→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   551→ GET /api/auth/me 200 in 17ms (compile: 2ms, render: 15ms)
+   552→prisma:query SELECT 1
+   553→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   554→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   555→ POST /api/auth/login 200 in 27ms (compile: 10ms, render: 17ms)
+   556→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   557→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   558→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   559→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   560→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   561→ GET /api/partners/dashboard 200 in 63ms (compile: 40ms, render: 23ms)
+   562→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   563→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   564→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   565→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   566→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   567→ GET /api/partners/dashboard 200 in 36ms (compile: 9ms, render: 27ms)
+   568→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   569→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   570→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   571→ GET /api/partners/commissions 200 in 44ms (compile: 3ms, render: 41ms)
+   572→ GET /api/partners/commissions 200 in 10ms (compile: 2ms, render: 8ms)
+   573→prisma:query SELECT 1
+   574→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   575→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   576→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   577→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   578→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   579→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   580→ GET /api/partners/commissions 200 in 10ms (compile: 5ms, render: 6ms)
+   581→ GET / 200 in 58ms (compile: 5ms, render: 53ms)
+   582→ GET /api/auth/me 200 in 15ms (compile: 5ms, render: 10ms)
+   583→prisma:query SELECT 1
+   584→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   585→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   586→ GET / 200 in 159ms (compile: 8ms, render: 152ms)
+   587→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   588→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   589→ GET /api/auth/me 200 in 42ms (compile: 17ms, render: 26ms)
+   590→ GET / 200 in 55ms (compile: 8ms, render: 47ms)
+   591→prisma:query SELECT 1
+   592→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   593→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   594→ GET /api/auth/me 200 in 23ms (compile: 5ms, render: 18ms)
+   595→ GET / 200 in 49ms (compile: 12ms, render: 36ms)
+   596→ GET /api/auth/me 200 in 54ms (compile: 11ms, render: 43ms)
+   597→prisma:query SELECT 1
+   598→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   599→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   600→ GET / 200 in 74ms (compile: 4ms, render: 70ms)
+   601→ GET /api/auth/me 200 in 12ms (compile: 2ms, render: 10ms)
+   602→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   603→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   604→prisma:query SELECT 1
+   605→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   606→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   607→ POST /api/auth/login 200 in 9ms (compile: 2ms, render: 6ms)
+   608→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   609→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   610→ POST /api/auth/login 200 in 10ms (compile: 3ms, render: 7ms)
+   611→ GET / 200 in 53ms (compile: 6ms, render: 47ms)
+   612→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   613→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   614→ GET /api/auth/me 200 in 23ms (compile: 6ms, render: 17ms)
+   615→prisma:query SELECT 1
+   616→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   617→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   618→ POST /api/auth/login 200 in 9ms (compile: 2ms, render: 6ms)
+   619→ GET / 200 in 45ms (compile: 4ms, render: 41ms)
+   620→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   621→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   622→ GET /api/auth/me 200 in 47ms (compile: 3ms, render: 43ms)
+   623→ GET / 200 in 44ms (compile: 3ms, render: 41ms)
+   624→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   625→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   626→ GET /api/auth/me 200 in 12ms (compile: 2ms, render: 10ms)
+   627→ GET / 200 in 53ms (compile: 10ms, render: 44ms)
+   628→prisma:query SELECT 1
+   629→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   630→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   631→ GET /api/auth/me 200 in 54ms (compile: 3ms, render: 50ms)
+   632→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   633→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   634→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   635→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   636→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   637→ GET /api/partners/dashboard 200 in 10ms (compile: 2ms, render: 8ms)
+   638→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   639→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   640→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   641→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   642→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   643→ GET /api/partners/dashboard 200 in 15ms (compile: 3ms, render: 13ms)
+   644→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   645→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   646→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   647→ GET /api/partners/commissions 200 in 18ms (compile: 9ms, render: 9ms)
+   648→ GET / 200 in 136ms (compile: 7ms, render: 129ms)
+   649→ GET /api/auth/me 200 in 14ms (compile: 3ms, render: 11ms)
+   650→prisma:query SELECT 1
+   651→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   652→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   653→ GET /api/partners/dashboard 200 in 10ms (compile: 3ms, render: 7ms)
+   654→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   655→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   656→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   657→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   658→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   659→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   660→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   661→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   662→ GET /api/partners/commissions 200 in 18ms (compile: 1918µs, render: 16ms)
+   663→ GET / 200 in 137ms (compile: 4ms, render: 133ms)
+   664→prisma:query SELECT 1
+   665→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   666→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   667→ GET /api/auth/me 200 in 35ms (compile: 2ms, render: 32ms)
+   668→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   669→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   670→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   671→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   672→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   673→ GET /api/partners/dashboard 200 in 42ms (compile: 4ms, render: 39ms)
+   674→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   675→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   676→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   677→ GET /api/partners/payouts 200 in 16ms (compile: 2ms, render: 13ms)
+   678→ GET / 200 in 34ms (compile: 3ms, render: 32ms)
+   679→prisma:query SELECT 1
+   680→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   681→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   682→ GET /api/auth/me 200 in 9ms (compile: 3ms, render: 6ms)
+   683→✓ Compiled in 164ms
+   684→✓ Compiled in 237ms
+   685→✓ Compiled in 263ms
+   686→✓ Compiled in 203ms
+   687→✓ Compiled in 245ms
+   688→✓ Compiled in 416ms
+   689→✓ Compiled in 218ms
+   690→✓ Compiled in 261ms
+   691→✓ Compiled in 157ms
+   692→✓ Compiled in 161ms
+   693→✓ Compiled in 200ms
+   694→ GET / 200 in 241ms (compile: 56ms, render: 185ms)
+   695→ GET / 200 in 59ms (compile: 4ms, render: 55ms)
+   696→prisma:query SELECT 1
+   697→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   698→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   699→ GET /api/auth/me 200 in 16ms (compile: 3ms, render: 13ms)
+   700→✓ Compiled in 320ms
+   701→ GET / 200 in 39ms (compile: 5ms, render: 35ms)
+   702→ GET / 200 in 38ms (compile: 2ms, render: 35ms)
+   703→prisma:query SELECT 1
+   704→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   705→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   706→ GET /api/auth/me 200 in 18ms (compile: 5ms, render: 12ms)
+   707→ GET / 200 in 61ms (compile: 9ms, render: 51ms)
+   708→prisma:query SELECT 1
+   709→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   710→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   711→ GET /api/auth/me 200 in 33ms (compile: 3ms, render: 30ms)
+   712→ GET / 200 in 110ms (compile: 5ms, render: 106ms)
+   713→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   714→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   715→ GET /api/auth/me 200 in 15ms (compile: 3ms, render: 12ms)
+   716→ GET / 200 in 281ms (compile: 4ms, render: 278ms)
+   717→prisma:query SELECT 1
+   718→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   719→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   720→ GET /api/auth/me 200 in 20ms (compile: 6ms, render: 14ms)
+   721→prisma:query SELECT 1
+   722→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   723→ POST /api/auth/login 401 in 15ms (compile: 3ms, render: 12ms)
+   724→prisma:query SELECT 1
+   725→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   726→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   727→ GET /api/auth/me 200 in 8ms (compile: 3ms, render: 5ms)
+   728→prisma:query SELECT 1
+   729→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   730→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   731→ POST /api/auth/login 200 in 13ms (compile: 6ms, render: 8ms)
+   732→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   733→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   734→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   735→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   736→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   737→ GET /api/partners/dashboard 200 in 12ms (compile: 1958µs, render: 10ms)
+   738→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   739→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   740→prisma:query SELECT `main`.`Referral`.`id`, `main`.`Referral`.`partnerId`, `main`.`Referral`.`referredEmail`, `main`.`Referral`.`referredName`, `main`.`Referral`.`plan`, `main`.`Referral`.`status`, `main`.`Referral`.`createdAt`, `main`.`Referral`.`updatedAt` FROM `main`.`Referral` WHERE `main`.`Referral`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   741→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   742→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   743→ GET /api/partners/dashboard 200 in 35ms (compile: 4ms, render: 31ms)
+   744→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   745→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   746→prisma:query SELECT `main`.`Commission`.`id`, `main`.`Commission`.`partnerId`, `main`.`Commission`.`referralId`, `main`.`Commission`.`amount`, `main`.`Commission`.`currency`, `main`.`Commission`.`status`, `main`.`Commission`.`period`, `main`.`Commission`.`createdAt` FROM `main`.`Commission` WHERE `main`.`Commission`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   747→ GET /api/partners/commissions 200 in 26ms (compile: 18ms, render: 8ms)
+   748→prisma:query SELECT 1
+   749→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE 1=1 ORDER BY `main`.`User`.`createdAt` DESC LIMIT ? OFFSET ?
+   750→prisma:query SELECT `main`.`Partner`.`id`, `main`.`Partner`.`userId`, `main`.`Partner`.`referralCode`, `main`.`Partner`.`status`, `main`.`Partner`.`createdAt`, `main`.`Partner`.`updatedAt` FROM `main`.`Partner` WHERE `main`.`Partner`.`userId` IN (?) LIMIT ? OFFSET ?
+   751→prisma:query SELECT `main`.`Payout`.`id`, `main`.`Payout`.`partnerId`, `main`.`Payout`.`amount`, `main`.`Payout`.`currency`, `main`.`Payout`.`status`, `main`.`Payout`.`method`, `main`.`Payout`.`createdAt`, `main`.`Payout`.`paidAt` FROM `main`.`Payout` WHERE `main`.`Payout`.`partnerId` IN (?) LIMIT ? OFFSET ?
+   752→ GET /api/partners/payouts 200 in 10ms (compile: 3ms, render: 7ms)
+   753→ POST /api/auth/logout 200 in 9ms (compile: 4ms, render: 5ms)
+   754→prisma:query SELECT 1
+   755→prisma:query SELECT `main`.`User`.`id`, `main`.`User`.`email`, `main`.`User`.`name`, `main`.`User`.`password`, `main`.`User`.`createdAt`, `main`.`User`.`updatedAt` FROM `main`.`User` WHERE (`main`.`User`.`email` = ? AND 1=1) LIMIT ? OFFSET ?
+   756→ POST /api/auth/forgot-password 200 in 13ms (compile: 4ms, render: 9ms)
+   757→✓ Compiled in 216ms
+   758→✓ Compiled in 236ms
+   759→✓ Compiled in 391ms
+   760→✓ Compiled in 415ms
+   761→✓ Compiled in 195ms
+   762→✓ Compiled in 113ms
+   763→✓ Compiled in 211ms
+   764→✓ Compiled in 143ms
+   765→✓ Compiled in 138ms
+   766→✓ Compiled in 491ms
+   767→✓ Compiled in 327ms
+   768→
