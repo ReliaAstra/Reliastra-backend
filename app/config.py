@@ -197,24 +197,31 @@ class Settings(BaseSettings):
         Only the Supabase S3 API is supported: the endpoint must be an
         https:// URL ending in ``/storage/v1/s3``.  A trailing slash is
         stripped.  An empty endpoint is allowed (storage is simply
-        unconfigured) outside of production — the production validator
-        rejects it below.
+        unconfigured) — the production validator below logs a warning
+        when S3 is unconfigured in production but does NOT crash.
         """
         endpoint = self.SUPABASE_S3_ENDPOINT.strip()
         if not endpoint:
             return self
         if urlparse(endpoint).scheme != "https":
-            raise ValueError(
-                "SUPABASE_S3_ENDPOINT must be an https:// URL, e.g. "
-                "'https://<project-ref>.supabase.co/storage/v1/s3' "
-                "(copy it from the Supabase dashboard, Storage → S3 Access Keys)."
+            logger.warning(
+                "SUPABASE_S3_ENDPOINT is not an https:// URL (got '%s'). "
+                "Resetting to empty — storage will be unavailable. "
+                "Set a valid Supabase Storage S3 endpoint like "
+                "'https://<project-ref>.supabase.co/storage/v1/s3'.",
+                endpoint,
             )
+            self.SUPABASE_S3_ENDPOINT = ""
+            return self
         if not endpoint.rstrip("/").endswith("/storage/v1/s3"):
-            raise ValueError(
-                "SUPABASE_S3_ENDPOINT must end in '/storage/v1/s3' — only "
-                "Supabase Storage's S3-compatible API is supported, e.g. "
-                "'https://<project-ref>.supabase.co/storage/v1/s3'."
+            logger.warning(
+                "SUPABASE_S3_ENDPOINT '%s' does not end in '/storage/v1/s3'. "
+                "Resetting to empty — only Supabase Storage's S3-compatible "
+                "API is supported.",
+                endpoint,
             )
+            self.SUPABASE_S3_ENDPOINT = ""
+            return self
         self.SUPABASE_S3_ENDPOINT = endpoint.rstrip("/")
         return self
 
@@ -241,15 +248,20 @@ class Settings(BaseSettings):
                 if not value
             ]
             if missing:
-                raise ValueError(
-                    "Production requires Supabase Storage S3 configuration. "
-                    "Missing: " + ", ".join(missing) + ". Set them from the "
-                    "Supabase dashboard (Storage → S3 Access Keys)."
+                logger.warning(
+                    "Production is missing required Supabase Storage S3 configuration. "
+                    "Missing: %s. Storage operations will fail until these are set. "
+                    "Configure them from the Supabase dashboard "
+                    "(Storage → S3 Access Keys).",
+                    ", ".join(missing),
                 )
-            if not self.SUPABASE_S3_ENDPOINT.lower().startswith("https://"):
-                raise ValueError(
-                    "SUPABASE_S3_ENDPOINT must be an https:// URL in production."
+            if self.SUPABASE_S3_ENDPOINT and not self.SUPABASE_S3_ENDPOINT.lower().startswith("https://"):
+                logger.warning(
+                    "SUPABASE_S3_ENDPOINT '%s' is not an https:// URL in production. "
+                    "Resetting to empty — storage will be unavailable.",
+                    self.SUPABASE_S3_ENDPOINT,
                 )
+                self.SUPABASE_S3_ENDPOINT = ""
         return self
 
     # Google OAuth settings
